@@ -890,7 +890,7 @@
 
     var THREE = await import('https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.min.js');
 
-    var panelHeight = 0.42; // 1 is the full height of the section
+    var panelHeight = 0.55; // 1 is the full height of the section (78svh on the test page, so this is about 43svh)
     var panelGap = 40; // px between images
     var wheel = 'horizontal'; // "horizontal" | "all" | "off"
 
@@ -915,12 +915,13 @@
     var lensVignette = 0; // darkens the corners of the section, 0 to 1
     var lensShimmer = true; // animates the ring
 
-    // Intro: once the text is in, the row pops in from nothing (like the ECHO tornado)
+    // Intro: once the text is in, every image grows from nothing to fill its own place in the
+    // row, like the photos on the ECHO site: the middle one first, the neighbours just after
     var introDelay = 1.6; // seconds after the page is ready, so the text comes first
-    var introDuration = 1.3; // seconds for the pop
-    var introEase = 'back.out(1.4)'; // overshoots a little, then settles (ECHO's tornado used expo.out)
-    var introSpread = 0.1; // delay per panel away from the middle, as a share of the intro
-    var introCaptionDelay = 0.6; // caption and counter follow after this many seconds
+    var introDuration = 1.6; // seconds for one image to grow
+    var introEase = 'expo.out';
+    var introSpread = 0.08; // delay per panel away from the middle, as a share of the intro
+    var introCaptionDelay = 0.6; // the caption follows after this many seconds
 
     // Autoplay: the row rolls left on its own and pauses while you touch it
     var autoDrift = 16; // px per second, 0 switches it off
@@ -1131,7 +1132,7 @@
       var loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
 
-      // Intro state: 0 = nothing there yet, 1 = in place (it passes 1 for a moment: the pop)
+      // Intro state: 0 = nothing there yet, 1 = every image at full size
       var intro = { value: 0 };
       var introStarted = false;
       var introDone = false;
@@ -1393,13 +1394,11 @@
             return;
           }
 
-          // Intro: the row pops in from nothing, the middle first and the neighbours just after
+          // Intro: each image grows in place, from nothing to its full size, the middle one first
           var grow = 1;
           if (!introDone) {
             var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
-            var f = (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread);
-            grow = Math.max(0, f); // passes 1 for a moment: that is the pop
-            centerX *= gsap.utils.clamp(0, 1, f);
+            grow = gsap.utils.clamp(0, 1, (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread));
           }
 
           var shrink = (1 - 0.25 * scrollEnergy) * grow;
@@ -1759,7 +1758,7 @@
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
 
-  if (path === '/') run('home', rdHome);
+  if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
   else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);
   else if (path === '/work') run('work', rdWork);
   else if (path.indexOf('/work/') === 0) run('case study', rdWorkItem);
