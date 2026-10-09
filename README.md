@@ -9,7 +9,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
-  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.0.0/main.min.js"></script>`
+  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.0.1/main.min.js"></script>`
   (jsDelivr builds `main.min.js` from `main.js` automatically)
 
 | Section | Runs on | Was Slater file |
@@ -20,8 +20,9 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdService` | `/service`, `/locations/…` | 35312 SERVICE.js |
 | `rdWork` | `/work` | 35413 WORK.js |
 | `rdWorkItem` | `/work/…` | 35499 PortFolioContent.js |
-| `rdNewsletter` | `/branding-brilliance-newsletter` | 35515 BOOKED CALL / NEWSL..js |
+| `rdNewsletter` | `/branding-brilliance-newsletter`, `/call-is-booked` | 35515 BOOKED CALL / NEWSL..js |
 | `rdResources` | `/resources` | 37087 RESOURCES.js |
+| `rdQuiz` | `/rimbo-quiz` | 35662 QUIZ .js |
 
 Not in here (still inline in Webflow): the Lenis setup in the site footer, Google tags,
 and a few page snippets (Cal.com + a second Lenis on /contact, the letter effect on
