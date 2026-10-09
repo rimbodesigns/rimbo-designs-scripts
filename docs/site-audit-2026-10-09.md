@@ -193,3 +193,31 @@ renaming (same name, different meaning per place).
 6. Case-study videos re-exported ≤ 2 MB; the Service/Locations background video too. *(you)*
 7. Assets panel: delete unused (≈ 200 MB), rename scratch files, folders. *(you)*
 8. GTM: one GA tag, load later. Fonts: Grifter as WOFF2, RM Mono licence. *(you)*
+
+## Done on 2026-10-09 (evening) — on staging, not yet live
+
+- **Images**: 12 page PNG/JPEGs converted to AVIF in place with Webflow's compressor:
+  7.9 MB → 0.45 MB (`TEST^%6.png` failed to convert and stays PNG). Originals are in
+  `_backup/images-before-avif/`.
+- **Alt text**: both cover fields of all 25 blog posts ("<title> – article cover"); 34
+  static assets (service tier boards, marquee covers, case-study visuals, brand boards);
+  9 Work-page preview images at element level. The "Top 50 Best Websites" post has
+  unpublished draft changes, so its alt only goes live when that item is published.
+- **Classes** (renamed everywhere via the API): `testiimonial_name`→`testimonial_name`,
+  `progession-bar`→`progress_bar`, `service_item_containter`→`service_item-container`,
+  `tesxtslide`→`text_slide`, `greytext`→`text-color-grey`, `form-2`→`form_main`,
+  `email_2-0`→`newsletter_wrapper`, `locales-list-2`→`locale_list`,
+  `collection-list-3`→`blog_list`, `slide-nav-2`→`slider_nav`, `text-block-5`→`text-style-tag`,
+  `_50`→`split_half`, `_4rem_top_mobile`→`spacer_mobile`, `_80vh`→`spacer_hero`; combos
+  `white`→`is-white`, `hidden`→`is-hidden`, `noselect`→`is-noselect`, `_2rem_left`→`is-padding-right`,
+  `_1remtop`→`is-margin-top`, `_0top-bot`→`is-no-padding`, `_100-_work`→`is-full-width`,
+  `show_9`→`is-collapsed`, `_1200`→`is-max-1200`, `_2-0`→`is-outlined`.
+  Not renamed: `heading-style-h6-2` (a `heading-style-h6` exists and is in use somewhere),
+  `service_copy` (`service_content` exists), the `_2`/`_1`… combos and `div-block-*`
+  (need a look per element), Osmo BEM and Relume classes (left on purpose).
+- **Accessibility/SEO**: `aria-label="staggering button"` removed from all 22 button
+  elements (nav, footer, blog, story, FAQ components + Service, Locations, Work pages);
+  H1s fixed on /seo-pricing (title H1, sections H2, prices H3), theFactor.e (3 → H3),
+  4 Levels component (H2); Muzammil Hussain description corrected.
+- **Fonts**: Grifter Bold served as WOFF2 (61 KB OTF → 20 KB, same font record);
+  RM Mono trial replaced by the licensed file (uploaded by Rimbo).
