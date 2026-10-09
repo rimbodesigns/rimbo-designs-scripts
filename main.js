@@ -420,6 +420,45 @@
   }
 
   // =========================================================
+  // MENU — every page: the burger menu's links rise in letter by letter,
+  // like the hero titles. The Webflow interaction keeps doing the fade and
+  // the burger animation; this only adds the letters.
+  // =========================================================
+  function rdMenu() {
+    var nav = qs('.nav');
+    var links = qsa('.pop-up_nav_menu .nav_link');
+    if (!nav || !links.length) return;
+
+    var chars = [];
+    links.forEach(function (link) {
+      var pieces = split(link);
+      gsap.set(pieces.lines, { overflow: 'hidden' }); // the line masks the letters while they rise
+      chars = chars.concat(pieces.chars);
+    });
+    gsap.set(chars, { yPercent: 110 });
+
+    function reveal() {
+      gsap.fromTo(chars, { yPercent: 110 }, {
+        yPercent: 0,
+        duration: 0.9,
+        ease: 'expo.out',
+        stagger: 0.02,
+        delay: 0.15,
+        overwrite: true
+      });
+    }
+
+    // The interaction switches .nav from display:none to flex once the burger
+    // has animated; that moment is the cue to start.
+    var open = false;
+    new MutationObserver(function () {
+      var visible = getComputedStyle(nav).display !== 'none';
+      if (visible && !open) reveal();
+      open = visible;
+    }).observe(nav, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  // =========================================================
   // LENIS — smooth scroll on every page (was the inline block in the Webflow footer)
   // =========================================================
   function rdLenis() {
@@ -434,9 +473,9 @@
     if (ownInstance) {
       instance = new Lenis(LENIS_OPTIONS);
       // Drive Lenis from GSAP's ticker so scrolling and animations share one frame
+      // (GSAP's lag smoothing stays on: after a stall, animations continue instead of jumping)
       instance.on('scroll', ScrollTrigger.update);
       gsap.ticker.add(function (time) { instance.raf(time * 1000); });
-      gsap.ticker.lagSmoothing(0);
     }
     window.lenis = instance;
     if (!ownInstance) return;
@@ -855,6 +894,7 @@
 
   run('global', rdGlobal);
   run('form validation', rdFormValidation);
+  run('menu', rdMenu);
 
   if (path === '/') run('home', rdHome);
   else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);

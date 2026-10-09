@@ -8,13 +8,14 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
-  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.1.0/main.min.js"></script>`
+  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.2.0/main.min.js"></script>`
   (jsDelivr builds `main.min.js` from `main.js` automatically)
 
 | Section | Runs on | Came from |
 | --- | --- | --- |
 | `rdGlobal` | every page | 35206 GLOBAL.js |
 | `rdFormValidation` | every page | 39499 FORM CODE.js |
+| `rdMenu` | every page | new: the burger menu's links rise in letter by letter |
 | `rdLenis` | every page | the inline Lenis block in the Webflow footer |
 | `rdHome` | `/` | 35211 HOME.js |
 | `rdService` | `/service`, `/locations/…` | 35312 SERVICE.js |
