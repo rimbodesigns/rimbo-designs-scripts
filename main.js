@@ -915,11 +915,17 @@
     var lensVignette = 0; // darkens the corners of the section, 0 to 1
     var lensShimmer = true; // animates the ring
 
-    // Intro
-    var introDuration = 1.8; // seconds for the spread
-    var introSpread = 0.12; // delay per panel away from the centre, as a share of the intro
-    var introStartScale = 0.15; // panels start this big
-    var introCaptionDelay = 0.9; // caption and counter fade in after this many seconds
+    // Intro: once the text is in, the row pops in from nothing (like the ECHO tornado)
+    var introDelay = 1.6; // seconds after the page is ready, so the text comes first
+    var introDuration = 1.3; // seconds for the pop
+    var introEase = 'back.out(1.4)'; // overshoots a little, then settles (ECHO's tornado used expo.out)
+    var introSpread = 0.1; // delay per panel away from the middle, as a share of the intro
+    var introCaptionDelay = 0.6; // caption and counter follow after this many seconds
+
+    // Autoplay: the row rolls left on its own and pauses while you touch it
+    var autoDrift = 16; // px per second, 0 switches it off
+    var driftResume = 2.5; // seconds of quiet after an interaction before it rolls again
+    var driftEase = 0.12;
 
     // Finer shader detail, rarely worth touching
     var lensNovaSize = 12;
@@ -1125,19 +1131,40 @@
       var loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
 
-      // Intro state: 0 = everything stacked in the middle, 1 = in place
+      // Intro state: 0 = nothing there yet, 1 = in place (it passes 1 for a moment: the pop)
       var intro = { value: 0 };
       var introStarted = false;
+      var introDone = false;
+      var introQueued = false;
+      var textureReady = false;
+      var readyAt = performance.now();
       if (captionEl) gsap.set(captionEl, { autoAlpha: 0 });
       if (counterEl) gsap.set(counterEl, { autoAlpha: 0 });
 
       function startIntro() {
         if (introStarted) return;
         introStarted = true;
-        gsap.to(intro, { value: 1, duration: introDuration, ease: 'expo.out' });
+        gsap.to(intro, {
+          value: 1,
+          duration: introDuration,
+          ease: introEase,
+          onComplete: function () {
+            intro.value = 1;
+            introDone = true;
+            lastInput = performance.now(); // the drift starts driftResume seconds after the pop
+          }
+        });
         gsap.to([captionEl, counterEl].filter(Boolean), {
           autoAlpha: 1, duration: 0.8, ease: 'power2.out', delay: introCaptionDelay, overwrite: true
         });
+      }
+
+      // The pop waits for two things: the first texture, and introDelay seconds after the page was ready
+      function queueIntro() {
+        if (introQueued || !textureReady) return;
+        introQueued = true;
+        var wait = Math.max(0, introDelay - (performance.now() - readyAt) / 1000);
+        gsap.delayedCall(wait, startIntro);
       }
 
       function fitToPanel(image) {
@@ -1174,8 +1201,9 @@
             scroll = centerForIndex(0);
             target = scroll;
           }
-          // The first texture is in: the panels have something to show, so spread them out
-          startIntro();
+          // The first texture is in: the panels have something to show
+          textureReady = true;
+          queueIntro();
         }, undefined, function () {
           console.warn('Glass Carousel: image failed to load', url);
         });
@@ -1193,6 +1221,7 @@
         var widest = 1;
         for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
         panelH = Math.min(H * panelHeight, (W * panelWidthMax) / widest);
+        wrapper.style.setProperty('--glass-carousel-panel', Math.round(panelH) + 'px'); // the CSS puts the caption under the row
       }
       measurePanel();
 
@@ -1309,7 +1338,7 @@
       lensScene.add(lensQuad);
 
       function lensSize() { // the lens opens with the intro
-        var s = 0.05 + 0.95 * intro.value;
+        var s = 0.05 + 0.95 * Math.min(1, intro.value);
         lensUniforms.uSizeX.value = (narrow ? lensWidthNarrow : lensWidth) * (W / H) * s;
         lensUniforms.uSizeY.value = (narrow ? lensHeightNarrow : lensHeight) * (W / H) * s;
       }
@@ -1364,11 +1393,14 @@
             return;
           }
 
-          // Intro: panels further from the middle start later, each grows while it travels
-          var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
-          var f = gsap.utils.clamp(0, 1, (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread));
-          var grow = introStartScale + (1 - introStartScale) * f;
-          centerX *= f;
+          // Intro: the row pops in from nothing, the middle first and the neighbours just after
+          var grow = 1;
+          if (!introDone) {
+            var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
+            var f = (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread);
+            grow = Math.max(0, f); // passes 1 for a moment: that is the pop
+            centerX *= gsap.utils.clamp(0, 1, f);
+          }
 
           var shrink = (1 - 0.25 * scrollEnergy) * grow;
           var h = panelH * shrink;
@@ -1579,24 +1611,39 @@
       el.addEventListener('click', onClick);
 
       var raf = 0;
+      var lastFrame = performance.now();
+      var drifting = false;
       function tick() {
         if (!wrapper.isConnected) return destroy();
+        var now = performance.now();
+        var dt = Math.min(0.05, (now - lastFrame) / 1000);
+        lastFrame = now;
+        var idle = now - lastInput;
+
         if (!dragging) {
           target += velocity;
           velocity *= friction;
           if (Math.abs(velocity) < 0.05) velocity = 0;
 
-          if (!snapped && performance.now() - lastInput > snapIdle) {
+          drifting = autoDrift > 0 && introDone && idle > driftResume * 1000;
+          if (drifting) {
+            target += autoDrift * dt; // the row rolls left on its own
+            snapped = false;
+          } else if (!snapped && idle > snapIdle) {
             target = centerForIndex(nearestIndex(scroll));
             snapped = true;
           }
+        } else {
+          drifting = false;
         }
 
         var follow = dragging && dragPointerType !== 'mouse'
           ? touchEase
-          : snapped
-            ? snapEase
-            : ease;
+          : drifting
+            ? driftEase
+            : snapped
+              ? snapEase
+              : ease;
         scroll += (target - scroll) * follow;
 
         var ci = sourceIndex(scroll);
@@ -1613,7 +1660,7 @@
 
         layout();
         refreshHover();
-        if (intro.value < 1) lensSize();
+        if (!introDone) lensSize();
 
         lensUniforms.uTime.value = performance.now() * 0.001;
 

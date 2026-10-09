@@ -8,7 +8,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
-  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.3.1/main.min.js"></script>`
+  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.4.0/main.min.js"></script>`
   (jsDelivr builds `main.min.js` from `main.js` automatically)
 
 | Section | Runs on | Came from |
@@ -25,7 +25,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdResources` | `/resources` | 37087 RESOURCES.js |
 | `rdQuiz` | `/rimbo-quiz` | 35662 QUIZ .js |
 | `rdLetterReveal` | `/audit`, `/my-story` | the anime.js page code on those pages |
-| `rdGlassCarousel` | any page with `[data-glass-carousel]` (new site) | Osmo Liquid Glass Carousel + a centre-expand intro; loads three.js only there |
+| `rdGlassCarousel` | any page with `[data-glass-carousel]` (new site) | Osmo Liquid Glass Carousel; pops in from nothing once the text is in, then rolls left on its own; loads three.js only there |
 
 Still inline in Webflow: Google Tag Manager (site head), the Lenis CSS (site head),
 the Finsweet attributes, Cal.com on /contact, and the SEO/JSON-LD blocks on the
