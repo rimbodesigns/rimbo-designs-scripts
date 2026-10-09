@@ -25,6 +25,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdResources` | `/resources` | 37087 RESOURCES.js |
 | `rdQuiz` | `/rimbo-quiz` | 35662 QUIZ .js |
 | `rdLetterReveal` | `/audit`, `/my-story` | the anime.js page code on those pages |
+| `rdGlassCarousel` | any page with `[data-glass-carousel]` (new site) | Osmo Liquid Glass Carousel + a centre-expand intro; loads three.js only there |
 
 Still inline in Webflow: Google Tag Manager (site head), the Lenis CSS (site head),
 the Finsweet attributes, Cal.com on /contact, and the SEO/JSON-LD blocks on the

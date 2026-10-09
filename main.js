@@ -877,6 +877,809 @@
   }
 
   // =========================================================
+  // GLASS CAROUSEL — any page with [data-glass-carousel] (new site, 2026-10)
+  // Osmo Supply's Liquid Glass Carousel (lens shader and scroll model adapted
+  // from Yousuf Soomro's liquid-glass-carousel, MIT). Kept as published, plus
+  // an intro: the panels start stacked in the middle and spread out to their
+  // places while they grow, the lens opens with them, then caption and
+  // counter fade in. Three.js loads only on pages that have the carousel.
+  // =========================================================
+  async function rdGlassCarousel() {
+    var wrappers = document.querySelectorAll('[data-glass-carousel]');
+    if (!wrappers.length) return;
+
+    var THREE = await import('https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.min.js');
+
+    var panelHeight = 0.42; // 1 is the full height of the section
+    var panelGap = 40; // px between images
+    var wheel = 'horizontal'; // "horizontal" | "all" | "off"
+
+    // Oval size
+    var lensWidth = 1;
+    var lensHeight = 0.6;
+    var lensRotation = 90; // degrees
+    var lensWidthNarrow = 1; // the same three, below 768px
+    var lensHeightNarrow = 0.7;
+    var lensRotationNarrow = 90;
+
+    var lensColor = '#ff7373'; // the ring and its aura (Rimbo coral)
+    var lensGlow = 4; // brightness of the ring, the outline and the centre, 0 to 17
+    var lensRing = 1; // the coloured ring, 0 removes it
+    var lensRingRadius = 0.49; // 0.1 sits near the middle, 0.49 on the edge
+    var lensRingWidth = 0.01; // higher is softer and wider
+    var lensRimLine = 1; // the white outline, 0 removes it
+    var lensNova = 0.1; // white bloom in the middle, 0 to 1
+    var lensDispersion = 11; // how far red and blue split near the edge
+    var lensRimWave = 0.3; // how much the edge ripples
+    var lensZoom = 0.4; // how much the glass magnifies, 0 is flat
+    var lensVignette = 0; // darkens the corners of the section, 0 to 1
+    var lensShimmer = true; // animates the ring
+
+    // Intro
+    var introDuration = 1.8; // seconds for the spread
+    var introSpread = 0.12; // delay per panel away from the centre, as a share of the intro
+    var introStartScale = 0.15; // panels start this big
+    var introCaptionDelay = 0.9; // caption and counter fade in after this many seconds
+
+    // Finer shader detail, rarely worth touching
+    var lensNovaSize = 12;
+    var lensShimmerFreq = 12;
+    var lensShimmerSpeed = 3.5;
+    var lensShimmerDepth = 0.12;
+    var lensRimStart = 0.578;
+    var lensRimFreq1 = 2;
+    var lensRimFreq2 = 1;
+    var lensRimLinePos = 0.488;
+    var lensRimLineWidth = 0.003;
+    var lensVignetteSize = 0.3;
+    var lensSamples = 16;
+
+    var textureDetail = 1.5; // texture resolution over the size it is drawn at
+    var panelWidthMax = 0.78; // the widest image never passes this share of the section width
+    var narrowBreakpoint = 768;
+
+    var repeats = 4;
+    var ease = 0.09;
+    var wheelSpeed = 1.4;
+    var dragSpeed = 1.6;
+    var touchSpeed = 1;
+    var touchEase = 0.22;
+    var friction = 0.865;
+    var snapIdle = 120;
+    var snapEase = 0.05;
+    var shrinkMax = 60;
+    var shrinkAttack = 0.25;
+    var shrinkDecay = 0.06;
+    var clickSlop = 6;
+    var touchClickSlop = 12;
+    var flickIdle = 90;
+
+    var vertexShader = [
+      'varying vec2 vUv;',
+      'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
+    ].join('\n');
+
+    var fragmentShader = [
+      '#define PI 3.14159265',
+      'precision highp float;',
+      'varying vec2 vUv;',
+      'uniform sampler2D uTex;',
+      'uniform vec2  uRes;',
+      'uniform vec2  uCenter;',
+      'uniform float uSizeX;',
+      'uniform float uSizeY;',
+      'uniform float uAspect;',
+      'uniform float uZoom;',
+      'uniform float uDispersion;',
+      'uniform float uGlow;',
+      'uniform float uWhiteGlow;',
+      'uniform float uNovaSize;',
+      'uniform float uBlueRing;',
+      'uniform float uRingRadius;',
+      'uniform float uRingWidth;',
+      'uniform float uShimmer;',
+      'uniform float uShimmerFreq;',
+      'uniform float uShimmerSpeed;',
+      'uniform float uShimmerDepth;',
+      'uniform float uTime;',
+      'uniform float uRimStart;',
+      'uniform float uRimTangential;',
+      'uniform float uRimFreq1;',
+      'uniform float uRimFreq2;',
+      'uniform vec3  uBlueColor;',
+      'uniform float uRimLine;',
+      'uniform float uRimLinePos;',
+      'uniform float uRimLineWidth;',
+      'uniform float uVignette;',
+      'uniform float uVignetteSize;',
+      'uniform float uRotation;',
+      'uniform int   uSamples;',
+      'const int MAX_SAMPLES = 16;',
+      'vec3 discLens(vec2 center, float aspectCorrect, out float outA) {',
+      '  vec2 p = (vUv - center);',
+      '  p.x *= aspectCorrect;',
+      '  float ca = cos(uRotation), sa = sin(uRotation);',
+      '  p = mat2(ca, -sa, sa, ca) * p;',
+      '  vec2 halfSize = vec2(uSizeX, uSizeY);',
+      '  float dist = length(p / halfSize);',
+      '  outA = 0.0;',
+      '  float maskND = dist;',
+      '  if (maskND > 1.0) return vec3(0.0);',
+      '  float shapeND = clamp(maskND, 0.0, 1.0);',
+      '  float nd = clamp(dist, 0.0, 1.0);',
+      '  vec2  offset = vUv - center;',
+      '  vec2  radialDir = normalize(offset + 1e-6);',
+      '  vec2  tangentDir = vec2(-radialDir.y, radialDir.x);',
+      '  float angle = atan(p.y, p.x);',
+      '  float pull = uZoom * 0.30 * (nd * nd);',
+      '  float rimStrength = smoothstep(uRimStart, 1.0, nd);',
+      '  float fluidWave = sin(angle * uRimFreq1) * 0.55 + sin(angle * uRimFreq2) * 0.25;',
+      '  float rScreen = (uSizeX + uSizeY) * 0.5;',
+      '  vec2  rimOff = tangentDir * fluidWave * rimStrength * rScreen * uRimTangential;',
+      '  vec2 baseUV = center + offset * (1.0 - pull) + rimOff;',
+      '  float rimMask = smoothstep(0.55, 1.0, nd);',
+      '  vec2  dispDir = offset * uDispersion * 0.004 * rimMask;',
+      '  int N = uSamples;',
+      '  if (N < 2) N = 2;',
+      '  if (N > MAX_SAMPLES) N = MAX_SAMPLES;',
+      '  vec3 col = vec3(0.0);',
+      '  vec3 caW = vec3(0.0);',
+      '  for (int i = 0; i < MAX_SAMPLES; i++) {',
+      '    if (i >= N) break;',
+      '    float t = float(i) / float(N - 1);',
+      '    vec2 sUV = baseUV + dispDir * (t - 0.5);',
+      '    vec3 s = texture2D(uTex, sUV).rgb;',
+      '    vec3 w = vec3(',
+      '      exp(-pow((t - 0.00) / 0.38, 2.0)),',
+      '      exp(-pow((t - 0.50) / 0.38, 2.0)),',
+      '      exp(-pow((t - 1.00) / 0.38, 2.0))',
+      '    );',
+      '    col += s * w;',
+      '    caW += w;',
+      '  }',
+      '  col /= max(caW, vec3(0.001));',
+      '  col *= mix(0.91, 1.0, smoothstep(0.0, 0.38, shapeND));',
+      '  float r2 = shapeND * shapeND * 0.25;',
+      '  float gs = max(uNovaSize * uGlow * 0.003, 0.004);',
+      '  float nova = exp(-r2 / gs) + exp(-r2 / (gs * 7.0)) * 0.18;',
+      '  nova *= uWhiteGlow * (uGlow / 17.0) * 1.15;',
+      '  col += vec3(nova);',
+      '  float dC = shapeND * 0.5;',
+      '  float tR = clamp(uRingRadius, 0.1, 0.49);',
+      '  float rW = max(uRingWidth, 0.003);',
+      '  float ring = exp(-pow((dC - tR) / rW, 2.0));',
+      '  ring *= uBlueRing * (uGlow / 17.0) * 1.8;',
+      '  if (uShimmer > 0.5) ring *= sin(angle * uShimmerFreq + uTime * uShimmerSpeed) * uShimmerDepth + (1.0 - uShimmerDepth);',
+      '  float ringAura = exp(-pow((dC - tR) / (rW * 6.0), 2.0)) * 0.28 * uBlueRing * (uGlow / 17.0);',
+      '  col += uBlueColor * (ring + ringAura);',
+      '  col += vec3(exp(-pow((dC - uRimLinePos) / max(uRimLineWidth, 0.0001), 2.0)) * uRimLine);',
+      '  outA = smoothstep(1.0, 0.93, maskND);',
+      '  return col;',
+      '}',
+      'void main(){',
+      '  vec3 base = texture2D(uTex, vUv).rgb;',
+      '  vec3 outc = base;',
+      '  float a = 0.0;',
+      '  vec3 c = discLens(uCenter, uAspect, a);',
+      '  outc = mix(outc, c, a);',
+      '  if (uVignette > 0.001) {',
+      '    vec2 vc = vUv - 0.5;',
+      '    vc.x *= uAspect;',
+      '    float d = length(vc) / max(uVignetteSize, 0.0001);',
+      '    float vig = 1.0 - uVignette * smoothstep(0.5, 1.0, d);',
+      '    outc *= clamp(vig, 0.0, 1.0);',
+      '  }',
+      '  gl_FragColor = vec4(outc, 1.0);',
+      '}'
+    ].join('\n');
+
+    function backgroundOf(element) {
+      var node = element;
+      while (node && node !== document.documentElement) {
+        var color = getComputedStyle(node).backgroundColor;
+        if (color && color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
+        node = node.parentElement;
+      }
+      return '#ffffff';
+    }
+
+    function setupInstance(wrapper) {
+      var mount = wrapper.querySelector('[data-glass-carousel-canvas]');
+      var items = Array.from(wrapper.querySelectorAll('[data-glass-carousel-item]'));
+      if (!mount || !items.length) return null;
+      if (wrapper.getAttribute('data-glass-carousel') === 'canvas') return null;
+
+      var captionEl = wrapper.querySelector('[data-glass-carousel-caption]');
+      var counterEl = wrapper.querySelector('[data-glass-carousel-counter]');
+
+      var total = items.length;
+      var W = Math.max(1, mount.clientWidth);
+      var H = Math.max(1, mount.clientHeight);
+      var narrow = W < narrowBreakpoint;
+      var panelH = 0;
+
+      var renderer;
+      try {
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, canvas: mount });
+      } catch (err) {
+        return null; // no webgl, the authored list stays as it is
+      }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(W, H, false);
+      renderer.setClearColor(new THREE.Color(backgroundOf(wrapper)), 1);
+
+      var scene = new THREE.Scene();
+      var camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, -100, 100);
+      camera.position.z = 10;
+
+      var maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      var sources = items.map(function (item) {
+        return {
+          tex: null,
+          aspect: 1,
+          image: item.querySelector('[data-glass-carousel-image]') || item.querySelector('img')
+        };
+      });
+
+      var loader = new THREE.TextureLoader();
+      loader.setCrossOrigin('anonymous');
+
+      // Intro state: 0 = everything stacked in the middle, 1 = in place
+      var intro = { value: 0 };
+      var introStarted = false;
+      if (captionEl) gsap.set(captionEl, { autoAlpha: 0 });
+      if (counterEl) gsap.set(counterEl, { autoAlpha: 0 });
+
+      function startIntro() {
+        if (introStarted) return;
+        introStarted = true;
+        gsap.to(intro, { value: 1, duration: introDuration, ease: 'expo.out' });
+        gsap.to([captionEl, counterEl].filter(Boolean), {
+          autoAlpha: 1, duration: 0.8, ease: 'power2.out', delay: introCaptionDelay, overwrite: true
+        });
+      }
+
+      function fitToPanel(image) {
+        var cap = Math.round(panelH * Math.min(window.devicePixelRatio || 1, 2) * textureDetail);
+        var height = image.naturalHeight || image.height;
+        var width = image.naturalWidth || image.width;
+        if (!height || height <= cap) return image;
+        var scaled = document.createElement('canvas');
+        scaled.width = Math.max(1, Math.round(width * (cap / height)));
+        scaled.height = cap;
+        scaled.getContext('2d').drawImage(image, 0, 0, scaled.width, scaled.height);
+        return scaled;
+      }
+
+      function adoptTexture(source) {
+        var image = source.image;
+        if (!image || !image.naturalWidth || !image.naturalHeight) return;
+        source.aspect = image.naturalWidth / image.naturalHeight;
+        measurePanel();
+        var url = image.currentSrc || image.src;
+        loader.load(url, function (tex) {
+          tex.image = fitToPanel(tex.image);
+          tex.minFilter = THREE.LinearMipmapLinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          tex.generateMipmaps = true;
+          tex.anisotropy = maxAnisotropy;
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.needsUpdate = true;
+          source.tex = tex;
+          measurePanel();
+          recomputeTotal();
+          if (!userInteracted) {
+            scroll = centerForIndex(0);
+            target = scroll;
+          }
+          // The first texture is in: the panels have something to show, so spread them out
+          startIntro();
+        }, undefined, function () {
+          console.warn('Glass Carousel: image failed to load', url);
+        });
+      }
+
+      function bindTextures() {
+        sources.forEach(function (source) {
+          if (!source.image) return;
+          if (source.image.complete) adoptTexture(source);
+          else source.image.addEventListener('load', function () { adoptTexture(source); }, { once: true });
+        });
+      }
+
+      function measurePanel() {
+        var widest = 1;
+        for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
+        panelH = Math.min(H * panelHeight, (W * panelWidthMax) / widest);
+      }
+      measurePanel();
+
+      function slotWidth(index) {
+        return sources[index].aspect * panelH + panelGap;
+      }
+
+      var offsets = [];
+      var totalWidth = 0;
+      function recomputeTotal() {
+        offsets = [];
+        var acc = 0;
+        for (var i = 0; i < sources.length; i++) {
+          offsets.push(acc);
+          acc += slotWidth(i);
+        }
+        totalWidth = acc;
+      }
+      recomputeTotal();
+
+      function slotCenter(index) {
+        return offsets[index] + slotWidth(index) / 2 - panelGap / 2;
+      }
+
+      function centerForIndex(index) {
+        var loop = Math.floor(index / total);
+        var s = ((index % total) + total) % total;
+        return slotCenter(s) + loop * totalWidth;
+      }
+
+      function nearestIndex(value) {
+        if (!totalWidth) return 0;
+        var best = 0;
+        var bestDist = Infinity;
+        for (var i = 0; i < total; i++) {
+          var center = slotCenter(i);
+          var k = Math.round((value - center) / totalWidth);
+          var dist = Math.abs(center + k * totalWidth - value);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = i + k * total;
+          }
+        }
+        return best;
+      }
+
+      function sourceIndex(value) {
+        return ((nearestIndex(value) % total) + total) % total;
+      }
+
+      var panelGeometry = new THREE.PlaneGeometry(1, 1);
+      var pool = [];
+      for (var r = 0; r < repeats; r++) {
+        for (var i = 0; i < total; i++) {
+          var mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true });
+          var mesh = new THREE.Mesh(panelGeometry, mat);
+          mesh.visible = false;
+          scene.add(mesh);
+          pool.push({ mesh: mesh, mat: mat, srcIndex: i, bound: false });
+        }
+      }
+
+      var scroll = centerForIndex(0);
+      var target = scroll;
+      var userInteracted = false;
+      var velocity = 0;
+      var prevScroll = 0;
+      var scrollEnergy = 0;
+      var lastInput = performance.now();
+      var snapped = false;
+      var lastCenter = -1;
+
+      var dpr = renderer.getPixelRatio() || 1;
+      var bufferW = function () { return Math.max(1, Math.round(W * dpr)); };
+      var bufferH = function () { return Math.max(1, Math.round(H * dpr)); };
+      var rt = new THREE.WebGLRenderTarget(bufferW(), bufferH());
+      var lensScene = new THREE.Scene();
+      var lensCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      var lensUniforms = {
+        uTex: { value: rt.texture },
+        uRes: { value: new THREE.Vector2(bufferW(), bufferH()) },
+        uCenter: { value: new THREE.Vector2(0.5, 0.5) },
+        uSizeX: { value: (narrow ? lensWidthNarrow : lensWidth) * (W / H) },
+        uSizeY: { value: (narrow ? lensHeightNarrow : lensHeight) * (W / H) },
+        uRotation: { value: 0 },
+        uAspect: { value: W / H },
+        uZoom: { value: lensZoom },
+        uDispersion: { value: lensDispersion },
+        uGlow: { value: lensGlow },
+        uWhiteGlow: { value: lensNova },
+        uNovaSize: { value: lensNovaSize },
+        uBlueRing: { value: lensRing },
+        uRingRadius: { value: lensRingRadius },
+        uRingWidth: { value: lensRingWidth },
+        uShimmer: { value: lensShimmer ? 1 : 0 },
+        uShimmerFreq: { value: lensShimmerFreq },
+        uShimmerSpeed: { value: lensShimmerSpeed },
+        uShimmerDepth: { value: lensShimmerDepth },
+        uTime: { value: 0 },
+        uRimStart: { value: lensRimStart },
+        uRimTangential: { value: lensRimWave },
+        uRimFreq1: { value: lensRimFreq1 },
+        uRimFreq2: { value: lensRimFreq2 },
+        uBlueColor: { value: new THREE.Color(lensColor) },
+        uRimLine: { value: lensRimLine },
+        uRimLinePos: { value: lensRimLinePos },
+        uRimLineWidth: { value: lensRimLineWidth },
+        uVignette: { value: lensVignette },
+        uVignetteSize: { value: lensVignetteSize },
+        uSamples: { value: lensSamples }
+      };
+      var lensMat = new THREE.ShaderMaterial({ uniforms: lensUniforms, vertexShader: vertexShader, fragmentShader: fragmentShader });
+      var lensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lensMat);
+      lensScene.add(lensQuad);
+
+      function lensSize() { // the lens opens with the intro
+        var s = 0.05 + 0.95 * intro.value;
+        lensUniforms.uSizeX.value = (narrow ? lensWidthNarrow : lensWidth) * (W / H) * s;
+        lensUniforms.uSizeY.value = (narrow ? lensHeightNarrow : lensHeight) * (W / H) * s;
+      }
+
+      function applyLook() {
+        renderer.setClearColor(new THREE.Color(backgroundOf(wrapper)), 1);
+        var active = sourceIndex(scroll);
+        measurePanel();
+        recomputeTotal();
+        scroll = centerForIndex(active);
+        target = scroll;
+        lensUniforms.uAspect.value = W / H;
+        lensSize();
+        lensUniforms.uRotation.value = ((narrow ? lensRotationNarrow : lensRotation) * Math.PI) / 180;
+      }
+
+      var panelRects = [];
+      var centeredPanel = null;
+
+      function layout() {
+        panelRects = [];
+        centeredPanel = null;
+        var centeredDist = Infinity;
+        var half = W / 2;
+        var buffer = panelH;
+
+        pool.forEach(function (p, poolIdx) {
+          var rep = Math.floor(poolIdx / total);
+          var i = p.srcIndex;
+          var src = sources[i];
+
+          var x = slotCenter(i) - scroll;
+          x = ((x % totalWidth) + totalWidth) % totalWidth;
+          x += (rep - Math.floor(repeats / 2)) * totalWidth;
+          if (x > half + totalWidth) x -= totalWidth * repeats;
+
+          var centerX = x;
+          if (centerX < -half - buffer || centerX > half + buffer) {
+            p.mesh.visible = false;
+            return;
+          }
+
+          // Intro: panels further from the middle start later, each grows while it travels
+          var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
+          var f = gsap.utils.clamp(0, 1, (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread));
+          var grow = introStartScale + (1 - introStartScale) * f;
+          centerX *= f;
+
+          var shrink = (1 - 0.25 * scrollEnergy) * grow;
+          var h = panelH * shrink;
+          var w = src.aspect * panelH * shrink;
+
+          if (src.tex && !p.bound) {
+            p.mat.map = src.tex;
+            p.mat.color.set(0xffffff);
+            p.mat.needsUpdate = true;
+            p.bound = true;
+          }
+
+          p.mesh.visible = true;
+          p.mesh.position.set(centerX, 0, 0);
+          p.mesh.scale.set(w, h, 1);
+
+          var sx = centerX + W / 2;
+          var sy = H / 2;
+          panelRects.push({
+            left: sx - w / 2,
+            right: sx + w / 2,
+            top: sy - h / 2,
+            bottom: sy + h / 2,
+            poolIdx: poolIdx,
+            srcIndex: i,
+            centerX: x
+          });
+
+          if (Math.abs(centerX) < centeredDist) {
+            centeredDist = Math.abs(centerX);
+            centeredPanel = { srcIndex: i, poolIdx: poolIdx };
+          }
+        });
+      }
+
+      var el = mount;
+      wrapper.setAttribute('data-glass-carousel-wheel', wheel);
+
+      function rectOf(px, py) {
+        var bounds = el.getBoundingClientRect();
+        var x = px - bounds.left;
+        var y = py - bounds.top;
+        for (var i = 0; i < panelRects.length; i++) {
+          var r = panelRects[i];
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return r;
+        }
+        return null;
+      }
+
+      var dragging = false;
+      var dragPointerId = null;
+      var dragLastX = 0;
+      var dragDist = 0;
+      var dragVel = 0;
+      var dragMoveT = 0;
+      var suppressClick = false;
+      var dragPointerType = 'mouse';
+      var lastPointerX = NaN;
+      var lastPointerY = NaN;
+      var pointerInside = false;
+      var lastPointerType = 'mouse';
+      var pointerState = '';
+
+      function setPointer(v) {
+        if (v === pointerState) return;
+        pointerState = v;
+        wrapper.setAttribute('data-glass-carousel-pointer', v);
+      }
+
+      function setHover(on) {
+        setPointer(dragging ? 'grabbing' : on ? 'grab' : '');
+      }
+
+      function refreshHover() {
+        if (!pointerInside || lastPointerType !== 'mouse') return;
+        if (!Number.isFinite(lastPointerX)) return;
+        setHover(rectOf(lastPointerX, lastPointerY) !== null);
+      }
+
+      function onWheel(e) {
+        if (wheel === 'off') return;
+        var sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+        if (wheel === 'horizontal' && !sideways) return;
+        e.preventDefault();
+        userInteracted = true;
+        target += (sideways ? e.deltaX : e.deltaY) * wheelSpeed;
+        lastInput = performance.now();
+        snapped = false;
+      }
+
+      function onPointerDown(e) {
+        suppressClick = false;
+        if (dragging) return;
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        dragging = true;
+        dragPointerId = e.pointerId;
+        dragPointerType = e.pointerType || 'mouse';
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        dragLastX = e.clientX;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        dragDist = 0;
+        dragVel = 0;
+        dragMoveT = performance.now();
+        setHover(false);
+        velocity = 0;
+        userInteracted = true;
+        snapped = false;
+        lastInput = dragMoveT;
+      }
+
+      function onPointerMove(e) {
+        if (dragging && e.pointerId === dragPointerId) {
+          var sens = dragPointerType === 'mouse' ? dragSpeed : touchSpeed;
+          var dx = e.clientX - dragLastX;
+          dragLastX = e.clientX;
+          dragDist += Math.abs(dx);
+          target -= dx * sens;
+          dragVel = dragVel * 0.6 + -dx * sens * 0.4;
+          dragMoveT = performance.now();
+          lastInput = dragMoveT;
+          snapped = false;
+        }
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        lastPointerType = e.pointerType || 'mouse';
+        pointerInside = true;
+        if (e.pointerType !== 'mouse') return;
+        setHover(rectOf(e.clientX, e.clientY) !== null);
+      }
+
+      function onPointerUp(e) {
+        if (!dragging) return;
+        if (e && dragPointerId !== null && e.pointerId !== dragPointerId) return;
+        dragging = false;
+        if (dragPointerId !== null) {
+          try { el.releasePointerCapture(dragPointerId); } catch (err) {}
+          dragPointerId = null;
+        }
+        velocity = performance.now() - dragMoveT > flickIdle ? 0 : dragVel;
+        dragVel = 0;
+        lastInput = performance.now();
+        snapped = false;
+        suppressClick = dragDist > (dragPointerType === 'mouse' ? clickSlop : touchClickSlop);
+        if (dragPointerType === 'mouse') setHover(rectOf(lastPointerX, lastPointerY) !== null);
+        else setHover(false);
+      }
+
+      function onEnter(e) {
+        pointerInside = true;
+        lastPointerType = e.pointerType || 'mouse';
+      }
+
+      function onLeave() {
+        pointerInside = false;
+        setHover(false);
+      }
+
+      function onClick(e) {
+        if (suppressClick) {
+          suppressClick = false;
+          return;
+        }
+        var hit = rectOf(e.clientX, e.clientY);
+        if (!hit) return;
+        if (centeredPanel && hit.poolIdx === centeredPanel.poolIdx) {
+          followLink(hit.srcIndex, e);
+          return;
+        }
+        userInteracted = true;
+        velocity = 0;
+        target = centerForIndex(nearestIndex(scroll + hit.centerX));
+        snapped = true;
+        setHover(false);
+      }
+
+      function followLink(srcIndex, e) {
+        var item = items[srcIndex];
+        var link = item && (item.matches('a[href]') ? item : item.querySelector('a[href]'));
+        if (!link) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || link.target === '_blank') {
+          window.open(link.href, link.target || '_blank', 'noopener');
+          return;
+        }
+        link.click();
+      }
+
+      function showActive(index) {
+        if (counterEl) {
+          counterEl.textContent = String(index + 1).padStart(2, '0') + '/' + String(total).padStart(2, '0');
+        }
+        var content = items[index].querySelector('[data-glass-carousel-content]');
+        if (captionEl && content) {
+          captionEl.replaceChildren(content.cloneNode(true));
+          if (introStarted) {
+            gsap.fromTo(captionEl, { yPercent: 25, autoAlpha: 0 }, { yPercent: 0, autoAlpha: 1, duration: 0.4, ease: 'power3.out' });
+          }
+        }
+      }
+
+      el.addEventListener('wheel', onWheel, { passive: false });
+      el.addEventListener('pointerdown', onPointerDown);
+      el.addEventListener('pointermove', onPointerMove);
+      el.addEventListener('pointerup', onPointerUp);
+      el.addEventListener('pointercancel', onPointerUp);
+      el.addEventListener('pointerenter', onEnter);
+      el.addEventListener('pointerleave', onLeave);
+      el.addEventListener('click', onClick);
+
+      var raf = 0;
+      function tick() {
+        if (!wrapper.isConnected) return destroy();
+        if (!dragging) {
+          target += velocity;
+          velocity *= friction;
+          if (Math.abs(velocity) < 0.05) velocity = 0;
+
+          if (!snapped && performance.now() - lastInput > snapIdle) {
+            target = centerForIndex(nearestIndex(scroll));
+            snapped = true;
+          }
+        }
+
+        var follow = dragging && dragPointerType !== 'mouse'
+          ? touchEase
+          : snapped
+            ? snapEase
+            : ease;
+        scroll += (target - scroll) * follow;
+
+        var ci = sourceIndex(scroll);
+        if (ci !== lastCenter) {
+          lastCenter = ci;
+          showActive(ci);
+        }
+
+        var rawSpeed = scroll - prevScroll;
+        prevScroll = scroll;
+        var norm = Math.min(1, Math.abs(rawSpeed) / Math.max(1, shrinkMax));
+        var k = norm > scrollEnergy ? shrinkAttack : shrinkDecay;
+        scrollEnergy += (norm - scrollEnergy) * k;
+
+        layout();
+        refreshHover();
+        if (intro.value < 1) lensSize();
+
+        lensUniforms.uTime.value = performance.now() * 0.001;
+
+        renderer.setRenderTarget(rt);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        renderer.render(lensScene, lensCam);
+
+        raf = requestAnimationFrame(tick);
+      }
+
+      function onResize() {
+        var nextW = mount.clientWidth;
+        var nextH = mount.clientHeight;
+        if (!nextW || !nextH) return;
+        W = nextW;
+        H = nextH;
+        renderer.setSize(W, H, false);
+        camera.left = -W / 2;
+        camera.right = W / 2;
+        camera.top = H / 2;
+        camera.bottom = -H / 2;
+        camera.updateProjectionMatrix();
+        rt.setSize(bufferW(), bufferH());
+        lensUniforms.uRes.value.set(bufferW(), bufferH());
+        narrow = W < narrowBreakpoint;
+        applyLook();
+      }
+
+      var resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(mount);
+
+      wrapper.setAttribute('data-glass-carousel', 'canvas');
+      bindTextures();
+      showActive(0);
+      lensSize();
+      tick();
+
+      function destroy() {
+        cancelAnimationFrame(raf);
+        resizeObserver.disconnect();
+        el.removeEventListener('wheel', onWheel);
+        el.removeEventListener('pointerdown', onPointerDown);
+        el.removeEventListener('pointermove', onPointerMove);
+        el.removeEventListener('pointerup', onPointerUp);
+        el.removeEventListener('pointercancel', onPointerUp);
+        el.removeEventListener('pointerenter', onEnter);
+        el.removeEventListener('pointerleave', onLeave);
+        el.removeEventListener('click', onClick);
+        renderer.dispose();
+        rt.dispose();
+        lensQuad.geometry.dispose();
+        lensMat.dispose();
+        panelGeometry.dispose();
+        pool.forEach(function (p) { p.mat.dispose(); });
+        sources.forEach(function (s) { if (s.tex) s.tex.dispose(); });
+        wrapper.setAttribute('data-glass-carousel', '');
+      }
+
+      return { destroy: destroy };
+    }
+
+    var instances = [];
+    var mm = gsap.matchMedia();
+
+    mm.add('(prefers-reduced-motion: no-preference)', function () {
+      wrappers.forEach(function (wrapper) {
+        var instance = setupInstance(wrapper);
+        if (instance) instances.push(instance);
+      });
+
+      return function () {
+        instances.forEach(function (instance) { instance.destroy(); });
+        instances.length = 0;
+      };
+    });
+  }
+
+  // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
   // runs on its own, so a missing element on one page can't stop the rest.
@@ -908,6 +1711,7 @@
   // the whole page and check whether that old code has run first.
   onReady(function () {
     run('lenis', rdLenis);
+    if (qs('[data-glass-carousel]')) run('glass carousel', rdGlassCarousel);
     if (path === '/audit') run('letter reveal', rdLetterReveal, { duration: 2, delay: 0.4 });
     if (path === '/my-story') run('letter reveal', rdLetterReveal, { duration: 1.4, delay: 0.3 });
   });
