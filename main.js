@@ -1152,7 +1152,8 @@
           onComplete: function () {
             intro.value = 1;
             introDone = true;
-            lastInput = performance.now(); // the drift starts driftResume seconds after the pop
+            lensStrength();
+            lastInput = performance.now(); // the drift starts driftResume seconds after the intro
           }
         });
         gsap.to([captionEl, counterEl].filter(Boolean), {
@@ -1338,10 +1339,21 @@
       var lensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lensMat);
       lensScene.add(lensQuad);
 
-      function lensSize() { // the lens opens with the intro
-        var s = 0.05 + 0.95 * Math.min(1, intro.value);
-        lensUniforms.uSizeX.value = (narrow ? lensWidthNarrow : lensWidth) * (W / H) * s;
-        lensUniforms.uSizeY.value = (narrow ? lensHeightNarrow : lensHeight) * (W / H) * s;
+      function lensSize() {
+        lensUniforms.uSizeX.value = (narrow ? lensWidthNarrow : lensWidth) * (W / H);
+        lensUniforms.uSizeY.value = (narrow ? lensHeightNarrow : lensHeight) * (W / H);
+      }
+
+      // The lens is already in its place, but invisible on the empty canvas: its ring, glow,
+      // refraction and colour split come up together with the images
+      function lensStrength() {
+        var f = introDone ? 1 : gsap.utils.clamp(0, 1, intro.value);
+        lensUniforms.uBlueRing.value = lensRing * f;
+        lensUniforms.uRimLine.value = lensRimLine * f;
+        lensUniforms.uWhiteGlow.value = lensNova * f;
+        lensUniforms.uDispersion.value = lensDispersion * f;
+        lensUniforms.uZoom.value = lensZoom * f;
+        lensUniforms.uRimTangential.value = lensRimWave * f;
       }
 
       function refitTextures() { // the section was smaller (even 0 x 0) when the textures were made
@@ -1659,7 +1671,7 @@
 
         layout();
         refreshHover();
-        if (!introDone) lensSize();
+        if (!introDone) lensStrength();
 
         lensUniforms.uTime.value = performance.now() * 0.001;
 
@@ -1696,6 +1708,7 @@
       bindTextures();
       showActive(0);
       lensSize();
+      lensStrength();
       tick();
 
       function destroy() {
