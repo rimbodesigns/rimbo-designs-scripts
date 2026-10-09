@@ -1159,6 +1159,7 @@
         measurePanel();
         var url = image.currentSrc || image.src;
         loader.load(url, function (tex) {
+          source.full = tex.image; // kept, so the texture can be refitted when the section grows
           tex.image = fitToPanel(tex.image);
           tex.minFilter = THREE.LinearMipmapLinearFilter;
           tex.magFilter = THREE.LinearFilter;
@@ -1313,10 +1314,22 @@
         lensUniforms.uSizeY.value = (narrow ? lensHeightNarrow : lensHeight) * (W / H) * s;
       }
 
+      function refitTextures() { // the section was smaller (even 0 x 0) when the textures were made
+        var cap = Math.round(panelH * Math.min(window.devicePixelRatio || 1, 2) * textureDetail);
+        sources.forEach(function (source) {
+          if (!source.tex || !source.full) return;
+          var current = source.tex.image.height || 0;
+          if (current >= cap || current >= source.full.height) return;
+          source.tex.image = fitToPanel(source.full);
+          source.tex.needsUpdate = true;
+        });
+      }
+
       function applyLook() {
         renderer.setClearColor(new THREE.Color(backgroundOf(wrapper)), 1);
         var active = sourceIndex(scroll);
         measurePanel();
+        refitTextures();
         recomputeTotal();
         scroll = centerForIndex(active);
         target = scroll;
