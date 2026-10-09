@@ -2,20 +2,20 @@
 
 Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webflow), migrated from Slater (project 13857).
 
-- `main.js` — everything in one file. Each former Slater script is its own
-  section (`rdGlobal`, `rdHome`, `rdService`, …); the router at the bottom
-  decides which sections run on which page. Dutch pages (`/nl/…`) run the
-  same code as their English twins.
+- `main.js` — everything in one file. One section per page or feature
+  (`rdGlobal`, `rdHome`, `rdService`, …); the router at the bottom decides
+  what runs where. Dutch pages (`/nl/…`) run the same code as their English twins.
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
-  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.0.1/main.min.js"></script>`
+  `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.1.0/main.min.js"></script>`
   (jsDelivr builds `main.min.js` from `main.js` automatically)
 
-| Section | Runs on | Was Slater file |
+| Section | Runs on | Came from |
 | --- | --- | --- |
 | `rdGlobal` | every page | 35206 GLOBAL.js |
 | `rdFormValidation` | every page | 39499 FORM CODE.js |
+| `rdLenis` | every page | the inline Lenis block in the Webflow footer |
 | `rdHome` | `/` | 35211 HOME.js |
 | `rdService` | `/service`, `/locations/…` | 35312 SERVICE.js |
 | `rdWork` | `/work` | 35413 WORK.js |
@@ -23,10 +23,11 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdNewsletter` | `/branding-brilliance-newsletter`, `/call-is-booked` | 35515 BOOKED CALL / NEWSL..js |
 | `rdResources` | `/resources` | 37087 RESOURCES.js |
 | `rdQuiz` | `/rimbo-quiz` | 35662 QUIZ .js |
+| `rdLetterReveal` | `/audit`, `/my-story` | the anime.js page code on those pages |
 
-Not in here (still inline in Webflow): the Lenis setup in the site footer, Google tags,
-and a few page snippets (Cal.com + a second Lenis on /contact, the letter effect on
-/my-story and /audit, the countdown on /audit, an Open Graph URL fix on /work and several other pages).
+Still inline in Webflow: Google Tag Manager (site head), the Lenis CSS (site head),
+the Finsweet attributes, Cal.com on /contact, and the SEO/JSON-LD blocks on the
+Locations and Blog post templates.
 
 ## Release flow
 1. Edit `main.js`, commit, push.
