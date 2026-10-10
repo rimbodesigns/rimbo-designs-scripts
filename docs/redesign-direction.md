@@ -31,10 +31,13 @@ Claude's proposals, so the next Webflow session can start from it.
 
   Keep the `data-glass-carousel-content` block (caption) and the link as in the other items.
   Square clips match the other covers (they are 1200 x 1176).
-- `media/dfs-home.mp4`: 25 s, 900 x 882, 2.2 MB. A slow scroll through the DFS home on
-  staging (Keeper logo ticking in the nav), down and back up so it loops without a jump.
-  Made with `media/record-dfs-home.js` (playwright-core driving the installed Chrome,
-  CDP screencast, ffmpeg). Re-run it when the DFS site changes.
+- `media/dfs-home.mp4`: 24 s, 900 x 882, 3 MB. The DFS home on staging: hero in day mode,
+  the switch to night mode, a scroll down past the outcome blocks (they stop short of the
+  testimonials, whose slider auto-advances), back up (the blocks fall back into place),
+  and the switch back to day so it loops without a jump. Made with
+  `media/record-dfs-home.js`: playwright-core drives the installed Chrome with a fake
+  clock stepped one frame at a time, so every frame is exactly 1/30 s however heavy the
+  page is (a real-time screencast stuttered). Re-run it when the DFS hero changes.
 - Prototype checked locally: DFS clip as the first panel, the seven covers after it, on
   #0c0c0c. MP4 first in the source list; a VP9 webm failed to decode in one Chrome build.
 
