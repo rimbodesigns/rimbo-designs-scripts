@@ -6,6 +6,8 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
   (`rdGlobal`, `rdHome`, `rdService`, …); the router at the bottom decides
   what runs where. Dutch pages (`/nl/…`) run the same code as their English twins.
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
+- `media/` — clips the carousel plays as video panels (served by jsDelivr like the script), with the recorder script that made them.
+- `docs/` — the site audit and the redesign direction notes.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
   `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.5.0/main.min.js"></script>`
@@ -25,7 +27,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdResources` | `/resources` | 37087 RESOURCES.js |
 | `rdQuiz` | `/rimbo-quiz` | 35662 QUIZ .js |
 | `rdLetterReveal` | `/audit`, `/my-story` | the anime.js page code on those pages |
-| `rdGlassCarousel` | any page with `[data-glass-carousel]` (new site) | Osmo Liquid Glass Carousel; each image grows into its place once the text is in, then the row rolls left on its own; loads three.js only there |
+| `rdGlassCarousel` | any page with `[data-glass-carousel]` (new site) | Osmo Liquid Glass Carousel; each image (or a muted looping `<video>`) grows into its place once the text is in, then the row rolls left on its own; loads three.js only there |
 
 Still inline in Webflow: Google Tag Manager (site head), the Lenis CSS (site head),
 the Finsweet attributes, Cal.com on /contact, and the SEO/JSON-LD blocks on the

@@ -1121,11 +1121,14 @@
 
       var maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
 
+      // An item's picture is an <img>, or a muted looping <video> for a moving panel
       var sources = items.map(function (item) {
+        var media = item.querySelector('[data-glass-carousel-image]') || item.querySelector('video, img');
         return {
           tex: null,
           aspect: 1,
-          image: item.querySelector('[data-glass-carousel-image]') || item.querySelector('img')
+          image: media,
+          video: media && media.tagName === 'VIDEO'
         };
       });
 
@@ -1181,7 +1184,34 @@
         return scaled;
       }
 
+      function adoptVideo(source) {
+        var video = source.image;
+        if (!video.videoWidth || !video.videoHeight || source.tex) return;
+        source.aspect = video.videoWidth / video.videoHeight;
+        measurePanel();
+        var tex = new THREE.VideoTexture(video);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        tex.anisotropy = maxAnisotropy;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        source.tex = tex;
+        recomputeTotal();
+        if (!userInteracted) {
+          scroll = centerForIndex(0);
+          target = scroll;
+        }
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        var playing = video.play();
+        if (playing && playing.catch) playing.catch(function () {});
+        textureReady = true;
+        queueIntro();
+      }
+
       function adoptTexture(source) {
+        if (source.video) return adoptVideo(source);
         var image = source.image;
         if (!image || !image.naturalWidth || !image.naturalHeight) return;
         source.aspect = image.naturalWidth / image.naturalHeight;
@@ -1214,6 +1244,18 @@
       function bindTextures() {
         sources.forEach(function (source) {
           if (!source.image) return;
+          if (source.video) {
+            var video = source.image;
+            video.muted = true; // a muted video may start on its own, and play() makes the browser load it
+            video.loop = true;
+            video.playsInline = true;
+            if (video.readyState >= 2) adoptVideo(source);
+            else video.addEventListener('loadeddata', function () { adoptVideo(source); }, { once: true });
+            video.addEventListener('error', function () { console.warn('Glass Carousel: video failed to load', video.currentSrc); }, { once: true });
+            var kick = video.play();
+            if (kick && kick.catch) kick.catch(function () {});
+            return;
+          }
           if (source.image.complete) adoptTexture(source);
           else source.image.addEventListener('load', function () { adoptTexture(source); }, { once: true });
         });
