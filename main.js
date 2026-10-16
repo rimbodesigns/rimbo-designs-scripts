@@ -1217,7 +1217,7 @@
         tex.colorSpace = THREE.NoColorSpace; // screen colour in, screen colour out
         source.tex = tex;
         recomputeTotal();
-        if (!userInteracted) {
+        if (!userInteracted && !introStarted) {
           scroll = centerForIndex(0);
           target = scroll;
         }
@@ -1264,7 +1264,7 @@
           source.tex = tex;
           measurePanel();
           recomputeTotal();
-          if (!userInteracted) {
+          if (!userInteracted && !introStarted) { // before anything is visible; never yank a moving row back
             scroll = centerForIndex(0);
             target = scroll;
           }
