@@ -81,3 +81,16 @@ point `record-dfs-home.js` at it.
   the testimonial, down to the chapters.
 - Dark or light rendering of the DFS site in the clip (the site has a night mode)?
 - Does the About Me get a photo, or the pixel style of the DFS icons?
+
+## Prototype log (2026-10-16)
+
+- Opening = the glass carousel full screen (88svh so the H1 peeks in), no hero text, no loader,
+  drift from the first frame. Captions: name only, the mono line on hover of the centred panel.
+- Panels: Digital Feng Shui (new home, `media/dfs-home-test.mp4`), Nathan Rajac, Charlie's Angels,
+  Anapana, Digital Feng Shui 2025 (`media/dfs-home.mp4`), Dieronesie, Sandra Dreisbach. Links go
+  straight to the live sites in a new tab (Anapana's shop is offline, it keeps the case study).
+- Under it: the statement (H1 + Branding · Design · Development), then Services for real as three
+  tracks with duration and from-price (numbers from the offer PDF, placeholders), then the plan
+  blocks 04 to 08.
+- Recorders: `media/record-dfs-home.js` (course site, night switch) and `media/record-dfs-home-test.js`
+  (new home, dive through the spiral). Both drive the page with a fake clock, one frame per 1/30 s.

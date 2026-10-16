@@ -5,7 +5,7 @@
 
 /* ---- OPENING: pure experience. No hero text, no spacer; the carousel fills the first screen ---- */
 #FadeOUT, .spacer_hero { display: none !important; }
-.glass-carousel { height: 100svh !important; min-height: 28rem !important; }
+.glass-carousel { height: 88svh !important; min-height: 26rem !important; } /* the H1 peeks in under it */
 
 /* grain over everything (the site has it at z-index -1, behind the canvas) */
 .grain { z-index: 60 !important; opacity: .06 !important; }
@@ -22,8 +22,8 @@
 html.proto-nav-wait .topnav, html.proto-nav-wait #FIXED_NAV, html.proto-nav-wait .burgermenu { opacity: 0 !important; transition: none !important; }
 
 /* ---- STATEMENT: the H1 after the opening ---- */
-.proto-statement { background: var(--color--black); color: var(--color--rimbobage); text-align: center; padding: clamp(6rem, 18vh, 12rem) clamp(1.25rem, 4vw, 4rem); }
-.proto-statement_title { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(2.4rem, 6.4vw, 5.6rem); line-height: .98; letter-spacing: -.01em; margin: 0 auto; max-width: 14ch; }
+.proto-statement { background: var(--color--black); color: var(--color--rimbobage); text-align: center; padding: 3vh clamp(1.25rem, 4vw, 4rem) clamp(6rem, 16vh, 11rem); }
+.proto-statement_title { color: var(--color--rimbobage); font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(2.4rem, 6.4vw, 5.6rem); line-height: .98; letter-spacing: -.01em; margin: 0 auto; max-width: 14ch; }
 .proto-statement_line { font-family: "RM MONO", monospace; font-size: .78rem; letter-spacing: .18em; text-transform: uppercase; color: var(--color--text-on-black); margin: 1.6rem 0 0; }
 .proto-statement_line span { color: var(--color--brand); margin: 0 .5em; }
 
@@ -63,3 +63,29 @@ html.proto-nav-wait .topnav, html.proto-nav-wait #FIXED_NAV, html.proto-nav-wait
 .proto-skel.is-calendar { grid-template-columns: 1fr 1.3fr; }
 .proto-skel.is-calendar div { display: grid; gap: .6rem; align-content: start; }
 .proto-skel.is-calendar u { min-height: 10rem; border-radius: .35rem; }
+
+/* ---- SERVICES: three tracks as a list ---- */
+.proto-services { background: var(--color--black); color: var(--color--rimbobage); padding: clamp(4rem, 10vh, 8rem) clamp(1.25rem, 4vw, 4rem) clamp(5rem, 12vh, 9rem); max-width: 86rem; margin: 0 auto; }
+.proto-services_head { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 4rem; align-items: end; margin-bottom: 3rem; }
+.proto-services_head .proto-label { grid-column: 1 / -1; }
+.proto-services_title { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.9rem, 4vw, 3.4rem); line-height: 1; margin: 0; max-width: 12ch; }
+.proto-services_intro { font-family: Akkuratllsub, sans-serif; font-size: 1.05rem; line-height: 1.55; color: var(--color--text-on-black); margin: 0; max-width: 40ch; justify-self: end; }
+.proto-services_list { border-top: 1px solid rgba(248, 245, 238, .14); }
+.proto-track { display: grid; grid-template-columns: 3rem minmax(10rem, .8fr) 1.6fr minmax(11rem, .6fr); gap: 1.5rem 2.5rem; align-items: baseline; padding: 2rem 0; border-bottom: 1px solid rgba(248, 245, 238, .14); color: inherit; text-decoration: none; transition: padding-left .5s cubic-bezier(.625, .05, 0, 1), opacity .3s; }
+.proto-track:hover { padding-left: .75rem; }
+.proto-services_list:hover .proto-track:not(:hover) { opacity: .55; }
+.proto-track_n { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .1em; color: var(--color--brand); }
+.proto-track_name { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.3rem, 2.2vw, 1.9rem); line-height: 1.05; }
+.proto-track_what { font-family: Akkuratllsub, sans-serif; font-size: 1rem; line-height: 1.5; color: var(--color--text-on-black); max-width: 44ch; }
+.proto-track_meta { display: flex; flex-direction: column; gap: .35rem; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--text-on-black); text-align: right; }
+.proto-track_meta span:last-child { color: var(--color--rimbobage); }
+.proto-services_foot { font-family: Akkuratllsub, sans-serif; color: var(--color--text-on-black); margin: 2.5rem 0 0; font-size: 1rem; }
+.proto-services_foot a { color: var(--color--rimbobage); border-bottom: 1px solid rgba(248, 245, 238, .3); padding-bottom: .1em; }
+.proto-services_foot a:hover { border-color: var(--color--rimbobage); }
+@media (max-width: 991px) {
+  .proto-services_head { grid-template-columns: 1fr; }
+  .proto-services_intro { justify-self: start; }
+  .proto-track { grid-template-columns: 3rem 1fr; }
+  .proto-track_what, .proto-track_meta { grid-column: 2; }
+  .proto-track_meta { flex-direction: row; gap: 1.5rem; text-align: left; }
+}

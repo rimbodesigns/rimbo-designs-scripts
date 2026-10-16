@@ -11,18 +11,42 @@
     opening.setAttribute('data-glass-carousel-intro-delay', '0.4');
   }
 
-  // ---- DIGITAL FENG SHUI as a moving panel: the recorded preview of the site, first in the row
+  // ---- DIGITAL FENG SHUI as moving panels: the new home (scroll story) first, the course site later
   var list = opening && opening.querySelector('[data-glass-carousel-list]');
-  if (list && !list.querySelector('video')) {
+  function videoItem(src, name, line, href) {
     var item = document.createElement('div');
     item.className = 'glass-carousel__item';
     item.setAttribute('data-glass-carousel-item', '');
     item.innerHTML =
-      '<video data-glass-carousel-image class="glass-carousel__item-img" muted loop playsinline autoplay preload="auto" src="/media/dfs-home.mp4"></video>' +
-      '<div data-glass-carousel-content class="glass-carousel__item-content"><p class="glass-carousel__item-p">Digital Feng Shui</p><p class="glass-carousel__item-p is--faded">Brand · Web · Course</p></div>' +
-      '<a href="https://www.rimbodesigns.com/work/digital-feng-shui" class="glass-carousel__item-link">View Digital Feng Shui</a>';
-    list.insertBefore(item, list.firstElementChild);
+      '<video data-glass-carousel-image class="glass-carousel__item-img" muted loop playsinline autoplay preload="auto" src="' + src + '"></video>' +
+      '<div data-glass-carousel-content class="glass-carousel__item-content"><p class="glass-carousel__item-p">' + name + '</p><p class="glass-carousel__item-p is--faded">' + line + '</p></div>' +
+      '<a href="' + href + '" target="_blank" rel="noopener" class="glass-carousel__item-link">Visit ' + name + '</a>';
+    return item;
   }
+  if (list && !list.querySelector('video')) {
+    list.insertBefore(videoItem('/media/dfs-home-test.mp4', 'Digital Feng Shui', 'Brand · Web · Course', 'https://www.digital-fengshui.com/'), list.firstElementChild);
+    var items = list.querySelectorAll('[data-glass-carousel-item]');
+    list.insertBefore(videoItem('/media/dfs-home.mp4', 'Digital Feng Shui · 2025', 'Course site', 'https://www.digital-fengshui.com/'), items[Math.min(3, items.length - 1)].nextElementSibling);
+  }
+
+  // ---- LINKS: straight to the live sites, in a new tab (no case-study stories on the home page)
+  var liveSites = {
+    'Nathan Rajac': 'https://www.nathanrajac.com/',
+    "Charlie's Angels Costa Rica": 'https://www.charlies-angels-rescue.org/',
+    'Dieronesie': 'https://www.dieronesie.com/',
+    'Sandra Dreisbach': 'https://www.sandradreisbach.com/'
+    // Anapana: the shop is offline, its link stays on the case study
+  };
+  document.querySelectorAll('[data-glass-carousel-item]').forEach(function (item) {
+    var name = item.querySelector('[data-glass-carousel-content] p');
+    var link = item.querySelector('a');
+    if (name && link && liveSites[name.textContent.trim()]) {
+      link.href = liveSites[name.textContent.trim()];
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = 'Visit ' + name.textContent.trim();
+    }
+  });
 
   // ---- TEST AID: ?nocache makes every cover load over the network again (the cold-cache path)
   if (/[?&]nocache/.test(location.search)) {
@@ -51,7 +75,8 @@
     'Muzammil Hussain': 'Branding · Webflow',
     'Sandra Dreisbach': 'Branding · Webflow',
     'MushroomTao': 'Custom CMS · Webflow',
-    'Digital Feng Shui': 'Brand · Web · Course'
+    'Digital Feng Shui': 'Brand · Web · Course',
+    'Digital Feng Shui · 2025': 'Course site'
   };
   document.querySelectorAll('[data-glass-carousel-content]').forEach(function (content) {
     var ps = content.querySelectorAll('p');
@@ -74,7 +99,7 @@
     setTimeout(showNav, 6000); // never leave the page without a nav
   }
 
-  // ---- STATEMENT: the H1 opens after the carousel, as its own section
+  // ---- STATEMENT: the H1 opens after the carousel, peeking into the first screen
   if (opening && !document.querySelector('.proto-statement')) {
     var statement = document.createElement('section');
     statement.className = 'proto-statement';
@@ -84,15 +109,33 @@
     opening.insertAdjacentElement('afterend', statement);
   }
 
+  // ---- SERVICES, for real: three ways to work together (numbers from the offer, placeholders)
+  var tracks = [
+    { n: '01', name: 'Brand', what: 'Strategy workshops, a visual and verbal identity, and a toolkit so everyone stays on brand.', time: '4 weeks', price: 'from €2.497' },
+    { n: '02', name: 'Brand + website', what: 'Everything in Brand, plus a focused Webflow site built to convert and to be found.', time: '6 to 8 weeks', price: 'from €6.497' },
+    { n: '03', name: 'The full thing', what: 'A multi-page home for the brand: motion, automation, search, and the systems behind it.', time: '8 to 12 weeks', price: 'from €9.997' }
+  ];
+  var stmt = document.querySelector('.proto-statement');
+  if (stmt && !document.querySelector('.proto-services')) {
+    var services = document.createElement('section');
+    services.className = 'proto-services';
+    services.innerHTML =
+      '<div class="proto-services_head"><span class="proto-label">Work with me</span><h2 class="proto-services_title" data-title>Three ways to work together</h2><p class="proto-services_intro" data-paragraph>Collaborative by design: you are in every step, from the first workshop to the last pixel.</p></div>' +
+      '<div class="proto-services_list">' + tracks.map(function (tr) {
+        return '<a class="proto-track" href="https://www.rimbodesigns.com/contact" data-component>' +
+          '<span class="proto-track_n">' + tr.n + '</span>' +
+          '<span class="proto-track_name">' + tr.name + '</span>' +
+          '<span class="proto-track_what">' + tr.what + '</span>' +
+          '<span class="proto-track_meta"><span>' + tr.time + '</span><span>' + tr.price + '</span></span>' +
+          '</a>';
+      }).join('') + '</div>' +
+      '<p class="proto-services_foot" data-paragraph>Not sure where you fit? A 45-minute scope call, €250, credited to the project. <a href="https://cal.com/rimbo-designs/45-minute-discovery-call" target="_blank" rel="noopener">Book it</a></p>';
+    stmt.insertAdjacentElement('afterend', services);
+  }
+
   // ---- ARCHITECTURE: placeholder blocks after the work carousel. Each one says what the
   // section should do; nothing here is the design yet.
   var plan = [
-    {
-      n: '03', name: 'Services', title: 'Three ways to work together',
-      does: 'Replaces the Service page. Not a price machine: three tracks, each with what you get, how long it takes and a from-price, so the wrong fit filters itself out. The extras and the fine print stay in the proposal.',
-      inside: ['Brand: strategy, identity, toolkit. From €2.497, 4 weeks', 'Brand + website: the above, plus a focused site that is found. From €6.497, 6 to 8 weeks', 'The full thing: multi-page, motion, automation, search. From €9.997, 8 to 12 weeks', 'How it runs: collaborative by design, you are in every step', 'Not sure? Scope call, €250, credited to the project'],
-      layout: 'steps'
-    },
     {
       n: '04', name: 'Proof', title: 'Numbers and names',
       does: 'A short strip that answers "can I trust this person" before the testimonials do.',
@@ -138,7 +181,7 @@
     var tag = document.createElement('div');
     tag.className = 'proto-tag';
     tag.innerHTML = '<span>02 · Work</span> The carousel stays. The way the work is presented gets its own round later.';
-    (document.querySelector('.proto-statement') || work).insertAdjacentElement('afterend', tag);
+    (document.querySelector('.proto-services') || document.querySelector('.proto-statement') || work).insertAdjacentElement('afterend', tag);
 
     var outer = document.createElement('div');
     outer.className = 'proto-plan-wrap';
