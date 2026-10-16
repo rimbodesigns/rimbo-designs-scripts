@@ -3,8 +3,13 @@
 (function () {
   'use strict';
 
-  // ---- HERO: the title smaller, the services line back, no button, everything higher.
-  // (all of it in prototype.css; nothing to add to the DOM)
+  // ---- OPENING: no hero text, the carousel is the first screen (hero and spacer hidden in CSS).
+  // Panels a little smaller than the default share of a full-height section, intro right away.
+  var opening = document.querySelector('[data-glass-carousel]');
+  if (opening) {
+    opening.setAttribute('data-glass-carousel-height', '0.46');
+    opening.setAttribute('data-glass-carousel-intro-delay', '0.4');
+  }
 
   // ---- ARCHITECTURE: placeholder blocks after the work carousel. Each one says what the
   // section should do; nothing here is the design yet.

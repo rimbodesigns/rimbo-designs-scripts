@@ -1112,6 +1112,11 @@
       var H = Math.max(1, mount.clientHeight);
       var narrow = W < narrowBreakpoint;
       var panelH = 0;
+      // Per-section overrides, set as attributes on the wrapper:
+      // data-glass-carousel-height="0.46" (share of the section) and data-glass-carousel-intro-delay="0.4" (s)
+      var panelShare = parseFloat(wrapper.getAttribute('data-glass-carousel-height')) || panelHeight;
+      var introWait = parseFloat(wrapper.getAttribute('data-glass-carousel-intro-delay'));
+      if (isNaN(introWait)) introWait = introDelay;
 
       var renderer;
       try {
@@ -1176,7 +1181,7 @@
       function queueIntro() {
         if (introQueued || !textureReady) return;
         introQueued = true;
-        var wait = Math.max(0, introDelay - (performance.now() - readyAt) / 1000);
+        var wait = Math.max(0, introWait - (performance.now() - readyAt) / 1000);
         gsap.delayedCall(wait, startIntro);
       }
 
@@ -1272,7 +1277,7 @@
       function measurePanel() {
         var widest = 1;
         for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
-        panelH = Math.min(H * panelHeight, (W * panelWidthMax) / widest);
+        panelH = Math.min(H * panelShare, (W * panelWidthMax) / widest);
         wrapper.style.setProperty('--glass-carousel-panel', Math.round(panelH) + 'px'); // the CSS puts the caption under the row
       }
       measurePanel();

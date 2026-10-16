@@ -3,12 +3,9 @@
 
 .w-webflow-badge { display: none !important; }
 
-/* ---- HERO: smaller title, services line back, no button, the whole thing higher ---- */
-#RED_DOT, #MotionBtn { display: none !important; }
-.fadeout_scroll { margin-top: 13vh !important; }
-.opening-text._2 .hero_heading { font-size: clamp(2rem, 4.6vw, 4rem); line-height: .95; letter-spacing: -.005em; }
-#HeroText { margin-top: 1.1rem; }
-.spacer_hero { height: 46svh !important; min-height: 20rem; } /* the carousel starts higher */
+/* ---- OPENING: pure experience. No hero text, no spacer; the carousel fills the first screen ---- */
+#FadeOUT, .spacer_hero { display: none !important; }
+.glass-carousel { height: 100svh !important; min-height: 28rem !important; }
 
 /* ---- PLAN blocks ---- */
 .proto-tag, .proto-plan-wrap { background: var(--color--black); }
