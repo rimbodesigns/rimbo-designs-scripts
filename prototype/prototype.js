@@ -88,9 +88,9 @@
   // section should do; nothing here is the design yet.
   var plan = [
     {
-      n: '03', name: 'Services', title: 'What working with me looks like',
-      does: 'Replaces the Service page. In one strip: the three disciplines, how a project runs, and what it costs to start. Nobody has to leave the home page to find out.',
-      inside: ['Branding · Design · Development, one line each', 'The four steps: Discover, Brand, Design, Build', 'Starting price or packages, said plainly', 'One button: Start a project'],
+      n: '03', name: 'Services', title: 'Three ways to work together',
+      does: 'Replaces the Service page. Not a price machine: three tracks, each with what you get, how long it takes and a from-price, so the wrong fit filters itself out. The extras and the fine print stay in the proposal.',
+      inside: ['Brand: strategy, identity, toolkit. From €2.497, 4 weeks', 'Brand + website: the above, plus a focused site that is found. From €6.497, 6 to 8 weeks', 'The full thing: multi-page, motion, automation, search. From €9.997, 8 to 12 weeks', 'How it runs: collaborative by design, you are in every step', 'Not sure? Scope call, €250, credited to the project'],
       layout: 'steps'
     },
     {
