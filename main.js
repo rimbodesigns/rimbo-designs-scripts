@@ -1119,6 +1119,9 @@
       if (isNaN(introWait)) introWait = introDelay;
       // data-glass-carousel-intro-event="name": the intro also waits for that window event (a page loader, say).
       // The section itself fires "glass-carousel:ready" on window once its first texture is in.
+      // data-glass-carousel-start="right": the first item begins at the right edge instead of the
+      // middle, so with the row rolling left it crosses the whole screen before it leaves
+      var startEdge = wrapper.getAttribute('data-glass-carousel-start') || 'center';
       var introEvent = wrapper.getAttribute('data-glass-carousel-intro-event');
       var introEventFired = !introEvent;
       if (introEvent) {
@@ -1218,7 +1221,7 @@
         source.tex = tex;
         recomputeTotal();
         if (!userInteracted && !introStarted) {
-          scroll = centerForIndex(0);
+          scroll = startScroll();
           target = scroll;
         }
         video.muted = true;
@@ -1265,7 +1268,7 @@
           measurePanel();
           recomputeTotal();
           if (!userInteracted && !introStarted) { // before anything is visible; never yank a moving row back
-            scroll = centerForIndex(0);
+            scroll = startScroll();
             target = scroll;
           }
           // The first texture is in: the panels have something to show
@@ -1339,6 +1342,14 @@
         return slotCenter(s) + loop * totalWidth;
       }
 
+      // where the row starts: the first item in the middle, or just inside the right/left edge
+      function startScroll() {
+        var w = sources[0].aspect * panelH;
+        if (startEdge === 'right') return centerForIndex(0) - (W / 2 - w / 2 - panelGap);
+        if (startEdge === 'left') return centerForIndex(0) + (W / 2 - w / 2 - panelGap);
+        return centerForIndex(0);
+      }
+
       function nearestIndex(value) {
         if (!totalWidth) return 0;
         var best = 0;
@@ -1371,7 +1382,7 @@
         }
       }
 
-      var scroll = centerForIndex(0);
+      var scroll = startScroll();
       var target = scroll;
       var userInteracted = false;
       var velocity = 0;

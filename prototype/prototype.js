@@ -9,6 +9,7 @@
   if (opening) {
     opening.setAttribute('data-glass-carousel-height', '0.46');
     opening.setAttribute('data-glass-carousel-intro-delay', '0.4');
+    opening.setAttribute('data-glass-carousel-start', 'right'); // the DFS clip enters from the right and crosses the screen
   }
 
   // ---- DIGITAL FENG SHUI as moving panels: the new home (scroll story) first, the course site later

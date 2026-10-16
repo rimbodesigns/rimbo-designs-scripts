@@ -24,7 +24,7 @@ const ease = 't => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2';
   await page.goto('https://dfs-staging.webflow.io/rimbo-home-test', { waitUntil: 'networkidle', timeout: 60000 });
   // warm up: let the page's load animations run, load every image, come back to the top
   await page.evaluate(() => { for (let i = 0; i < 240; i++) window.__step(1000 / 30); });
-  await page.evaluate(() => window.lenis.scrollTo(5000, { immediate: true }));
+  await page.evaluate(() => window.lenis.scrollTo(7000, { immediate: true }));
   await page.evaluate(() => { for (let i = 0; i < 60; i++) window.__step(1000 / 30); });
   await page.waitForTimeout(1500);
   await page.evaluate(() => window.lenis.scrollTo(0, { immediate: true }));
@@ -39,10 +39,11 @@ const ease = 't => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2';
   await page.evaluate(() => { const t = document.querySelector('.dfs-night-toggle'); if (t && !document.documentElement.classList.contains('dfs-night')) t.click(); });
   await page.evaluate(() => { for (let i = 0; i < 90; i++) window.__step(1000 / 30); });
   await page.waitForTimeout(2500);
+  // 25 s: the same pace as before, further down the page
   const script = {
-    [at(1.0)]: () => page.evaluate(`window.lenis.scrollTo(2400, { duration: 9, easing: ${ease} })`),
+    [at(1.0)]: () => page.evaluate(`window.lenis.scrollTo(6000, { duration: 22.5, easing: ${ease} })`),
   };
-  const total = at(11.4);
+  const total = at(25.0);
   const t0 = Date.now();
   for (let frame = 0; frame < total; frame++) {
     if (script[frame]) await script[frame]();
