@@ -35,12 +35,14 @@ const ease = 't => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2';
   await client.send('Animation.enable');
   await client.send('Animation.setPlaybackRate', { playbackRate: 0.45 });
   const at = s => Math.round(s * FPS);
-  // the new home is a scroll story: dive slowly through the first screens, then come back up
+  // night mode on before the camera rolls, then one dive down through the first screens (no way back)
+  await page.evaluate(() => { const t = document.querySelector('.dfs-night-toggle'); if (t && !document.documentElement.classList.contains('dfs-night')) t.click(); });
+  await page.evaluate(() => { for (let i = 0; i < 90; i++) window.__step(1000 / 30); });
+  await page.waitForTimeout(2500);
   const script = {
-    [at(1.2)]: () => page.evaluate(`window.lenis.scrollTo(2400, { duration: 13, easing: ${ease} })`),
-    [at(15.4)]: () => page.evaluate(`window.lenis.scrollTo(0, { duration: 6, easing: ${ease} })`),
+    [at(1.0)]: () => page.evaluate(`window.lenis.scrollTo(2400, { duration: 9, easing: ${ease} })`),
   };
-  const total = at(22.4);
+  const total = at(11.4);
   const t0 = Date.now();
   for (let frame = 0; frame < total; frame++) {
     if (script[frame]) await script[frame]();
