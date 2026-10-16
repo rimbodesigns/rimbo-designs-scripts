@@ -8,7 +8,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
 - `media/` — clips the carousel plays as video panels (served by jsDelivr like the script), with the recorder script that made them.
 - `docs/` — the site audit and the redesign direction notes.
-- `prototype/` — the new home page as plain HTML/CSS on top of `main.js`, built while Webflow is disconnected. `node prototype/server.js` and open http://localhost:8766. Classes are Client-First, so sections port to Webflow as they are.
+- `prototype/` — a local copy of the Webflow staging page (/home-copy) to design on while Webflow is disconnected. `node prototype/sync-from-staging.js` rebuilds `index.html` from staging (local `main.js`, darker black, no analytics); changes go in `prototype.css` and `main.js`. `node prototype/server.js` and open http://localhost:8766. `_new/` holds the earlier section drafts (what I do, about, testimonials, CTA) for later.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
   `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.5.0/main.min.js"></script>`

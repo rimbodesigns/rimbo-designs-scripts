@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rimbo Designs — new home (prototype)</title>
+<meta name="theme-color" content="#0c0c0c">
+<link rel="stylesheet" href="/prototype/prototype.css">
+<script src="https://cdn.prod.website-files.com/gsap/3.15.0/gsap.min.js"></script>
+<script src="https://cdn.prod.website-files.com/gsap/3.15.0/ScrollTrigger.min.js"></script>
+<script src="https://cdn.prod.website-files.com/gsap/3.15.0/SplitText.min.js"></script>
+</head>
+<body>
+<div class="page-wrapper">
+  <div class="grain_overlay" aria-hidden="true"></div>
+
+  <nav class="navbar_component">
+    <a href="/" class="navbar_logo" aria-label="Rimbo Designs home"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg" alt="Rimbo Designs"></a>
+    <div class="navbar_menu">
+      <a href="#work">Work</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </nav>
+
+  <main class="main-wrapper" id="MainWrap">
+
+    <!-- HERO -->
+    <header class="section_hero padding-global">
+      <div class="container-large hero_component">
+        <h1 class="heading-style-h1 hero_title" id="HeroTitle">Unlock your next level</h1>
+        <div class="hero_meta">
+          <p class="hero_line" id="HeroText">Branding <span>|</span> Design <span>|</span> Development</p>
+          <a href="#contact" class="button" id="MotionBtn" data-button-animate-chars><span>⚡</span> Book a call <span>⚡</span></a>
+          <div class="hero_spots" id="RED_DOT"><span class="hero_spots-dot"></span> 2 spots left</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- WORK: the glass carousel. Markup identical to the Webflow section -->
+    <section class="section_work" id="work">
+      <section data-glass-carousel class="glass-carousel">
+        <canvas aria-hidden="true" data-glass-carousel-canvas class="glass-carousel__canvas"></canvas>
+        <div class="glass-carousel__collection">
+          <div data-glass-carousel-list class="glass-carousel__list">
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <video data-glass-carousel-image class="glass-carousel__item-img" muted loop playsinline autoplay preload="auto" src="/media/dfs-home.mp4"></video>
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Digital Feng Shui</p>
+            <p class="glass-carousel__item-p is--faded">Branding, web design & course platform</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/digital-feng-shui" class="glass-carousel__item-link">View Digital Feng Shui</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e3d914128c8952d1dd6523_Nathan4.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="Nathan Rajac, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Nathan Rajac</p>
+            <p class="glass-carousel__item-p is--faded">Breathwork & coaching for men · Webflow</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/nathan-rajac" class="glass-carousel__item-link">View Nathan Rajac</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6811f08989345b3409601f8b_Charlies_angels.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="Charlie's Angels Costa Rica, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Charlie's Angels Costa Rica</p>
+            <p class="glass-carousel__item-p is--faded">Branding & Webflow development</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/charlies-angels-costa-rica" class="glass-carousel__item-link">View Charlie's Angels Costa Rica</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6821a12565a36dfb5f0179c3_Anapana.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="Anapana, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Anapana</p>
+            <p class="glass-carousel__item-p is--faded">Shopify e-commerce · Branding, UI/UX & development</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/anapana" class="glass-carousel__item-link">View Anapana</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="Dieronesie, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Dieronesie</p>
+            <p class="glass-carousel__item-p is--faded">Retreat, festival & ceremony · Webflow</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/dieronesie-retreat-festival-ceremony" class="glass-carousel__item-link">View Dieronesie</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6821b7686c7e34dc10e71986_New%20Muza.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="Muzammil Hussain, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Muzammil Hussain</p>
+            <p class="glass-carousel__item-p is--faded">Digital art gallery · Branding & Webflow</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/muzammil-hussain" class="glass-carousel__item-link">View Muzammil Hussain</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e3dbbfbf16c85454d3ebf2_Sandra%205.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="Sandra Dreisbach, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">Sandra Dreisbach</p>
+            <p class="glass-carousel__item-p is--faded">Branding & Webflow website</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/sandra-dreisbach" class="glass-carousel__item-link">View Sandra Dreisbach</a>
+        </div>
+        <div data-glass-carousel-item class="glass-carousel__item">
+          <img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68219e7147fafc5db3671677_MT_New.avif" loading="eager" data-glass-carousel-image class="glass-carousel__item-img" alt="MushroomTao, project visual preview">
+          <div data-glass-carousel-content class="glass-carousel__item-content">
+            <p class="glass-carousel__item-p">MushroomTao</p>
+            <p class="glass-carousel__item-p is--faded">Custom CMS blog · Webflow</p>
+          </div>
+          <a href="https://www.rimbodesigns.com/work/mushroomtao" class="glass-carousel__item-link">View MushroomTao</a>
+        </div>
+          </div>
+        </div>
+        <div aria-live="polite" data-glass-carousel-caption class="glass-carousel__caption"></div>
+      </section>
+      <div class="work_hint padding-global"><span>Drag or swipe</span><span>Click the middle one to open it</span></div>
+    </section>
+
+    <!-- WHAT I DO: replaces the Service page -->
+    <section class="section_services padding-global padding-section-large">
+      <div class="container-large">
+        <div class="section_header">
+          <h2 class="heading-style-h2" data-title>One pair of hands,<br>start to finish</h2>
+          <p class="text-style-muted" data-paragraph>Brand, design and build by the same person, so nothing gets lost between a deck and a live site. You talk to me, not to a team.</p>
+        </div>
+        <div class="services_grid">
+          <div class="services_item" data-component>
+            <span class="services_index">01</span>
+            <h3 class="heading-style-h3">Branding</h3>
+            <p>A workshop to find out who you are and what you offer, then a mark, a type system and colours that hold up everywhere.</p>
+            <span class="services_proof">Charlie's Angels · Anapana · Dieronesie</span>
+          </div>
+          <div class="services_item" data-component>
+            <span class="services_index">02</span>
+            <h3 class="heading-style-h3">Design</h3>
+            <p>UX first: how it should feel to use, then how it looks. Pages people read to the end and forms people finish.</p>
+            <span class="services_proof">Digital Feng Shui · Nathan Rajac</span>
+          </div>
+          <div class="services_item" data-component>
+            <span class="services_index">03</span>
+            <h3 class="heading-style-h3">Development</h3>
+            <p>Webflow and Shopify, with custom code where it earns its place. Fast, animated with care, and yours to edit afterwards.</p>
+            <span class="services_proof">MushroomTao · Muzammil Hussain</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT: in the spirit of "Your Instructor" on digital-fengshui.com -->
+    <section class="section_about padding-global padding-section-large" id="about">
+      <div class="container-large about_component">
+        <div class="about_portrait" data-component>
+          <img src="https://cdn.prod.website-files.com/67f2341f69b4c6d58de38b9d/69b9c2ae8e5e9cb19fbca33d_Rimbo_image.avif" alt="Rimbout Bobeldijk">
+        </div>
+        <div class="about_copy">
+          <span class="text-style-eyebrow">About</span>
+          <h2 class="heading-style-h2" data-title>Rimbout Bobeldijk</h2>
+          <p class="text-size-large" data-paragraph>I'm a UX designer. My job is obsessing over how a system should feel to use, so that what you ship comes out effortless.</p>
+          <p class="text-style-muted" data-paragraph>I've done that for brands, web shops, course platforms and my own tools, and I build what I design, in Webflow and in code. Based in the Netherlands, working with clients anywhere. One project at a time.</p>
+          <div class="about_links">
+            <a href="https://www.linkedin.com/" target="_blank" rel="noopener">LinkedIn</a>
+            <a href="https://www.digital-fengshui.com/" target="_blank" rel="noopener">Digital Feng Shui</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TESTIMONIALS: three from the Service page -->
+    <section class="section_testimonials padding-global padding-section-large">
+      <div class="container-large">
+        <div class="section_header">
+          <h2 class="heading-style-h2" data-title>Kind words</h2>
+          <p class="text-style-muted" data-paragraph>From the people I built with. More on Google, all verified.</p>
+        </div>
+        <div class="testimonials_grid">
+          <div class="testimonials_card" data-component>
+            <p class="testimonials_quote">Absolutely thrilled with our experience working with Rimbo Designs. Our e-commerce store has never looked better and the results speak for themselves. We're seeing real-world conversions like never before.</p>
+            <div class="testimonials_name">Marko Bosnjak<span>Anapana</span></div>
+          </div>
+          <div class="testimonials_card" data-component>
+            <p class="testimonials_quote">I couldn't be happier with the website Rimbo Designs created for my paintings. It has an elegant touch combined with a playful, seamless flow. He brings my vision to life with a keen eye for detail.</p>
+            <div class="testimonials_name">Muzammil Hussain<span>Painter</span></div>
+          </div>
+          <div class="testimonials_card" data-component>
+            <p class="testimonials_quote">Never a dull moment with Rimbo on the team. He is a creative with a great imagination but surprised me with his inquisitive attitude. Curious, analytical, and it shows in his work.</p>
+            <div class="testimonials_name">Marvin Reingoud<span>UX Designer @ theFactor.e</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section_cta padding-global padding-section-large" id="contact">
+      <div class="container-large cta_component">
+        <span class="text-style-eyebrow">Start a project</span>
+        <h2 class="heading-style-h2" data-title>Let's make the next one</h2>
+        <p class="text-style-muted" data-paragraph>A 30-minute call to see if we fit. No deck, no pitch, just your project and what it needs.</p>
+        <a href="https://www.rimbodesigns.com/contact" class="button" data-button-animate-chars><span>⚡</span> Book a call <span>⚡</span></a>
+      </div>
+    </section>
+
+    <footer class="padding-global">
+      <div class="container-large footer_component">
+        <span>© 2026 Rimbo Designs</span>
+        <span><a href="https://www.rimbodesigns.com/work">All work</a> · <a href="https://www.rimbodesigns.com/resources">Resources</a> · <a href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></span>
+      </div>
+    </footer>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.23/bundled/lenis.min.js"></script>
+<script src="/main.js"></script>
+</body>
+</html>
