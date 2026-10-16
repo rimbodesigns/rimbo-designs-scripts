@@ -47,10 +47,12 @@
     img.replaceWith(video);
   });
 
-  // ---- the clips run at 1.5x: a scroll-through reads better a little quick
+  // ---- the clips run quick: a scroll-through reads better that way (the DFS dive at 2x)
+  var rates = { 'dfs-home-test.mp4': 2 };
   document.querySelectorAll('[data-glass-carousel-item] video').forEach(function (v) {
-    v.playbackRate = 1.5;
-    v.addEventListener('loadedmetadata', function () { v.playbackRate = 1.5; }, { once: true });
+    var rate = rates[v.src.split('/').pop()] || 1.5;
+    v.playbackRate = rate;
+    v.addEventListener('loadedmetadata', function () { v.playbackRate = rate; }, { once: true });
   });
 
   // ---- LINKS: straight to the live sites, in a new tab (no case-study stories on the home page)
