@@ -1,6 +1,21 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "prototype", "runtimeExecutable": "node", "runtimeArgs": ["prototype/server.js"], "port": 8766 }
+    {
+      "name": "prototype",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "prototype/server.js"
+      ],
+      "port": 8777
+    },
+    {
+      "name": "web-inspiration",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "web-inspiration/tools/serve.mjs"
+      ],
+      "port": 8767
+    }
   ]
 }
