@@ -104,99 +104,106 @@
     var statement = document.createElement('section');
     statement.className = 'proto-statement';
     statement.innerHTML =
-      '<h1 class="proto-statement_title" data-title>Unlock your next level</h1>' +
+      '<h1 class="proto-statement_title" data-title>Unlock your<br>next level</h1>' +
       '<p class="proto-statement_line" data-paragraph>Branding <span>·</span> Design <span>·</span> Development</p>';
     opening.insertAdjacentElement('afterend', statement);
   }
 
-  // ---- SERVICES, for real: three ways to work together (numbers from the offer, placeholders)
-  var tracks = [
-    { n: '01', name: 'Brand', what: 'Strategy workshops, a visual and verbal identity, and a toolkit so everyone stays on brand.', time: '4 weeks', price: 'from €2.497' },
-    { n: '02', name: 'Brand + website', what: 'Everything in Brand, plus a focused Webflow site built to convert and to be found.', time: '6 to 8 weeks', price: 'from €6.497' },
-    { n: '03', name: 'The full thing', what: 'A multi-page home for the brand: motion, automation, search, and the systems behind it.', time: '8 to 12 weeks', price: 'from €9.997' }
-  ];
-  var stmt = document.querySelector('.proto-statement');
-  if (stmt && !document.querySelector('.proto-services')) {
-    var services = document.createElement('section');
-    services.className = 'proto-services';
-    services.innerHTML =
-      '<div class="proto-services_head"><span class="proto-label">Work with me</span><h2 class="proto-services_title" data-title>Three ways to work together</h2><p class="proto-services_intro" data-paragraph>Collaborative by design: you are in every step, from the first workshop to the last pixel.</p></div>' +
-      '<div class="proto-services_list">' + tracks.map(function (tr) {
-        return '<a class="proto-track" href="https://www.rimbodesigns.com/contact" data-component>' +
-          '<span class="proto-track_n">' + tr.n + '</span>' +
-          '<span class="proto-track_name">' + tr.name + '</span>' +
-          '<span class="proto-track_what">' + tr.what + '</span>' +
-          '<span class="proto-track_meta"><span>' + tr.time + '</span><span>' + tr.price + '</span></span>' +
-          '</a>';
+  // ---- THE REST OF THE PAGE, built for real. Each section is one function so any of them can
+  // be kept, moved or thrown away on its own.
+  var GOOGLE = 'https://www.google.com/maps/place/Rimbo+Designs/@46.423669,-79.5417226,4z/data=!4m8!3m7!1s0xa776f9ed49735c5f:0x670eecc344d2a298!8m2!3d46.423669!4d-79.5417226!9m1!1b1!16s%2Fg%2F11rq9qpsxs?entry=ttu';
+  var sections = [];
+
+  // 1. Names: who the work was for, as a quiet marquee (the site's own marquee code drives it)
+  sections.push(function () {
+    var names = ['Digital Feng Shui', 'Nathan Rajac', "Charlie's Angels Costa Rica", 'Dieronesie', 'Sandra Dreisbach', 'Anapana', 'theFactor.e', 'Pooh Balance', 'MushroomTao', 'Zen met Madeleine', 'Catherine Hamilton', 'Henry Byrne', 'Psychedelic Passage', 'Tripsitters', 'Muzammil Hussain'];
+    var row = names.map(function (n) { return '<span class="proto-names_item">' + n + '</span><span class="proto-names_dot">·</span>'; }).join('');
+    return '<section class="proto-names">' +
+      '<div class="proto-names_head"><span class="proto-label">Selected clients</span><p>20+ success stories, from one-person practices to platforms. <a href="' + GOOGLE + '" target="_blank" rel="noopener">Verified on Google</a></p></div>' +
+      '<div class="proto-names_marquee" data-marquee-scroll-direction-target data-marquee-speed="40" data-marquee-direction="left" data-marquee-duplicate="2" data-marquee-scroll-speed="6">' +
+        '<div class="proto-names_scroll" data-marquee-scroll-target><div class="proto-names_list" data-marquee-collection-target>' + row + '</div></div>' +
+      '</div>' +
+      '</section>';
+  });
+
+  // 2. Kind words: four voices, the rest on Google
+  sections.push(function () {
+    var words = [
+      { q: 'Absolutely thrilled with our experience working with Rimbo Designs. Our e-commerce store has never looked better and the results speak for themselves: real-world conversions like never before.', who: 'Marko Bosnjak', role: 'Anapana' },
+      { q: "Rimbout created a refreshing and creative website that perfectly fits my company. His branding workshops gave me a lot of clarity in how I want to position myself.", who: 'Madeleine', role: 'Founder, Zen met Madeleine' },
+      { q: "I couldn't be happier with the website Rimbo Designs created for my paintings. An elegant touch combined with a playful, seamless flow, and a keen eye for detail.", who: 'Muzammil Hussain', role: 'Painter' },
+      { q: 'Never a dull moment with Rimbo on the team. A creative with a great imagination who surprised me with his inquisitive attitude. Curious, analytical, and it shows in his work.', who: 'Marvin Reingoud', role: 'UX Designer, theFactor.e' }
+    ];
+    return '<section class="proto-words">' +
+      '<div class="proto-words_head"><span class="proto-label">Kind words</span><h2 class="proto-h2" data-title>Said by the people<br>I built with</h2></div>' +
+      '<div class="proto-words_grid">' + words.map(function (w, i) {
+        return '<figure class="proto-words_item" data-component><span class="proto-words_n">0' + (i + 1) + '</span><blockquote>' + w.q + '</blockquote><figcaption>' + w.who + '<span>' + w.role + '</span></figcaption></figure>';
       }).join('') + '</div>' +
-      '<p class="proto-services_foot" data-paragraph>Not sure where you fit? A 45-minute scope call, €250, credited to the project. <a href="https://cal.com/rimbo-designs/45-minute-discovery-call" target="_blank" rel="noopener">Book it</a></p>';
-    stmt.insertAdjacentElement('afterend', services);
-  }
+      '<p class="proto-foot"><a href="' + GOOGLE + '" target="_blank" rel="noopener">All reviews on Google</a></p>' +
+      '</section>';
+  });
 
-  // ---- ARCHITECTURE: placeholder blocks after the work carousel. Each one says what the
-  // section should do; nothing here is the design yet.
-  var plan = [
-    {
-      n: '04', name: 'Proof', title: 'Numbers and names',
-      does: 'A short strip that answers "can I trust this person" before the testimonials do.',
-      inside: ['20+ success stories', 'Google rating with the review count', 'A row of client marks, small and quiet'],
-      layout: 'strip'
-    },
-    {
-      n: '05', name: 'Kind words', title: 'Three voices, the rest on Google',
-      does: 'The testimonials from the Service page, three at a time, with the verified Google link.',
-      inside: ['Three quotes, name and company', 'Link: all verified Google reviews', 'Later: the ones that match the project someone just looked at'],
-      layout: 'cards'
-    },
-    {
-      n: '06', name: 'About', title: 'Your designer',
-      does: 'In the spirit of "Your Instructor" on Digital Feng Shui: a portrait, three lines, and the side projects as credibility.',
-      inside: ['Portrait in a ring', 'Three short paragraphs: what you do, how you work, where you are', 'Digital Feng Shui and Rhythms as proof you build your own things'],
-      layout: 'split'
-    },
-    {
-      n: '07', name: 'Resources', title: 'Notes worth reading',
-      does: 'The latest three pieces from the Resources page, so that page is reachable from home without a menu.',
-      inside: ['Three cards from the CMS: title, one line, reading time', 'One line for the newsletter', 'Link: all resources'],
-      layout: 'cards'
-    },
-    {
-      n: '08', name: 'Start', title: 'Start a project',
-      does: 'The contact page, folded in: pick a time right here. This is where "2 spots left" lives now.',
-      inside: ['Cal.com calendar, inline', 'Email for people who do not do calendars', 'Spots left this quarter'],
-      layout: 'calendar'
-    }
-  ];
+  // 3. About: the person, in the spirit of "Your Instructor"
+  sections.push(function () {
+    return '<section class="proto-about" id="about">' +
+      '<div class="proto-about_portrait" data-component><img src="https://cdn.prod.website-files.com/67f2341f69b4c6d58de38b9d/69b9c2ae8e5e9cb19fbca33d_Rimbo_image.avif" alt="Rimbout Bobeldijk"></div>' +
+      '<div class="proto-about_copy">' +
+        '<span class="proto-label">About</span>' +
+        '<h2 class="proto-h2" data-title>Rimbout Bobeldijk</h2>' +
+        '<p class="proto-about_lead" data-paragraph>I’m a UX designer. My job is obsessing over how a system should feel to use, so that what you ship comes out effortless.</p>' +
+        '<p data-paragraph>I’ve done that for brands, web shops, course platforms and my own tools, and I build what I design: in Webflow, in code, and lately in native apps. Based in the Netherlands, working with clients anywhere. One project at a time.</p>' +
+        '<div class="proto-about_links"><a href="https://www.linkedin.com/in/rimbout-bobeldijk-9836ba168/" target="_blank" rel="noopener">LinkedIn</a><a href="https://www.instagram.com/rimbodesigns_/" target="_blank" rel="noopener">Instagram</a><a href="https://www.rimbodesigns.com/my-story">My story</a></div>' +
+      '</div>' +
+      '</section>';
+  });
 
-  var skeletons = {
-    steps: '<div class="proto-skel is-steps"><i></i><i></i><i></i><i></i></div>',
-    strip: '<div class="proto-skel is-strip"><b>20+</b><b>4.9 ★</b><i></i><i></i><i></i><i></i></div>',
-    cards: '<div class="proto-skel is-cards"><i></i><i></i><i></i></div>',
-    split: '<div class="proto-skel is-split"><u></u><div><i></i><i></i><i></i></div></div>',
-    calendar: '<div class="proto-skel is-calendar"><div><i></i><i></i></div><u></u></div>'
-  };
+  // 4. Own things: proof that I build, not only design
+  sections.push(function () {
+    var own = [
+      { name: 'Digital Feng Shui', what: 'A course and a method for a calm digital life. Brand, site, course platform, the lot.', meta: 'digital-fengshui.com', href: 'https://www.digital-fengshui.com/' },
+      { name: 'Rhythms', what: 'A Mac app that closes what pulls at you, on a rhythm you set. Menu bar, block page, no snooze button.', meta: 'macOS · in the works', href: 'https://www.digital-fengshui.com/' }
+    ];
+    return '<section class="proto-own">' +
+      '<div class="proto-own_head"><span class="proto-label">Own things</span><h2 class="proto-h2" data-title>What I build when<br>nobody asks</h2></div>' +
+      '<div class="proto-own_list">' + own.map(function (o, i) {
+        return '<a class="proto-own_item" href="' + o.href + '" target="_blank" rel="noopener" data-component><span class="proto-own_n">0' + (i + 1) + '</span><span class="proto-own_name">' + o.name + '</span><span class="proto-own_what">' + o.what + '</span><span class="proto-own_meta">' + o.meta + ' ↗</span></a>';
+      }).join('') + '</div>' +
+      '</section>';
+  });
 
-  var work = document.querySelector('[data-glass-carousel]');
-  if (work && !document.querySelector('.proto-plan')) {
-    var tag = document.createElement('div');
-    tag.className = 'proto-tag';
-    tag.innerHTML = '<span>02 · Work</span> The carousel stays. The way the work is presented gets its own round later.';
-    (document.querySelector('.proto-services') || document.querySelector('.proto-statement') || work).insertAdjacentElement('afterend', tag);
+  // 5. Notes: three from the Resources page
+  sections.push(function () {
+    var notes = [
+      { t: 'Top 50 Best Websites 2025: Get inspired', c: 'UI/UX Design', href: 'https://www.rimbodesigns.com/post/top-50-best-websites-2025' },
+      { t: 'Conversion Optimization Trends 2025', c: 'Online Marketing', href: 'https://www.rimbodesigns.com/post/conversion-optimization-trends-2025' },
+      { t: 'How to Build a Brand That Stands Out', c: 'Branding', href: 'https://www.rimbodesigns.com/post/how-to-build-a-brand-that-stands-out' }
+    ];
+    return '<section class="proto-notes">' +
+      '<div class="proto-notes_head"><span class="proto-label">Notes</span><h2 class="proto-h2" data-title>Things worth<br>reading</h2></div>' +
+      '<div class="proto-notes_list">' + notes.map(function (n) {
+        return '<a class="proto-notes_item" href="' + n.href + '" data-component><span class="proto-notes_cat">' + n.c + '</span><span class="proto-notes_title">' + n.t + '</span><span class="proto-notes_arrow">→</span></a>';
+      }).join('') + '</div>' +
+      '<p class="proto-foot"><a href="https://www.rimbodesigns.com/resources">All resources</a></p>' +
+      '</section>';
+  });
 
-    var outer = document.createElement('div');
-    outer.className = 'proto-plan-wrap';
-    var wrap = document.createElement('div');
-    wrap.className = 'proto-plan';
-    var html = '<div class="proto-plan_intro"><span class="proto-label">Plan</span><h2>The home page does the work of Service, Work, Resources and Contact.</h2><p>Each block below is a placeholder: what the section should do, not yet how it looks. We go through them one by one.</p></div>';
-    plan.forEach(function (b) {
-      html += '<section class="proto-block" data-layout="' + b.layout + '">' +
-        '<div class="proto-block_head"><span class="proto-label">' + b.n + ' · ' + b.name + '</span><h3>' + b.title + '</h3><p>' + b.does + '</p></div>' +
-        '<ul class="proto-block_list">' + b.inside.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>' +
-        skeletons[b.layout] +
-        '</section>';
-    });
-    wrap.innerHTML = html;
-    outer.appendChild(wrap);
-    tag.insertAdjacentElement('afterend', outer);
+  // 6. Start: no pitch, one line, two ways in
+  sections.push(function () {
+    return '<section class="proto-start" id="contact">' +
+      '<span class="proto-label"><i class="proto-start_dot"></i> 2 spots left this quarter</span>' +
+      '<h2 class="proto-start_title" data-title>Have something<br>in mind?</h2>' +
+      '<div class="proto-start_ways">' +
+        '<a class="proto-start_way" href="https://cal.com/rimbo-designs/45-minute-discovery-call" target="_blank" rel="noopener"><span class="proto-start_way-k">45 minutes</span><span class="proto-start_way-v">Book a call ↗</span></a>' +
+        '<a class="proto-start_way" href="mailto:hello@rimbodesigns.com"><span class="proto-start_way-k">Or write</span><span class="proto-start_way-v">hello@rimbodesigns.com</span></a>' +
+      '</div>' +
+      '</section>';
+  });
+
+  var after = document.querySelector('.proto-statement');
+  if (after && !document.querySelector('.proto-rest')) {
+    var rest = document.createElement('div');
+    rest.className = 'proto-rest';
+    rest.innerHTML = sections.map(function (make) { return make(); }).join('');
+    after.insertAdjacentElement('afterend', rest);
   }
 })();

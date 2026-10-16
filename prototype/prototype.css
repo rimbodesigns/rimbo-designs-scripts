@@ -27,65 +27,73 @@ html.proto-nav-wait .topnav, html.proto-nav-wait #FIXED_NAV, html.proto-nav-wait
 .proto-statement_line { font-family: "RM MONO", monospace; font-size: .78rem; letter-spacing: .18em; text-transform: uppercase; color: var(--color--text-on-black); margin: 1.6rem 0 0; }
 .proto-statement_line span { color: var(--color--brand); margin: 0 .5em; }
 
-/* ---- no more Integral in the prototype: Grifter is the display face ---- */
-.proto-plan_intro h2, .proto-block_head h3, .proto-skel b { font-family: "GRIFTER BOLD", sans-serif !important; font-weight: 700 !important; text-transform: none !important; }
 
-/* ---- PLAN blocks ---- */
-.proto-tag, .proto-plan-wrap { background: var(--color--black); }
-.proto-tag { padding: 1.25rem clamp(1.25rem, 4vw, 4rem) 0; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--color--grey); }
-.proto-tag span { color: var(--color--brand); margin-right: .75rem; }
-.proto-plan { padding: clamp(3rem, 6vw, 5rem) clamp(1.25rem, 4vw, 4rem) clamp(4rem, 8vw, 7rem); display: grid; gap: 1.5rem; max-width: 86rem; margin: 0 auto; color: var(--color--rimbobage); }
-.proto-label { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--color--brand); }
-.proto-plan_intro { padding: 0 0 1.5rem; max-width: 52rem; }
-.proto-plan_intro h2 { font-family: IntegralNEW, Arial, sans-serif; font-weight: 900; text-transform: uppercase; font-size: clamp(1.5rem, 3vw, 2.4rem); line-height: 1; margin: .9rem 0 1rem; }
-.proto-plan_intro p, .proto-block_head p { font-family: Akkuratllsub, sans-serif; color: var(--color--text-on-black); font-size: 1rem; line-height: 1.55; margin: 0; max-width: 46ch; }
-.proto-block { display: grid; grid-template-columns: minmax(16rem, 1.1fr) minmax(12rem, .8fr) 1.4fr; gap: 2rem 3rem; align-items: start; padding: 2.25rem 2rem; border: 1px dashed rgba(248, 245, 238, .22); border-radius: .5rem; background: rgba(248, 245, 238, .015); }
-.proto-block_head h3 { font-family: IntegralNEW, Arial, sans-serif; font-weight: 900; text-transform: uppercase; font-size: clamp(1.1rem, 1.8vw, 1.5rem); line-height: 1.05; margin: .7rem 0 .9rem; }
-.proto-block_list { margin: 0; padding: 0; list-style: none; font-family: "RM MONO", monospace; font-size: .75rem; letter-spacing: .03em; line-height: 1.6; color: var(--color--text-on-black); }
-.proto-block_list li { font: inherit; letter-spacing: inherit; padding-left: 1.1rem; position: relative; margin-bottom: .45rem; }
-.proto-block_list li::before { content: "–"; position: absolute; left: 0; color: var(--color--brand); }
-@media (max-width: 991px) { .proto-block { grid-template-columns: 1fr; } }
 
-/* skeletons: grey boxes that hint at the layout */
-.proto-skel { display: grid; gap: .6rem; min-height: 9rem; }
-.proto-skel i, .proto-skel u, .proto-skel b { display: block; background: rgba(248, 245, 238, .07); border-radius: .35rem; min-height: 2.4rem; }
-.proto-skel b { font-family: IntegralNEW, Arial, sans-serif; font-weight: 900; font-size: 1.3rem; display: grid; place-items: center; color: var(--color--rimbobage); background: transparent; border: 1px solid rgba(248, 245, 238, .12); }
-.proto-skel.is-steps { grid-template-columns: repeat(4, 1fr); }
-.proto-skel.is-steps i { min-height: 7rem; }
-.proto-skel.is-strip { grid-template-columns: 1fr 1fr repeat(4, .7fr); align-items: center; min-height: 4rem; }
-.proto-skel.is-strip i { min-height: 1.6rem; opacity: .6; }
-.proto-skel.is-cards { grid-template-columns: repeat(3, 1fr); }
-.proto-skel.is-cards i { min-height: 9rem; }
-.proto-skel.is-split { grid-template-columns: .7fr 1fr; align-items: center; }
-.proto-skel.is-split u { aspect-ratio: 1; border-radius: 50%; min-height: 0; }
-.proto-skel.is-split div { display: grid; gap: .6rem; }
-.proto-skel.is-split div i:last-child { width: 60%; }
-.proto-skel.is-calendar { grid-template-columns: 1fr 1.3fr; }
-.proto-skel.is-calendar div { display: grid; gap: .6rem; align-content: start; }
-.proto-skel.is-calendar u { min-height: 10rem; border-radius: .35rem; }
+/* ====== THE REST OF THE PAGE ====== */
+.proto-rest { background: var(--color--black); color: var(--color--rimbobage); }
+.proto-rest section { padding: clamp(4.5rem, 11vh, 9rem) clamp(1.25rem, 4vw, 4rem); max-width: 86rem; margin: 0 auto; }
+.proto-rest a { color: inherit; text-decoration: none; }
+.proto-label { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--brand); display: inline-flex; align-items: center; gap: .6rem; }
+.proto-h2 { color: var(--color--rimbobage); font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.9rem, 4vw, 3.4rem); line-height: 1; margin: .9rem 0 0; }
+.proto-foot { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--text-on-black); margin: 2.5rem 0 0; }
+.proto-foot a { border-bottom: 1px solid rgba(248, 245, 238, .3); padding-bottom: .25em; }
+.proto-foot a:hover { color: var(--color--rimbobage); border-color: var(--color--rimbobage); }
+.proto-rest p { font-family: Akkuratllsub, sans-serif; }
 
-/* ---- SERVICES: three tracks as a list ---- */
-.proto-services { background: var(--color--black); color: var(--color--rimbobage); padding: clamp(4rem, 10vh, 8rem) clamp(1.25rem, 4vw, 4rem) clamp(5rem, 12vh, 9rem); max-width: 86rem; margin: 0 auto; }
-.proto-services_head { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 4rem; align-items: end; margin-bottom: 3rem; }
-.proto-services_head .proto-label { grid-column: 1 / -1; }
-.proto-services_title { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.9rem, 4vw, 3.4rem); line-height: 1; margin: 0; max-width: 12ch; }
-.proto-services_intro { font-family: Akkuratllsub, sans-serif; font-size: 1.05rem; line-height: 1.55; color: var(--color--text-on-black); margin: 0; max-width: 40ch; justify-self: end; }
-.proto-services_list { border-top: 1px solid rgba(248, 245, 238, .14); }
-.proto-track { display: grid; grid-template-columns: 3rem minmax(10rem, .8fr) 1.6fr minmax(11rem, .6fr); gap: 1.5rem 2.5rem; align-items: baseline; padding: 2rem 0; border-bottom: 1px solid rgba(248, 245, 238, .14); color: inherit; text-decoration: none; transition: padding-left .5s cubic-bezier(.625, .05, 0, 1), opacity .3s; }
-.proto-track:hover { padding-left: .75rem; }
-.proto-services_list:hover .proto-track:not(:hover) { opacity: .55; }
-.proto-track_n { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .1em; color: var(--color--brand); }
-.proto-track_name { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.3rem, 2.2vw, 1.9rem); line-height: 1.05; }
-.proto-track_what { font-family: Akkuratllsub, sans-serif; font-size: 1rem; line-height: 1.5; color: var(--color--text-on-black); max-width: 44ch; }
-.proto-track_meta { display: flex; flex-direction: column; gap: .35rem; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--text-on-black); text-align: right; }
-.proto-track_meta span:last-child { color: var(--color--rimbobage); }
-.proto-services_foot { font-family: Akkuratllsub, sans-serif; color: var(--color--text-on-black); margin: 2.5rem 0 0; font-size: 1rem; }
-.proto-services_foot a { color: var(--color--rimbobage); border-bottom: 1px solid rgba(248, 245, 238, .3); padding-bottom: .1em; }
-.proto-services_foot a:hover { border-color: var(--color--rimbobage); }
-@media (max-width: 991px) {
-  .proto-services_head { grid-template-columns: 1fr; }
-  .proto-services_intro { justify-self: start; }
-  .proto-track { grid-template-columns: 3rem 1fr; }
-  .proto-track_what, .proto-track_meta { grid-column: 2; }
-  .proto-track_meta { flex-direction: row; gap: 1.5rem; text-align: left; }
-}
+/* 1. names */
+.proto-rest .proto-names { padding-top: clamp(2rem, 5vh, 4rem); padding-bottom: clamp(2rem, 5vh, 4rem); max-width: none; }
+.proto-names_head { max-width: 86rem; margin: 0 auto 2.5rem; display: flex; justify-content: space-between; gap: 2rem; align-items: baseline; }
+.proto-names_head p { margin: 0; color: var(--color--text-on-black); font-size: 1rem; max-width: 46ch; }
+.proto-names_head a { border-bottom: 1px solid rgba(248, 245, 238, .3); color: var(--color--rimbobage); }
+.proto-names_marquee { overflow: hidden; margin: 0 calc(-1 * clamp(1.25rem, 4vw, 4rem)); padding: 1.6rem 0; border-top: 1px solid rgba(248, 245, 238, .12); border-bottom: 1px solid rgba(248, 245, 238, .12); }
+.proto-names_scroll { display: flex; }
+.proto-names_list { display: flex; flex-shrink: 0; align-items: center; white-space: nowrap; font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.4rem, 3vw, 2.6rem); line-height: 1; color: var(--color--rimbobage); }
+.proto-names_item { padding: 0 1.4rem; }
+.proto-names_dot { color: var(--color--brand); }
+@media (max-width: 767px) { .proto-names_head { flex-direction: column; } }
+
+/* 2. kind words */
+.proto-words_grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4rem; margin-top: 3rem; border-top: 1px solid rgba(248, 245, 238, .14); }
+.proto-words_item { margin: 0; padding: 2.5rem 0 2.75rem; border-bottom: 1px solid rgba(248, 245, 238, .14); display: grid; grid-template-columns: 3rem 1fr; gap: .5rem 1rem; }
+.proto-words_n { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .1em; color: var(--color--brand); padding-top: .4rem; }
+.proto-words_item blockquote { margin: 0; font-family: Akkuratllsub, sans-serif; font-size: clamp(1.05rem, 1.5vw, 1.3rem); line-height: 1.5; }
+.proto-words_item figcaption { grid-column: 2; margin-top: 1.2rem; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+.proto-words_item figcaption span { display: block; color: var(--color--grey); margin-top: .3rem; }
+@media (max-width: 991px) { .proto-words_grid { grid-template-columns: 1fr; } }
+
+/* 3. about */
+.proto-rest .proto-about { display: grid; grid-template-columns: minmax(14rem, 24rem) 1fr; gap: 3rem 6rem; align-items: center; }
+.proto-about_portrait { aspect-ratio: 1; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1px rgba(248, 245, 238, .18), 0 0 0 1rem var(--color--black), 0 0 0 calc(1rem + 1px) rgba(248, 245, 238, .14); }
+.proto-about_portrait img { width: 100%; height: 100%; object-fit: cover; display: block; filter: grayscale(.15) contrast(1.05); }
+.proto-about_copy p { margin: 1.4rem 0 0; color: var(--color--text-on-black); font-size: 1.02rem; line-height: 1.55; max-width: 52ch; }
+.proto-about_copy .proto-about_lead { color: var(--color--rimbobage); font-size: clamp(1.15rem, 1.7vw, 1.45rem); line-height: 1.4; }
+.proto-about_links { display: flex; gap: 1.75rem; margin-top: 2rem; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+.proto-about_links a { border-bottom: 1px solid rgba(248, 245, 238, .3); padding-bottom: .25em; }
+.proto-about_links a:hover { border-color: var(--color--rimbobage); }
+@media (max-width: 767px) { .proto-rest .proto-about { grid-template-columns: 1fr; } .proto-about_portrait { max-width: 16rem; } }
+
+/* 4. own things + 5. notes share the list language */
+.proto-own_list, .proto-notes_list { margin-top: 3rem; border-top: 1px solid rgba(248, 245, 238, .14); }
+.proto-own_item, .proto-notes_item { display: grid; align-items: baseline; gap: 1.25rem 2.5rem; padding: 2rem 0; border-bottom: 1px solid rgba(248, 245, 238, .14); transition: padding-left .5s cubic-bezier(.625, .05, 0, 1), opacity .3s; }
+.proto-own_item { grid-template-columns: 3rem minmax(10rem, .7fr) 1.6fr minmax(10rem, .5fr); }
+.proto-notes_item { grid-template-columns: minmax(9rem, .5fr) 1.6fr 2rem; }
+.proto-own_item:hover, .proto-notes_item:hover { padding-left: .75rem; }
+.proto-own_list:hover .proto-own_item:not(:hover), .proto-notes_list:hover .proto-notes_item:not(:hover) { opacity: .5; }
+.proto-own_n { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .1em; color: var(--color--brand); }
+.proto-own_name, .proto-notes_title { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(1.2rem, 2vw, 1.7rem); line-height: 1.1; }
+.proto-own_what { font-family: Akkuratllsub, sans-serif; font-size: 1rem; line-height: 1.5; color: var(--color--text-on-black); max-width: 44ch; }
+.proto-own_meta, .proto-notes_cat { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--text-on-black); }
+.proto-own_meta { text-align: right; }
+.proto-notes_arrow { font-family: "RM MONO", monospace; color: var(--color--brand); text-align: right; }
+@media (max-width: 991px) { .proto-own_item { grid-template-columns: 3rem 1fr; } .proto-own_what, .proto-own_meta { grid-column: 2; } .proto-own_meta { text-align: left; } .proto-notes_item { grid-template-columns: 1fr 2rem; } .proto-notes_title { grid-column: 1; } }
+
+/* 6. start */
+.proto-rest .proto-start { text-align: center; padding-top: clamp(6rem, 16vh, 12rem); padding-bottom: clamp(6rem, 16vh, 12rem); }
+.proto-start_dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--color--brand); box-shadow: 0 0 0 0 rgba(255, 115, 115, .6); animation: proto-spot 2.4s ease-out infinite; }
+@keyframes proto-spot { 0% { box-shadow: 0 0 0 0 rgba(255, 115, 115, .55); } 70% { box-shadow: 0 0 0 .6rem rgba(255, 115, 115, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 115, 115, 0); } }
+.proto-start_title { color: var(--color--rimbobage); font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(2.4rem, 6.4vw, 5.6rem); line-height: .98; margin: 1.2rem 0 0; }
+.proto-start_ways { display: flex; justify-content: center; gap: 1.5rem; margin-top: 3rem; flex-wrap: wrap; }
+.proto-start_way { display: flex; flex-direction: column; gap: .5rem; min-width: 16rem; padding: 1.4rem 1.6rem; border: 1px solid rgba(248, 245, 238, .16); border-radius: .5rem; text-align: left; transition: border-color .3s, transform .5s cubic-bezier(.625, .05, 0, 1); }
+.proto-start_way:hover { border-color: rgba(248, 245, 238, .5); transform: translateY(-3px); }
+.proto-start_way-k { font-family: "RM MONO", monospace; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--text-on-black); }
+.proto-start_way-v { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: 1.15rem; }
