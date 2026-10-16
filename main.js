@@ -924,7 +924,7 @@
     var introCaptionDelay = 0.6; // the caption follows after this many seconds
 
     // Autoplay: the row rolls left on its own and pauses while you touch it
-    var autoDrift = 20; // px per second, 0 switches it off
+    var autoDrift = 26; // px per second, 0 switches it off
     var driftResume = 2.5; // seconds of quiet after an interaction before it rolls again
     var driftEase = 0.12;
 
@@ -1241,7 +1241,15 @@
       function adoptTexture(source) {
         if (source.video) return adoptVideo(source);
         var image = source.image;
-        if (!image || !image.naturalWidth || !image.naturalHeight) return;
+        if (!image || source.adopted) return;
+        if (!image.naturalWidth || !image.naturalHeight) { // not decoded yet: come back when it is
+          if (!source.waiting) {
+            source.waiting = true;
+            waitForImage(image, function () { source.waiting = false; adoptTexture(source); });
+          }
+          return;
+        }
+        source.adopted = true;
         source.aspect = image.naturalWidth / image.naturalHeight;
         measurePanel();
         var url = image.currentSrc || image.src;
@@ -1268,6 +1276,15 @@
         });
       }
 
+      // "load" alone is not enough: an <img> can report complete while its size is still 0,
+      // and a cached one may never fire load again. decode() settles both cases.
+      function waitForImage(image, done) {
+        var called = false;
+        var once = function () { if (!called) { called = true; done(); } };
+        image.addEventListener('load', once, { once: true });
+        if (image.decode) image.decode().then(once, function () {}); // a failed decode leaves it to the load/error path
+      }
+
       function bindTextures() {
         sources.forEach(function (source) {
           if (!source.image) return;
@@ -1283,8 +1300,8 @@
             if (kick && kick.catch) kick.catch(function () {});
             return;
           }
-          if (source.image.complete) adoptTexture(source);
-          else source.image.addEventListener('load', function () { adoptTexture(source); }, { once: true });
+          if (source.image.complete && source.image.naturalWidth) adoptTexture(source);
+          else waitForImage(source.image, function () { adoptTexture(source); });
         });
       }
 

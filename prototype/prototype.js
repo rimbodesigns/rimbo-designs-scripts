@@ -24,6 +24,40 @@
     list.insertBefore(item, list.firstElementChild);
   }
 
+  // ---- TEST AID: ?nocache makes every cover load over the network again (the cold-cache path)
+  if (/[?&]nocache/.test(location.search)) {
+    document.querySelectorAll('[data-glass-carousel-item] img').forEach(function (img) {
+      var bust = (img.src.indexOf('?') > -1 ? '&' : '?') + 'nocache=' + Date.now();
+      img.removeAttribute('srcset'); img.removeAttribute('sizes');
+      img.src = img.src + bust;
+    });
+  }
+
+  // ---- FEWER, BETTER: the older or simpler sites leave the row for now
+  ['Muzammil Hussain', 'MushroomTao'].forEach(function (name) {
+    document.querySelectorAll('[data-glass-carousel-item]').forEach(function (item) {
+      var first = item.querySelector('[data-glass-carousel-content] p');
+      if (first && first.textContent.trim() === name) item.remove();
+    });
+  });
+
+  // ---- CURSOR: the site's own cursor pill says what a click does here.
+  // On a side panel: "Drag", on the centred one: "View". It reads the carousel's state attributes.
+  var cursor = document.querySelector('.cursor');
+  var cursorLabel = cursor && cursor.querySelector('p');
+  if (opening && cursor && cursorLabel && matchMedia('(hover: hover)').matches) {
+    cursor.classList.add('is-proto');
+    var updateCursor = function () {
+      var pointer = opening.getAttribute('data-glass-carousel-pointer');
+      var centre = opening.getAttribute('data-glass-carousel-focus') === 'center';
+      if (pointer === 'grabbing') { cursorLabel.textContent = 'Drag'; cursor.style.opacity = '1'; }
+      else if (pointer === 'grab') { cursorLabel.textContent = centre ? 'View' : 'Drag'; cursor.style.opacity = '1'; }
+      else cursor.style.opacity = '';
+    };
+    new MutationObserver(updateCursor).observe(opening, { attributes: true, attributeFilter: ['data-glass-carousel-pointer', 'data-glass-carousel-focus'] });
+    opening.addEventListener('pointerleave', function () { cursor.style.opacity = ''; });
+  }
+
   // ---- CAPTIONS: the name only; the line under it (what was done) shows once you are on the
   // centred panel (data-glass-carousel-focus, see CSS). Short lines, RM Mono caps.
   var lines = {
