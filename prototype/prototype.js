@@ -50,9 +50,9 @@
   var liveSites = {
     'Nathan Rajac': 'https://www.nathanrajac.com/',
     "Charlie's Angels Costa Rica": 'https://www.charlies-angels-rescue.org/',
-    'Dieronesie': 'https://www.dieronesie.com/',
     'Sandra Dreisbach': 'https://www.sandradreisbach.com/'
-    // Anapana: the shop is offline, its link stays on the case study
+    // Anapana and Dieronesie: their sites are offline (dieronesie.com is dead, .nl redirects to a casino),
+    // so their links stay on the case studies
   };
   document.querySelectorAll('[data-glass-carousel-item]').forEach(function (item) {
     var name = item.querySelector('[data-glass-carousel-content] p');
