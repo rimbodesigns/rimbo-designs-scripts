@@ -908,7 +908,7 @@
     var lensRingRadius = 0.49; // 0.1 sits near the middle, 0.49 on the edge
     var lensRingWidth = 0.01; // higher is softer and wider
     var lensRimLine = 1; // the white outline, 0 removes it
-    var lensNova = 0.1; // white bloom in the middle, 0 to 1
+    var lensNova = 0; // white bloom in the middle, 0 to 1 (off: its falloff is wider than the canvas and lifted the black by ~5 levels)
     var lensDispersion = 11; // how far red and blue split near the edge
     var lensRimWave = 0.3; // how much the edge ripples
     var lensZoom = 0.4; // how much the glass magnifies, 0 is flat
