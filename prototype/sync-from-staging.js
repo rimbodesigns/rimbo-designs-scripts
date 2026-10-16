@@ -1,7 +1,8 @@
 // Rebuilds prototype/index.html from the Webflow staging page, so the prototype starts as an
 // exact copy of the baseline. Run: node prototype/sync-from-staging.js
-// Changes made on the way: the site script comes from this repo (/main.js), the black is the
-// darker dark, analytics are left out, and page links point at the staging site.
+// Changes made on the way: prototype.js + prototype.css are added, the site script comes from
+// this repo (/main.js), the black is the darker dark, analytics are left out, and page links
+// point at the staging site.
 const fs = require('fs');
 const path = require('path');
 const SOURCE = 'https://rimbodesigns.webflow.io/home-copy';
@@ -13,7 +14,7 @@ const DARK = '#0c0c0c';
   let html = await res.text();
 
   // the site script from this repo instead of the tagged jsDelivr build
-  html = html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/gh\/rimbodesigns\/rimbo-designs-scripts@[^"]+\/main\.min\.js"><\/script>/, '<script src="/main.js"></script>');
+  html = html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/gh\/rimbodesigns\/rimbo-designs-scripts@[^"]+\/main\.min\.js"><\/script>/, '<script src="/prototype/prototype.js"></script>\n<script src="/main.js"></script>');
   // no Google Tag Manager from localhost
   html = html.replace(/<!-- Google Tag Manager -->[\s\S]*?<!-- End Google Tag Manager -->/g, '');
   html = html.replace(/<!-- Google Tag Manager \(noscript\) -->[\s\S]*?<!-- End Google Tag Manager \(noscript\) -->/g, '');
