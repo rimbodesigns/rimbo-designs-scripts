@@ -41,23 +41,6 @@
     });
   });
 
-  // ---- CURSOR: the site's own cursor pill says what a click does here.
-  // On a side panel: "Drag", on the centred one: "View". It reads the carousel's state attributes.
-  var cursor = document.querySelector('.cursor');
-  var cursorLabel = cursor && cursor.querySelector('p');
-  if (opening && cursor && cursorLabel && matchMedia('(hover: hover)').matches) {
-    cursor.classList.add('is-proto');
-    var updateCursor = function () {
-      var pointer = opening.getAttribute('data-glass-carousel-pointer');
-      var centre = opening.getAttribute('data-glass-carousel-focus') === 'center';
-      if (pointer === 'grabbing') { cursorLabel.textContent = 'Drag'; cursor.style.opacity = '1'; }
-      else if (pointer === 'grab') { cursorLabel.textContent = centre ? 'View' : 'Drag'; cursor.style.opacity = '1'; }
-      else cursor.style.opacity = '';
-    };
-    new MutationObserver(updateCursor).observe(opening, { attributes: true, attributeFilter: ['data-glass-carousel-pointer', 'data-glass-carousel-focus'] });
-    opening.addEventListener('pointerleave', function () { cursor.style.opacity = ''; });
-  }
-
   // ---- CAPTIONS: the name only; the line under it (what was done) shows once you are on the
   // centred panel (data-glass-carousel-focus, see CSS). Short lines, RM Mono caps.
   var lines = {

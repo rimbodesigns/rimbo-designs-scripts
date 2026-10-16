@@ -21,11 +21,6 @@
 .topnav, #FIXED_NAV, .burgermenu { transition: opacity .7s cubic-bezier(.22, 1, .36, 1); }
 html.proto-nav-wait .topnav, html.proto-nav-wait #FIXED_NAV, html.proto-nav-wait .burgermenu { opacity: 0 !important; transition: none !important; }
 
-/* ---- CURSOR pill over the canvas: light on dark, native hand underneath ---- */
-.cursor.is-proto { background: var(--color--rimbobage); color: var(--color--black); font-size: 1em; padding: .35em .8em .45em; transition: opacity .25s ease; }
-.cursor.is-proto .cursor-paragraph { letter-spacing: .12em; font-size: .68rem; }
-[data-glass-carousel-focus="center"] canvas { cursor: pointer !important; }
-
 /* ---- STATEMENT: the H1 after the opening ---- */
 .proto-statement { background: var(--color--black); color: var(--color--rimbobage); text-align: center; padding: clamp(6rem, 18vh, 12rem) clamp(1.25rem, 4vw, 4rem); }
 .proto-statement_title { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(2.4rem, 6.4vw, 5.6rem); line-height: .98; letter-spacing: -.01em; margin: 0 auto; max-width: 14ch; }

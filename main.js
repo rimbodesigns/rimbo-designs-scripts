@@ -925,7 +925,7 @@
 
     // Autoplay: the row rolls left on its own and pauses while you touch it
     var autoDrift = 26; // px per second, 0 switches it off
-    var driftResume = 2.5; // seconds of quiet after an interaction before it rolls again
+    var driftResume = 0.5; // seconds of quiet after an interaction before it rolls again
     var driftEase = 0.12;
 
     // Finer shader detail, rarely worth touching
@@ -1176,7 +1176,6 @@
             intro.value = 1;
             introDone = true;
             lensStrength();
-            lastInput = performance.now(); // the drift starts driftResume seconds after the intro
             window.dispatchEvent(new CustomEvent('glass-carousel:intro-done', { detail: { wrapper: wrapper } }));
           }
         });
@@ -1738,7 +1737,7 @@
           velocity *= friction;
           if (Math.abs(velocity) < 0.05) velocity = 0;
 
-          drifting = autoDrift > 0 && introDone && idle > driftResume * 1000;
+          drifting = autoDrift > 0 && idle > driftResume * 1000; // also during the intro: it moves from the start
           if (drifting) {
             target += autoDrift * dt; // the row rolls left on its own
             snapped = false;
