@@ -1,0 +1,13 @@
+{
+  "name": "rimbo-designs-scripts",
+  "private": true,
+  "description": "Site-wide JavaScript for rimbodesigns.com, the home-page prototype and the clip recorder",
+  "scripts": {
+    "prototype": "node prototype/server.js",
+    "sync": "node prototype/sync-from-staging.js",
+    "record": "node media/record-site.js"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0"
+  }
+}
