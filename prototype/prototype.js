@@ -32,7 +32,8 @@
 
   // ---- MOVING PANELS for existing items: swap the cover for a recorded scroll-through
   var clips = {
-    "Charlie's Angels Costa Rica": '/media/charlies-angels.mp4'
+    "Charlie's Angels Costa Rica": '/media/charlies-angels.mp4',
+    'Dieronesie': '/media/dieronesie.mp4' // recorded from dieronesie.webflow.io, the live domain is gone
   };
   document.querySelectorAll('[data-glass-carousel-item]').forEach(function (item) {
     var name = item.querySelector('[data-glass-carousel-content] p');
