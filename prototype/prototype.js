@@ -47,6 +47,12 @@
     img.replaceWith(video);
   });
 
+  // ---- the clips run at 1.5x: a scroll-through reads better a little quick
+  document.querySelectorAll('[data-glass-carousel-item] video').forEach(function (v) {
+    v.playbackRate = 1.5;
+    v.addEventListener('loadedmetadata', function () { v.playbackRate = 1.5; }, { once: true });
+  });
+
   // ---- LINKS: straight to the live sites, in a new tab (no case-study stories on the home page)
   var liveSites = {
     'Nathan Rajac': 'https://www.nathanrajac.com/',
