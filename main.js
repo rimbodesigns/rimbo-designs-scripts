@@ -1177,6 +1177,7 @@
             introDone = true;
             lensStrength();
             lastInput = performance.now(); // the drift starts driftResume seconds after the intro
+            window.dispatchEvent(new CustomEvent('glass-carousel:intro-done', { detail: { wrapper: wrapper } }));
           }
         });
         gsap.to([captionEl, counterEl].filter(Boolean), {
@@ -1553,10 +1554,25 @@
         setPointer(dragging ? 'grabbing' : on ? 'grab' : '');
       }
 
+      var focusState = false;
+      function setFocus(on) { // the pointer rests on the centred panel
+        on = !!on;
+        if (on === focusState) return;
+        focusState = on;
+        if (on) wrapper.setAttribute('data-glass-carousel-focus', 'center');
+        else wrapper.removeAttribute('data-glass-carousel-focus');
+      }
+
+      function hoverAt(x, y) {
+        var hit = rectOf(x, y);
+        setHover(hit !== null);
+        setFocus(hit && centeredPanel && hit.poolIdx === centeredPanel.poolIdx);
+      }
+
       function refreshHover() {
         if (!pointerInside || lastPointerType !== 'mouse') return;
         if (!Number.isFinite(lastPointerX)) return;
-        setHover(rectOf(lastPointerX, lastPointerY) !== null);
+        hoverAt(lastPointerX, lastPointerY);
       }
 
       function onWheel(e) {
@@ -1608,7 +1624,7 @@
         lastPointerType = e.pointerType || 'mouse';
         pointerInside = true;
         if (e.pointerType !== 'mouse') return;
-        setHover(rectOf(e.clientX, e.clientY) !== null);
+        hoverAt(e.clientX, e.clientY);
       }
 
       function onPointerUp(e) {
@@ -1624,8 +1640,8 @@
         lastInput = performance.now();
         snapped = false;
         suppressClick = dragDist > (dragPointerType === 'mouse' ? clickSlop : touchClickSlop);
-        if (dragPointerType === 'mouse') setHover(rectOf(lastPointerX, lastPointerY) !== null);
-        else setHover(false);
+        if (dragPointerType === 'mouse') hoverAt(lastPointerX, lastPointerY);
+        else { setHover(false); setFocus(false); }
       }
 
       function onEnter(e) {
@@ -1636,6 +1652,7 @@
       function onLeave() {
         pointerInside = false;
         setHover(false);
+        setFocus(false);
       }
 
       function onClick(e) {
