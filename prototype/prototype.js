@@ -76,15 +76,16 @@
     if (ps[1] && lines[name]) ps[1].textContent = lines[name];
   });
 
-  // ---- NAV TIMING: logo, burger and the top nav stay out until the grow-in has finished
-  var navBits = Array.prototype.slice.call(document.querySelectorAll('#FIXED_NAV, .burgermenu, .topnav'));
-  if (opening && !reduceMotion && window.gsap && navBits.length) {
-    gsap.set(navBits, { autoAlpha: 0, y: -8 });
+  // ---- NAV TIMING: whatever nav the page would show is held back until the grow-in has finished.
+  // A class on <html> keeps it at opacity 0 (see CSS); removing the class lets the page's own
+  // rules and interactions take over again (on desktop the fixed logo and burger only come on scroll).
+  if (opening && !reduceMotion) {
+    document.documentElement.classList.add('proto-nav-wait');
     var navShown = false;
     function showNav() {
       if (navShown) return;
       navShown = true;
-      gsap.to(navBits, { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power3.out', stagger: 0.08, delay: 0.5, clearProps: 'transform' });
+      setTimeout(function () { document.documentElement.classList.remove('proto-nav-wait'); }, 500);
     }
     window.addEventListener('glass-carousel:intro-done', showNav, { once: true });
     setTimeout(showNav, 6000); // never leave the page without a nav

@@ -17,6 +17,10 @@
 [data-glass-carousel-focus="center"] .glass-carousel__caption .glass-carousel__item-p.is--faded { opacity: 1; transform: none; }
 @media (hover: none) { .glass-carousel__caption .glass-carousel__item-p.is--faded { opacity: 1; transform: none; } }
 
+/* ---- NAV TIMING: held back until the grow-in is done, then the page's own rules apply ---- */
+.topnav, #FIXED_NAV, .burgermenu { transition: opacity .7s cubic-bezier(.22, 1, .36, 1); }
+html.proto-nav-wait .topnav, html.proto-nav-wait #FIXED_NAV, html.proto-nav-wait .burgermenu { opacity: 0 !important; transition: none !important; }
+
 /* ---- CURSOR pill over the canvas: light on dark, native hand underneath ---- */
 .cursor.is-proto { background: var(--color--rimbobage); color: var(--color--black); font-size: 1em; padding: .35em .8em .45em; transition: opacity .25s ease; }
 .cursor.is-proto .cursor-paragraph { letter-spacing: .12em; font-size: .68rem; }
