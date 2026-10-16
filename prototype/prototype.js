@@ -3,15 +3,8 @@
 (function () {
   'use strict';
 
-  // ---- HERO: less text, more air. The services line and the spots counter are hidden in CSS;
-  // one short line of context goes under the title instead.
-  var heroContainer = document.querySelector('#FadeOUT .hero_container');
-  if (heroContainer && !document.querySelector('.proto-hero_line')) {
-    var line = document.createElement('p');
-    line.className = 'proto-hero_line';
-    line.innerHTML = 'Independent brand &amp; web design <span>·</span> Netherlands';
-    heroContainer.insertAdjacentElement('afterend', line);
-  }
+  // ---- HERO: the title smaller, the services line back, no button, everything higher.
+  // (all of it in prototype.css; nothing to add to the DOM)
 
   // ---- ARCHITECTURE: placeholder blocks after the work carousel. Each one says what the
   // section should do; nothing here is the design yet.

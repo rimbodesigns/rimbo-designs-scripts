@@ -3,12 +3,12 @@
 
 .w-webflow-badge { display: none !important; }
 
-/* ---- HERO: less text, more air ---- */
-#HeroText, #RED_DOT { display: none !important; }
-.opening-text._2 .hero_heading { font-size: clamp(2.6rem, 6.4vw, 5.6rem); line-height: .95; letter-spacing: -.005em; }
-.proto-hero_line { margin: 1.4rem 0 0; font-family: "RM MONO", monospace; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--color--text-on-black); text-align: center; }
-.proto-hero_line span { color: var(--color--brand); margin: 0 .35em; }
-#MotionBtn.top2rem { margin-top: 2.6rem; transform: scale(.88); transform-origin: top center; }
+/* ---- HERO: smaller title, services line back, no button, the whole thing higher ---- */
+#RED_DOT, #MotionBtn { display: none !important; }
+.fadeout_scroll { margin-top: 13vh !important; }
+.opening-text._2 .hero_heading { font-size: clamp(2rem, 4.6vw, 4rem); line-height: .95; letter-spacing: -.005em; }
+#HeroText { margin-top: 1.1rem; }
+.spacer_hero { height: 46svh !important; min-height: 20rem; } /* the carousel starts higher */
 
 /* ---- PLAN blocks ---- */
 .proto-tag, .proto-plan-wrap { background: var(--color--black); }

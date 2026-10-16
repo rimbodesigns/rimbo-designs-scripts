@@ -1080,6 +1080,14 @@
       '}'
     ].join('\n');
 
+    // The lens pass copies the render target straight to the screen, so everything that goes
+    // into that render target must already be in screen colour: the clear colour, the
+    // textures and the ring colour are all kept as-is instead of being converted to linear.
+    // That is what makes the canvas black the same black as the page.
+    function screenColor(css) {
+      return new THREE.Color().setStyle(css, THREE.LinearSRGBColorSpace);
+    }
+
     function backgroundOf(element) {
       var node = element;
       while (node && node !== document.documentElement) {
@@ -1113,7 +1121,7 @@
       }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(W, H, false);
-      renderer.setClearColor(new THREE.Color(backgroundOf(wrapper)), 1);
+      renderer.setClearColor(screenColor(backgroundOf(wrapper)), 1);
 
       var scene = new THREE.Scene();
       var camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, -100, 100);
@@ -1194,7 +1202,7 @@
         tex.magFilter = THREE.LinearFilter;
         tex.generateMipmaps = false;
         tex.anisotropy = maxAnisotropy;
-        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.colorSpace = THREE.NoColorSpace; // screen colour in, screen colour out
         source.tex = tex;
         recomputeTotal();
         if (!userInteracted) {
@@ -1224,7 +1232,7 @@
           tex.magFilter = THREE.LinearFilter;
           tex.generateMipmaps = true;
           tex.anisotropy = maxAnisotropy;
-          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.colorSpace = THREE.NoColorSpace; // screen colour in, screen colour out
           tex.needsUpdate = true;
           source.tex = tex;
           measurePanel();
@@ -1369,7 +1377,7 @@
         uRimTangential: { value: lensRimWave },
         uRimFreq1: { value: lensRimFreq1 },
         uRimFreq2: { value: lensRimFreq2 },
-        uBlueColor: { value: new THREE.Color(lensColor) },
+        uBlueColor: { value: screenColor(lensColor) },
         uRimLine: { value: lensRimLine },
         uRimLinePos: { value: lensRimLinePos },
         uRimLineWidth: { value: lensRimLineWidth },
@@ -1410,7 +1418,7 @@
       }
 
       function applyLook() {
-        renderer.setClearColor(new THREE.Color(backgroundOf(wrapper)), 1);
+        renderer.setClearColor(screenColor(backgroundOf(wrapper)), 1);
         var active = sourceIndex(scroll);
         measurePanel();
         refitTextures();
