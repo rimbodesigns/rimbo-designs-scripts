@@ -94,3 +94,6 @@ point `record-dfs-home.js` at it.
   blocks 04 to 08.
 - Recorders: `media/record-dfs-home.js` (course site, night switch) and `media/record-dfs-home-test.js`
   (new home, dive through the spiral). Both drive the page with a fake clock, one frame per 1/30 s.
+- `media/record-site.js` is the general recorder: `node media/record-site.js <url> <out.mp4> [scrollTo] [seconds] [--night]`.
+  Charlie's Angels (`media/charlies-angels.mp4`, 25 s, scroll to 4700) was made with it; the prototype swaps a
+  cover for a clip through the `clips` map in prototype.js.

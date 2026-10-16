@@ -30,6 +30,22 @@
     list.insertBefore(videoItem('/media/dfs-home.mp4', 'Digital Feng Shui · 2025', 'Course site', 'https://www.digital-fengshui.com/'), items[Math.min(3, items.length - 1)].nextElementSibling);
   }
 
+  // ---- MOVING PANELS for existing items: swap the cover for a recorded scroll-through
+  var clips = {
+    "Charlie's Angels Costa Rica": '/media/charlies-angels.mp4'
+  };
+  document.querySelectorAll('[data-glass-carousel-item]').forEach(function (item) {
+    var name = item.querySelector('[data-glass-carousel-content] p');
+    var img = item.querySelector('img');
+    if (!name || !img || !clips[name.textContent.trim()]) return;
+    var video = document.createElement('video');
+    video.className = 'glass-carousel__item-img';
+    video.setAttribute('data-glass-carousel-image', '');
+    video.muted = true; video.loop = true; video.playsInline = true; video.autoplay = true; video.preload = 'auto';
+    video.src = clips[name.textContent.trim()];
+    img.replaceWith(video);
+  });
+
   // ---- LINKS: straight to the live sites, in a new tab (no case-study stories on the home page)
   var liveSites = {
     'Nathan Rajac': 'https://www.nathanrajac.com/',
