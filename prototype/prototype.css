@@ -7,6 +7,24 @@
 #FadeOUT, .spacer_hero { display: none !important; }
 .glass-carousel { height: 100svh !important; min-height: 28rem !important; }
 
+/* grain over everything (the site has it at z-index -1, behind the canvas) */
+.grain { z-index: 60 !important; opacity: .06 !important; }
+
+/* ---- CAPTION: name in the display font, the line in RM Mono caps, more air ---- */
+.glass-carousel__caption { top: calc(50% + var(--glass-carousel-panel, 46svh) / 2 + 2.25rem) !important; }
+.glass-carousel__caption .glass-carousel__item-p { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: 1.3rem; line-height: 1.1; letter-spacing: -.005em; }
+.glass-carousel__caption .glass-carousel__item-p.is--faded { font-family: "RM MONO", monospace; font-weight: 400; font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; opacity: 1; color: var(--color--text-on-black); margin-top: .6rem; }
+
+/* ---- LOADER ---- */
+html.is-loading { overflow: hidden; }
+.proto-loader { position: fixed; inset: 0; z-index: 200; background: var(--color--black); display: grid; place-items: center; align-content: center; gap: .9rem; color: var(--color--rimbobage); clip-path: inset(0 0 0 0); }
+.proto-loader_count { font-family: "GRIFTER BOLD", sans-serif; font-weight: 700; font-size: clamp(3rem, 9vw, 7rem); line-height: 1; font-variant-numeric: tabular-nums; }
+.proto-loader_label { font-family: "RM MONO", monospace; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--color--text-on-black); }
+.proto-loader_line { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--color--brand); transform: scaleX(0); transform-origin: left center; }
+
+/* ---- no more Integral in the prototype: Grifter is the display face ---- */
+.proto-plan_intro h2, .proto-block_head h3, .proto-skel b { font-family: "GRIFTER BOLD", sans-serif !important; font-weight: 700 !important; text-transform: none !important; }
+
 /* ---- PLAN blocks ---- */
 .proto-tag, .proto-plan-wrap { background: var(--color--black); }
 .proto-tag { padding: 1.25rem clamp(1.25rem, 4vw, 4rem) 0; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--color--grey); }

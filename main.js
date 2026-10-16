@@ -918,13 +918,13 @@
     // Intro: once the text is in, every image grows from nothing to fill its own place in the
     // row, like the photos on the ECHO site: the middle one first, the neighbours just after
     var introDelay = 1.6; // seconds after the page is ready, so the text comes first
-    var introDuration = 1.6; // seconds for one image to grow
+    var introDuration = 1.1; // seconds for one image to grow
     var introEase = 'expo.out';
-    var introSpread = 0.08; // delay per panel away from the middle, as a share of the intro
+    var introSpread = 0.06; // delay per panel away from the middle, as a share of the intro
     var introCaptionDelay = 0.6; // the caption follows after this many seconds
 
     // Autoplay: the row rolls left on its own and pauses while you touch it
-    var autoDrift = 16; // px per second, 0 switches it off
+    var autoDrift = 20; // px per second, 0 switches it off
     var driftResume = 2.5; // seconds of quiet after an interaction before it rolls again
     var driftEase = 0.12;
 
@@ -1117,6 +1117,13 @@
       var panelShare = parseFloat(wrapper.getAttribute('data-glass-carousel-height')) || panelHeight;
       var introWait = parseFloat(wrapper.getAttribute('data-glass-carousel-intro-delay'));
       if (isNaN(introWait)) introWait = introDelay;
+      // data-glass-carousel-intro-event="name": the intro also waits for that window event (a page loader, say).
+      // The section itself fires "glass-carousel:ready" on window once its first texture is in.
+      var introEvent = wrapper.getAttribute('data-glass-carousel-intro-event');
+      var introEventFired = !introEvent;
+      if (introEvent) {
+        window.addEventListener(introEvent, function () { introEventFired = true; queueIntro(); }, { once: true });
+      }
 
       var renderer;
       try {
@@ -1179,7 +1186,7 @@
 
       // The pop waits for two things: the first texture, and introDelay seconds after the page was ready
       function queueIntro() {
-        if (introQueued || !textureReady) return;
+        if (introQueued || !textureReady || !introEventFired) return;
         introQueued = true;
         var wait = Math.max(0, introWait - (performance.now() - readyAt) / 1000);
         gsap.delayedCall(wait, startIntro);
@@ -1219,7 +1226,14 @@
         video.playsInline = true;
         var playing = video.play();
         if (playing && playing.catch) playing.catch(function () {});
-        textureReady = true;
+        markReady();
+      }
+
+      function markReady() {
+        if (!textureReady) {
+          textureReady = true;
+          window.dispatchEvent(new CustomEvent('glass-carousel:ready', { detail: { wrapper: wrapper } }));
+        }
         queueIntro();
       }
 
@@ -1247,8 +1261,7 @@
             target = scroll;
           }
           // The first texture is in: the panels have something to show
-          textureReady = true;
-          queueIntro();
+          markReady();
         }, undefined, function () {
           console.warn('Glass Carousel: image failed to load', url);
         });

@@ -4,11 +4,62 @@
   'use strict';
 
   // ---- OPENING: no hero text, the carousel is the first screen (hero and spacer hidden in CSS).
-  // Panels a little smaller than the default share of a full-height section, intro right away.
   var opening = document.querySelector('[data-glass-carousel]');
+  var reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (opening) {
     opening.setAttribute('data-glass-carousel-height', '0.46');
-    opening.setAttribute('data-glass-carousel-intro-delay', '0.4');
+    opening.setAttribute('data-glass-carousel-intro-delay', '0');
+    if (!reduceMotion) opening.setAttribute('data-glass-carousel-intro-event', 'rd:loader-done');
+  }
+
+  // ---- CAPTIONS: short lines under the name. Name in the display font, the line in RM Mono caps (CSS).
+  var lines = {
+    'Nathan Rajac': 'Branding · Webflow',
+    "Charlie's Angels Costa Rica": 'Branding · Webflow',
+    'Anapana': 'Branding · Shopify',
+    'Dieronesie': 'Webflow',
+    'Muzammil Hussain': 'Branding · Webflow',
+    'Sandra Dreisbach': 'Branding · Webflow',
+    'MushroomTao': 'Custom CMS · Webflow',
+    'Digital Feng Shui': 'Brand · Web · Course'
+  };
+  document.querySelectorAll('[data-glass-carousel-content]').forEach(function (content) {
+    var ps = content.querySelectorAll('p');
+    var name = ps[0] && ps[0].textContent.trim();
+    if (ps[1] && lines[name]) ps[1].textContent = lines[name];
+  });
+
+  // ---- PAGE LOADER: the darker dark, a counter in the display font, a coral line. It waits for
+  // the carousel's first texture (window event glass-carousel:ready) and at least 1.3 s, then
+  // lifts away and tells the carousel to grow in (rd:loader-done).
+  if (opening && !reduceMotion && window.gsap) {
+    var loader = document.createElement('div');
+    loader.className = 'proto-loader';
+    loader.innerHTML = '<div class="proto-loader_count">00</div><div class="proto-loader_label">Rimbo Designs</div><div class="proto-loader_line"></div>';
+    document.body.appendChild(loader);
+    document.documentElement.classList.add('is-loading');
+    var count = loader.querySelector('.proto-loader_count');
+    var bar = loader.querySelector('.proto-loader_line');
+    var ready = false;
+    var minTimeUp = false;
+    var finished = false;
+    window.addEventListener('glass-carousel:ready', function () { ready = true; maybeFinish(); }, { once: true });
+    setTimeout(function () { ready = true; maybeFinish(); }, 4000); // never hold the page hostage
+    var progress = { v: 0 };
+    var tween = gsap.to(progress, {
+      v: 99, duration: 1.3, ease: 'power2.inOut',
+      onUpdate: function () { count.textContent = String(Math.round(progress.v)).padStart(2, '0'); bar.style.transform = 'scaleX(' + (progress.v / 100) + ')'; },
+      onComplete: function () { minTimeUp = true; maybeFinish(); }
+    });
+    function maybeFinish() {
+      if (finished || !ready || !minTimeUp) return;
+      finished = true;
+      count.textContent = '100';
+      bar.style.transform = 'scaleX(1)';
+      gsap.timeline({ onComplete: function () { loader.remove(); document.documentElement.classList.remove('is-loading'); } })
+        .to([count, loader.querySelector('.proto-loader_label')], { yPercent: -40, autoAlpha: 0, duration: 0.45, ease: 'power3.in', stagger: 0.05 }, 0.15)
+        .to(loader, { clipPath: 'inset(0 0 100% 0)', duration: 0.9, ease: 'expo.inOut', onStart: function () { window.dispatchEvent(new CustomEvent('rd:loader-done')); } }, 0.35);
+    }
   }
 
   // ---- ARCHITECTURE: placeholder blocks after the work carousel. Each one says what the
