@@ -24,15 +24,3 @@ html.proto-nav-wait .topnav, html.proto-nav-wait #FIXED_NAV, html.proto-nav-wait
 /* ---- scroll room under the opening; sections come back one by one ---- */
 .proto-space { height: 120svh; background: var(--color--black); }
 
-/* ---- SERVICES, new idea: the three words under the liquid glass ---- */
-.proto-services2 { position: relative; height: 100svh; min-height: 32rem; background: var(--color--black); color: var(--color--rimbobage); overflow: hidden; }
-.proto-services2_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.proto-services2_sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; padding: 0; list-style: none; }
-.proto-services2_sr.is-visible { position: static; width: auto; height: auto; clip-path: none; padding: 14vh 6vw; font-family: "GRIFTER BOLD", sans-serif; font-size: clamp(2rem, 9vw, 8rem); line-height: .98; text-transform: uppercase; }
-.proto-services2_link { position: absolute; inset: 0; z-index: 2; cursor: pointer; }
-.proto-services2_foot { position: absolute; left: 6vw; right: 6vw; bottom: clamp(1.5rem, 5vh, 3rem); z-index: 3; pointer-events: none; display: flex; gap: 1.5rem; align-items: baseline; font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--color--text-on-black); }
-.proto-services2_label { color: var(--color--brand); }
-.proto-services2_about { flex: 1; font-family: Akkuratllsub, sans-serif; text-transform: none; letter-spacing: 0; font-size: .95rem; color: var(--color--rimbobage); opacity: 0; transform: translateY(4px); transition: opacity .4s ease, transform .4s cubic-bezier(.625, .05, 0, 1); }
-.proto-services2_about.is-on { opacity: 1; transform: none; }
-.proto-services2_more { white-space: nowrap; }
-@media (max-width: 767px) { .proto-services2_foot { flex-wrap: wrap; } .proto-services2_about { flex-basis: 100%; } }

@@ -925,7 +925,8 @@
 
     // Autoplay: the row rolls left on its own and pauses while you touch it
     var autoDrift = 26; // px per second, 0 switches it off
-    var driftResume = 0.5; // seconds of quiet after an interaction before it rolls again
+    var driftResume = 1.2; // seconds of quiet after a drag or wheel before it rolls again
+    var clickHold = 3.5; // seconds a clicked panel stays in the middle before the row rolls on
     var driftEase = 0.12;
 
     // Finer shader detail, rarely worth touching
@@ -953,7 +954,7 @@
     var touchEase = 0.22;
     var friction = 0.865;
     var snapIdle = 120;
-    var snapEase = 0.05;
+    var snapEase = 0.14; // quick enough to actually arrive before anything else moves the row
     var shrinkMax = 60;
     var shrinkAttack = 0.25;
     var shrinkDecay = 0.06;
@@ -1389,6 +1390,7 @@
       var prevScroll = 0;
       var scrollEnergy = 0;
       var lastInput = performance.now();
+      var holdUntil = 0; // after a click, the drift waits until this time
       var snapped = false;
       var lastCenter = -1;
 
@@ -1697,6 +1699,7 @@
         velocity = 0;
         target = centerForIndex(nearestIndex(scroll + hit.centerX));
         snapped = true;
+        holdUntil = performance.now() + clickHold * 1000; // you asked for this one: let it sit
         setHover(false);
       }
 
@@ -1748,7 +1751,7 @@
           velocity *= friction;
           if (Math.abs(velocity) < 0.05) velocity = 0;
 
-          drifting = autoDrift > 0 && idle > driftResume * 1000; // also during the intro: it moves from the start
+          drifting = autoDrift > 0 && idle > driftResume * 1000 && now > holdUntil; // also during the intro: it moves from the start
           if (drifting) {
             target += autoDrift * dt; // the row rolls left on its own
             snapped = false;
@@ -1767,7 +1770,9 @@
             : snapped
               ? snapEase
               : ease;
-        scroll += (target - scroll) * follow;
+        // the eases are "per frame at 60fps"; scale them by the real frame time so a slow
+        // machine or a phone settles in the same half second as a fast one
+        scroll += (target - scroll) * (1 - Math.pow(1 - follow, dt * 60));
 
         var ci = sourceIndex(scroll);
         if (ci !== lastCenter) {
@@ -1817,6 +1822,17 @@
       resizeObserver.observe(mount);
 
       wrapper.setAttribute('data-glass-carousel', 'canvas');
+      // read-only peek for tooling: positions and state of the row (no behaviour depends on it)
+      wrapper.glassCarousel = {
+        get rects() { return panelRects.slice(); },
+        get centered() { return centeredPanel; },
+        get scroll() { return scroll; },
+        get target() { return target; },
+        get width() { return W; },
+        get panel() { return panelH; },
+        get aspects() { return sources.map(function (s) { return s.aspect; }); },
+        get intro() { return { value: intro.value, done: introDone, started: introStarted }; }
+      };
       bindTextures();
       showActive(0);
       lensSize();
