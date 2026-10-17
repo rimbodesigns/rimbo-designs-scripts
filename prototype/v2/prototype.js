@@ -66,13 +66,16 @@
   space.className = 'proto-space'; space.id = 'v2-next';
   hero.insertAdjacentElement('afterend', space);
 
-  // clip speeds, also for the copies the marquee makes (it clones the row after this script ran)
+  // clip speeds, also for the copies the marquee makes (it clones the row after this script ran).
+  // Touch a video only once: re-setting the rate or calling play() on a running one makes it hiccup.
   function tune() {
     hero.querySelectorAll('video').forEach(function (v) {
+      if (v.__tuned) return;
+      v.__tuned = true;
       var rate = parseFloat(v.getAttribute('data-rate')) || 1.5;
       v.muted = true; v.loop = true; v.playsInline = true;
-      v.playbackRate = rate;
-      if (!v.__tuned) { v.__tuned = true; v.addEventListener('loadedmetadata', function () { v.playbackRate = rate; }, { once: true }); }
+      var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
+      if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
       if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
     });
   }
