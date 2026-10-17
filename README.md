@@ -8,7 +8,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 - `slater/` — the original Slater files, as they were on 2026-10-09. Reference only, not loaded on the site.
 - `media/` — clips the carousel plays as video panels (served by jsDelivr like the script), with the recorder script that made them.
 - `docs/` — the site audit and the redesign direction notes.
-- `prototype/` — a local copy of the Webflow staging page (/home-copy) to design on while Webflow is disconnected. `node prototype/sync-from-staging.js` rebuilds `index.html` from staging (local `main.js`, darker black, no analytics); changes go in `prototype.css` and `main.js`. `node prototype/server.js` and open the address it prints (http://localhost:8777 when free). `_new/` holds the earlier section drafts (what I do, about, testimonials, CTA) for later.
+- `prototype/` — local prototypes on top of the Webflow staging page (/home-copy), to design on while Webflow is disconnected. `node prototype/server.js` serves them (http://localhost:8777 when free): `/` and `/v2` = the version being worked on, `/v1` = the frozen glass-carousel opening (tag `prototype-v1`, with its own copies of main.js, css and js). `node prototype/sync-from-staging.js v2` rebuilds `v2/index.html` from staging; all changes go in `v2/prototype.css` and `v2/prototype.js`. `_new/` holds parked experiments.
 - Served via jsDelivr, pinned to a git tag, as one tag in Webflow
   Site settings → Custom code → Footer (no `defer`), below GSAP and Lenis:
   `<script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.5.0/main.min.js"></script>`
