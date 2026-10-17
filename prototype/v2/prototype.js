@@ -45,13 +45,16 @@
 
   // button styles to compare: ?buttons=a (ghost pill), b (solid), c (text + line), d (coral outline)
   var buttonVariant = (/[?&]buttons=([a-d])/.exec(location.search) || [])[1] || 'b';
+  // test switches for flicker hunting: ?noclips (covers only), ?nograin (no grain overlay)
+  var noClips = /[?&]noclips/.test(location.search);
+  if (/[?&]nograin/.test(location.search)) document.documentElement.classList.add('v2-nograin');
 
   var hero = document.createElement('section');
   hero.className = 'v2-hero';
   hero.innerHTML =
     '<div class="v2-hero_stage" aria-hidden="true"><div class="v2-band">' +
       row(names, 'left', 55, 'v2-band_edge') +
-      row(work.map(function (w) { return panel(w, false); }), 'left', 90) +
+      row(work.map(function (w) { return panel(w, noClips); }), 'left', 90) +
       row(work.slice(4).concat(work.slice(0, 4)).map(function (w) { return panel(w, true); }), 'right', 100) +
     '</div></div>' +
     '<div class="v2-hero_copy">' +

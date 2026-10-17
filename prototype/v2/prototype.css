@@ -11,16 +11,16 @@
 .v2-hero { position: relative; height: 100svh; min-height: 36rem; overflow: hidden; background: var(--color--black); color: var(--color--rimbobage); }
 .v2-hero_stage { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 50% 45%; }
 /* the band falls to the right (like the Figma), which leaves the top-right corner for the copy and the bottom-left for the hint */
-.v2-band { position: absolute; left: 50%; top: 50%; width: 250vw; transform: translate(-50%, -50%) translateY(10vw) rotateX(56deg) rotateZ(27deg); transform-style: preserve-3d; display: grid; gap: 1.5vw; }
+.v2-band { position: absolute; left: 50%; top: 50%; width: 250vw; transform: translate(-50%, -50%) translateY(10vw) rotateX(56deg) rotateZ(27deg); transform-style: flat; backface-visibility: hidden; display: grid; gap: 1.5vw; }
 .v2-band_edge { display: flex; overflow: visible; margin-bottom: .2vw; }
 .v2-band_edge .v2-row_list { gap: 0; }
 .v2-edge_name { flex: none; font-family: "RM MONO", monospace; font-size: .72vw; letter-spacing: .22em; text-transform: uppercase; color: var(--color--text-on-black); padding-right: 3vw; white-space: nowrap; }
 .v2-edge_name::before { content: "\2726"; color: var(--color--brand); margin-right: 1.2em; }
 .v2-row { overflow: visible; }
 .v2-row_scroll { display: flex; }
-.v2-row_list { display: flex; flex-shrink: 0; gap: 1.5vw; padding-right: 1.5vw; }
-.v2-panel { position: relative; display: block; flex: none; width: 20vw; aspect-ratio: 1.02; border-radius: .4vw; overflow: hidden; background: #161616; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); transform: translateZ(0); }
-.v2-panel_media { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(1.05); }
+.v2-row_list { display: flex; flex-shrink: 0; gap: 1.5vw; padding-right: 1.5vw; will-change: transform; }
+.v2-panel { position: relative; display: block; flex: none; width: 20vw; aspect-ratio: 1.02; border-radius: .4vw; overflow: hidden; background: #161616; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); }
+.v2-panel_media { width: 100%; height: 100%; object-fit: cover; display: block; }
 .v2-panel_label { position: absolute; left: .9vw; bottom: .8vw; font-family: "RM MONO", monospace; font-size: .62vw; letter-spacing: .16em; text-transform: uppercase; color: var(--color--rimbobage); opacity: 0; transition: opacity .3s; }
 .v2-panel:hover .v2-panel_label { opacity: 1; }
 
@@ -71,3 +71,6 @@
   .v2-title { font-size: clamp(2.2rem, 9vw, 4rem); }
 }
 }
+
+/* test switches: ?nograin hides the grain, ?noclips shows covers only (see prototype.js) */
+html.v2-nograin .grain { display: none !important; }
