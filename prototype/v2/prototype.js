@@ -16,19 +16,21 @@
 
   // ---- the work on the band: clips where we have them, covers otherwise
   var CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
+  // every item has a cover; some also have a clip. The front row plays the clips, the back row
+  // shows covers only, so the page decodes four videos instead of sixteen.
   var work = [
-    { name: 'Digital Feng Shui', video: '/media/dfs-home-test.mp4', rate: 2, href: 'https://www.digital-fengshui.com/' },
+    { name: 'Digital Feng Shui', video: '/media/dfs-home-test.mp4', rate: 2, img: CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif', href: 'https://www.digital-fengshui.com/' },
     { name: 'Nathan Rajac', img: CDN + '67e3d914128c8952d1dd6523_Nathan4.avif', href: 'https://www.nathanrajac.com/' },
-    { name: "Charlie's Angels", video: '/media/charlies-angels.mp4', rate: 1.5, href: 'https://www.charlies-angels-rescue.org/' },
+    { name: "Charlie's Angels", video: '/media/charlies-angels.mp4', rate: 1.5, img: CDN + '6811f08989345b3409601f8b_Charlies_angels.avif', href: 'https://www.charlies-angels-rescue.org/' },
     { name: 'Anapana', img: CDN + '6821a12565a36dfb5f0179c3_Anapana.avif', href: 'https://www.rimbodesigns.com/work/anapana' },
-    { name: 'Dieronesie', video: '/media/dieronesie.mp4', rate: 1.5, href: 'https://www.rimbodesigns.com/work/dieronesie-retreat-festival-ceremony' },
+    { name: 'Dieronesie', video: '/media/dieronesie.mp4', rate: 1.5, img: CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif', href: 'https://www.rimbodesigns.com/work/dieronesie-retreat-festival-ceremony' },
     { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
-    { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, href: 'https://www.digital-fengshui.com/' },
+    { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif', href: 'https://www.digital-fengshui.com/' },
     { name: 'Pooh Balance', img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif', href: 'https://www.rimbodesigns.com/work/pooh-balance' }
   ];
 
-  function panel(w) {
-    var media = w.video
+  function panel(w, coverOnly) {
+    var media = (w.video && !coverOnly)
       ? '<video class="v2-panel_media" muted loop playsinline autoplay preload="auto" src="' + w.video + '" data-rate="' + (w.rate || 1.5) + '"></video>'
       : '<img class="v2-panel_media" src="' + w.img + '" alt="" loading="eager">';
     return '<a class="v2-panel" href="' + w.href + '" target="_blank" rel="noopener" aria-label="' + w.name + '">' + media + '<span class="v2-panel_label">' + w.name + '</span></a>';
@@ -40,20 +42,22 @@
   // the names, written along the top edge of the band ("text in the angle of the shape")
   var names = work.map(function (w) { return '<span class="v2-edge_name">' + w.name + '</span>'; });
 
+  // button styles to compare: ?buttons=a (ghost pill), b (solid), c (text + line), d (coral outline)
+  var buttonVariant = (/[?&]buttons=([a-d])/.exec(location.search) || [])[1] || 'a';
+
   var hero = document.createElement('section');
   hero.className = 'v2-hero';
   hero.innerHTML =
     '<div class="v2-hero_stage" aria-hidden="true"><div class="v2-band">' +
       row(names, 'left', 55, 'v2-band_edge') +
-      row(work.slice(0, 4).map(panel), 'left', 70) +
-      row(work.slice(4, 8).map(panel), 'right', 80) +
+      row(work.map(function (w) { return panel(w, false); }), 'left', 90) +
+      row(work.slice(4).concat(work.slice(0, 4)).map(function (w) { return panel(w, true); }), 'right', 100) +
     '</div></div>' +
     '<div class="v2-hero_copy">' +
       '<span class="v2-eyebrow">Branding <i>·</i> Design <i>·</i> Development</span>' +
       '<h1 class="v2-title">Unlock your<br>next level</h1>' +
-      '<div class="v2-links"><a href="https://cal.com/rimbo-designs/45-minute-discovery-call" target="_blank" rel="noopener">Book a call <span>→</span></a><a href="https://www.rimbodesigns.com/work">See the work <span>→</span></a></div>' +
-    '</div>' +
-    '<a class="v2-hero_hint" href="#v2-next"><img src="' + CDN + '6346d0e17ad57fc0a45093aa_dingDVG.svg" alt=""><span>See what’s possible</span></a>';
+      '<div class="v2-links is-' + buttonVariant + '"><a class="v2-btn" href="https://cal.com/rimbo-designs/45-minute-discovery-call" target="_blank" rel="noopener"><span class="v2-btn_t">Book a call</span><span class="v2-btn_a">→</span></a><a class="v2-btn is-second" href="https://www.rimbodesigns.com/work"><span class="v2-btn_t">See the work</span><span class="v2-btn_a">→</span></a></div>' +
+    '</div>';
   main.insertAdjacentElement('afterbegin', hero);
 
   // scroll room after it, for whatever comes next
