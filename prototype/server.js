@@ -7,7 +7,8 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascr
 const server = http.createServer((req, res) => {
   try {
     let p = decodeURIComponent(req.url.split('?')[0]);
-    if (p === '/' || p === '/index.html') p = '/prototype/index.html';
+    if (p === '/' || p === '/index.html') p = '/prototype/v2/index.html';   // the version being worked on
+    if (/^\/v\d+\/?$/.test(p)) p = '/prototype' + p.replace(/\/$/, '') + '/index.html'; // /v1, /v2 ...
     const file = path.join(root, p);
     if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('not here'); }
     const stat = fs.statSync(file), type = types[path.extname(file)] || 'application/octet-stream';
