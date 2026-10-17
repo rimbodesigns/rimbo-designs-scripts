@@ -9,8 +9,8 @@
   var main = document.getElementById('MainWrap');
   if (!main || document.querySelector('.v2-hero')) return;
 
-  // ---- out with the old opening
-  ['.spacer_hero', '#FadeOUT', '[data-glass-carousel]'].forEach(function (sel) {
+  // ---- out with the old opening, and with the pill nav at the top: the burger is the menu now
+  ['.spacer_hero', '#FadeOUT', '[data-glass-carousel]', '.topnav'].forEach(function (sel) {
     var el = document.querySelector(sel); if (el) el.remove();
   });
 
@@ -19,6 +19,7 @@
   // every item has a cover; some also have a clip. The front row plays the clips, the back row
   // shows covers only, so the page decodes four videos instead of sixteen.
   var work = [
+    { name: 'Innergym', video: '/media/innergym.mp4', rate: 1.5, img: '/media/innergym-cover.jpg', href: 'https://relume-35142b-1c4210f53c5dee0536bbe334f.webflow.io/' },
     { name: 'Digital Feng Shui', video: '/media/dfs-home-test.mp4', rate: 2, img: CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif', href: 'https://www.digital-fengshui.com/' },
     { name: 'Nathan Rajac', img: CDN + '67e3d914128c8952d1dd6523_Nathan4.avif', href: 'https://www.nathanrajac.com/' },
     { name: "Charlie's Angels", video: '/media/charlies-angels.mp4', rate: 1.5, img: CDN + '6811f08989345b3409601f8b_Charlies_angels.avif', href: 'https://www.charlies-angels-rescue.org/' },
@@ -43,7 +44,7 @@
   var names = work.map(function (w) { return '<span class="v2-edge_name">' + w.name + '</span>'; });
 
   // button styles to compare: ?buttons=a (ghost pill), b (solid), c (text + line), d (coral outline)
-  var buttonVariant = (/[?&]buttons=([a-d])/.exec(location.search) || [])[1] || 'a';
+  var buttonVariant = (/[?&]buttons=([a-d])/.exec(location.search) || [])[1] || 'b';
 
   var hero = document.createElement('section');
   hero.className = 'v2-hero';

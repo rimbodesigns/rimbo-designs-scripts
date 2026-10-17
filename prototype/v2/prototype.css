@@ -44,8 +44,8 @@
 .v2-links.is-a .v2-btn:hover { background: var(--color--rimbobage); color: var(--color--black); border-color: var(--color--rimbobage); }
 /* b: one solid, one ghost */
 .v2-links.is-b .v2-btn { padding: .95em 1.4em; border-radius: 10em; border: 1px solid rgba(248, 245, 238, .18); }
-.v2-links.is-b .v2-btn:not(.is-second) { background: var(--color--rimbobage); color: var(--color--black); border-color: var(--color--rimbobage); }
-.v2-links.is-b .v2-btn:not(.is-second):hover { background: var(--color--brand); border-color: var(--color--brand); color: var(--color--black); }
+.v2-links.is-b .v2-btn:not(.is-second) { background: var(--color--rimbobage); color: var(--color--black); border-color: var(--color--rimbobage); box-shadow: 0 0 1.2rem rgba(248, 245, 238, .18); transition: background .35s, color .35s, border-color .35s, box-shadow .6s cubic-bezier(.625, .05, 0, 1), transform .6s cubic-bezier(.625, .05, 0, 1); }
+.v2-links.is-b .v2-btn:not(.is-second):hover { box-shadow: 0 0 2.2rem rgba(248, 245, 238, .4), 0 0 .6rem rgba(248, 245, 238, .3); transform: translateY(-1px); }
 .v2-links.is-b .v2-btn.is-second:hover { border-color: rgba(248, 245, 238, .6); }
 /* c: text with a line that draws under it */
 .v2-links.is-c { gap: 1.75rem; }
@@ -59,9 +59,15 @@
 .v2-links.is-d .v2-btn.is-second { border-color: rgba(248, 245, 238, .18); }
 
 @media (max-width: 991px) {
-  .v2-band { width: 340vw; gap: 2.4vw; transform: translate(-50%, -50%) translateY(-18vw) rotateX(56deg) rotateZ(27deg); }
+  /* the band lives in the upper part, the copy sits on solid dark underneath it */
+  .v2-hero_stage { bottom: 38%; perspective-origin: 50% 60%; }
+  .v2-hero_stage::after { height: 30%; }
+  .v2-band { width: 340vw; gap: 2.4vw; transform: translate(-50%, -50%) translateY(-6vw) rotateX(56deg) rotateZ(27deg); }
   .v2-panel { width: 36vw; }
   .v2-edge_name { font-size: 1.6vw; }
   .v2-panel_label { font-size: 1.4vw; left: 1.4vw; bottom: 1.2vw; }
-  .v2-hero_copy { right: 1.25rem; left: 1.25rem; top: auto; bottom: 7rem; align-items: flex-start; text-align: left; max-width: none; }
+  .v2-hero_copy { right: 1.25rem; left: 1.25rem; top: auto; bottom: clamp(3rem, 9vh, 6rem); align-items: flex-start; text-align: left; max-width: none; gap: 1rem; }
+  .v2-hero_copy::before { display: none; }
+  .v2-title { font-size: clamp(2.2rem, 9vw, 4rem); }
+}
 }
