@@ -775,19 +775,13 @@
         });
       });
 
-      // back/forward cache: coming back must show the pill as it was (rdPageTransition restores the page)
+      // back/forward cache: coming back must show the pill as it was (the leave below restores the page)
       window.addEventListener('pageshow', function (e) { if (e.persisted) setActive(current); });
     });
   }
 
-  // =========================================================
-  // PAGE TRANSITION — every page
-  // Clicking a link to another page on this site fades the page content (.main-wrapper, and the menu panel
-  // if it is open) out and up a little, then opens the link. The grain, logo and burger stay put, and the
-  // browser keeps the faded page on screen until the next one paints, whose own intro then brings it in.
-  // Skipped for: other sites, new-tab/modified clicks, downloads, #anchors on the same page, mailto/tel,
-  // links whose click another script already handled, [data-no-transition], and reduced motion.
-  // =========================================================
+  // Language-switch leave (used by rdLangToggle only): fades the page content (and an open menu) out and up
+  // a little, then opens the other locale. Not a site-wide page transition; that is a separate task.
   var LEAVE_MS = 320;
   var leaving = false;
   var faded = []; // [element, its inline styles before the fade]
@@ -811,30 +805,13 @@
       setTimeout(function () { window.location.href = href; }, LEAVE_MS + 20);
     }, delay || 0);
   }
-  function rdPageTransition() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    document.addEventListener('click', function (e) {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      var a = e.target.closest && e.target.closest('a[href]');
-      if (!a || a.hasAttribute('download') || a.closest('[data-no-transition]')) return;
-      if (a.target && a.target !== '_self') return;
-      var raw = a.getAttribute('href') || '';
-      if (!raw || raw.charAt(0) === '#' || /^(mailto|tel|javascript):/i.test(raw)) return;
-      var url;
-      try { url = new URL(a.href, location.href); } catch (err) { return; }
-      if (url.origin !== location.origin) return;
-      if (url.pathname === location.pathname && url.search === location.search) return; // same page (an #anchor or a reload)
-      e.preventDefault();
-      rdLeave(url.href);
-    });
-    // back/forward cache: a page we left by fading must come back visible
-    window.addEventListener('pageshow', function (e) {
-      if (!e.persisted) return;
-      leaving = false;
-      faded.forEach(function (f) { Object.keys(f[1]).forEach(function (k) { f[0].style[k] = f[1][k]; }); });
-      faded = [];
-    });
-  }
+  // back/forward cache: a page we left by fading must come back visible
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    leaving = false;
+    faded.forEach(function (f) { Object.keys(f[1]).forEach(function (k) { f[0].style[k] = f[1][k]; }); });
+    faded = [];
+  });
 
   // Queued scroll reveal, from Osmo Supply as it came: cards that enter the screen wait their turn and
   // rise in one after the other. Needs [data-queued-reveal-group] with [data-queued-reveal-item]s (or
@@ -3506,7 +3483,6 @@
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
   run('post cards', rdPostCards);
-  run('page transition', rdPageTransition);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
