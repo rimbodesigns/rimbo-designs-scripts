@@ -425,6 +425,17 @@
   // the burger animation; this only adds the letters.
   // =========================================================
   function rdMenu() {
+    // The menu's "Netherlands · 17:44" line shows the local time in Amsterdam
+    var clocks = qsa('[data-rd-clock]');
+    if (clocks.length) {
+      var tick = function () {
+        var time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' });
+        clocks.forEach(function (el) { if (el.textContent !== time) el.textContent = time; });
+      };
+      tick();
+      setInterval(tick, 10000);
+    }
+
     var nav = qs('.nav');
     var links = qsa('.pop-up_nav_menu .nav_link');
     if (!nav || !links.length) return;
