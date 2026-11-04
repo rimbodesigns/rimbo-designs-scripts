@@ -727,6 +727,69 @@
     if (tools) tl.from(tools, { opacity: 0, filter: 'blur(5px)', duration: 0.6 }, title ? '<50%' : 0);
     run('resources filter', rdMultiFilter);
     run('queued reveal', rdQueuedReveal);
+    run('language toggle', rdLangToggle);
+  }
+
+  // Language toggle, after Osmo's Toggle Switch: a pill slides under the current language. Here the buttons
+  // are the Webflow locale links (they know the right URL for every page), so picking the other language
+  // slides the pill, fades the page out softly and then opens that locale. Works on [data-lang-toggle] or
+  // .rs-lang; the track is the locale list inside it (or the element itself), the pill is added here.
+  function rdLangToggle() {
+    var ease = 'cubic-bezier(0.625, 0.05, 0, 1)';
+    qsa('[data-lang-toggle], .rs-lang').forEach(function (root) {
+      if (root.hasAttribute('data-toggle-ready')) return;
+      var links = qsa('a[hreflang]', root);
+      if (links.length < 2) return;
+      var track = qs('.w-locales-items', root) || root;
+      var pill = document.createElement('span');
+      pill.className = 'rs-lang__pill';
+      pill.setAttribute('aria-hidden', 'true');
+      track.insertBefore(pill, track.firstChild);
+      track.style.setProperty('--toggle-count', links.length);
+
+      var current = links.findIndex(function (a) { return a.classList.contains('w--current') || a.getAttribute('aria-current') === 'page'; });
+      if (current < 0) current = 0;
+      function setActive(i) {
+        track.style.setProperty('--toggle-active', i);
+        links.forEach(function (a, j) { a.toggleAttribute('data-toggle-active', i === j); });
+      }
+      setActive(current);
+      root.setAttribute('data-toggle-ready', '');
+
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      links.forEach(function (a, i) {
+        a.addEventListener('click', function (e) {
+          if (i === current) { e.preventDefault(); return; }
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return; // new tab etc.: let the browser do it
+          if (reduce) return;
+          e.preventDefault();
+          setActive(i);
+          var page = qs('.main-wrapper') || document.body;
+          // the pill slides (0.5s); the page starts fading halfway, then the other language loads
+          setTimeout(function () {
+            page.style.transition = 'opacity 0.3s ' + ease + ', transform 0.3s ' + ease;
+            page.style.opacity = '0';
+            page.style.transform = 'translateY(-0.5rem)';
+          }, 200);
+          setTimeout(function () { window.location.href = a.href; }, 520);
+        });
+        // Osmo's keyboard: left/right moves between the languages
+        a.addEventListener('keydown', function (e) {
+          var dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+          if (!dir) return;
+          e.preventDefault();
+          links[(i + dir + links.length) % links.length].focus();
+        });
+      });
+
+      // back/forward cache: coming back must show the page and the pill as they were
+      window.addEventListener('pageshow', function (e) {
+        if (!e.persisted) return;
+        var page = qs('.main-wrapper') || document.body;
+        page.style.transition = page.style.opacity = page.style.transform = '';
+        setActive(current);
+      });
+    });
   }
 
   // Queued scroll reveal, from Osmo Supply as it came: cards that enter the screen wait their turn and
