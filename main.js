@@ -1921,6 +1921,7 @@
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var narrow = function () { return window.innerWidth < 992; };
     var copy = qs('.band_copy', hero), title = qs('.band_title', hero), eyebrow = qs('.band_eyebrow', hero);
+    var curve = 0; // set below (the curve experiment)
     var buttons = qsa('.btn', copy || hero), scrollLine = qs('.band_scroll', hero), loader = qs('.band_loader', hero);
     var nav = [byId('FIXED_NAV'), qs('.burgermenu')].filter(Boolean);
     var hidden = false;
@@ -2007,7 +2008,7 @@
     if (stage) {
       var dragRows = null, axis = null, lastX = 0, lastY = 0, lastT = 0, vel = 0, inertia = null, dragging = false;
       var rowsOf = function () {
-        return qsa('.band_row', hero).map(function (r) {
+        return qsa('.band_row:not(.is-names)', hero).map(function (r) { // the names strip keeps its own pace
           var list = qs('[data-marquee-collection-target]', r);
           var tween = (window.gsap && list) ? gsap.getTweensOf(list).filter(function (t) { return t.duration() > 0; })[0] : null;
           if (tween && r.__base == null) r.__base = tween.timeScale() || 1;
@@ -2034,8 +2035,8 @@
           r.tween.progress(p - Math.floor(p));
         });
       };
-      var hold = function (on) { // no lift under a moving hand
-        qsa('.band_panel', hero).forEach(function (p) { p.style.transform = on ? 'none' : ''; });
+      var hold = function (on) { // no lift under a moving hand (the curve writes its own transforms)
+        if (!curve) qsa('.band_panel', hero).forEach(function (p) { p.style.transform = on ? 'none' : ''; });
         hero.classList.toggle('is-dragging', on);
       };
       var stop = function () {
@@ -2093,23 +2094,48 @@
       return true;
     };
 
-    // ---- the fade-behind on scroll (the old hero's move): the section is fixed, the spacer scrolls;
-    // over the first screen the copy fades and blurs away and the band sinks back, then the hero
-    // hides and its clips pause until the visitor comes back up.
+    // ---- the old hero's move, as Rimbo wants it now: the band stays, the copy is not pinned. It rides
+    // the page scroll (the spacer scrolls, the copy moves up with it) and, sitting behind the stage,
+    // slides away behind the panels; the next section then covers the band. Off-screen, the clips pause.
     var spacer = qs('[data-band-spacer]');
     var fadeBehind = function () {
-      if (!spacer || !window.ScrollTrigger) return;
-      gsap.timeline({
-        scrollTrigger: {
-          trigger: spacer, start: 'top top', end: 'bottom top', scrub: true,
-          onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
-          onEnterBack: function () { hidden = false; hero.style.visibility = ''; tune(); }
-        }
-      })
-        .to(copy, { opacity: 0, filter: 'blur(10px)', y: -24, ease: 'none', duration: 0.45 }, 0)
-        .to(scrollLine, { opacity: 0, ease: 'none', duration: 0.2 }, 0)
-        .to(stage, { opacity: 0.3, scale: 0.96, ease: 'none', duration: 1 }, 0);
+      if (!spacer || !window.ScrollTrigger || !copy) return;
+      gsap.to(copy, { y: function () { return -spacer.offsetHeight; }, ease: 'none', scrollTrigger: {
+        trigger: spacer, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true,
+        onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
+        onEnterBack: function () { hidden = false; hero.style.visibility = ''; tune(); }
+      } });
+      if (scrollLine) gsap.to(scrollLine, { opacity: 0, ease: 'none', scrollTrigger: { trigger: spacer, start: 'top top', end: '25% top', scrub: true } });
     };
+
+    // ---- the curve (experiment): with ?curve=N (or data-band-curve="N" on the section) the panels
+    // sit on an arc instead of a straight line: each turns away (rotateY) and recedes (translateZ)
+    // by N degrees per panel of distance from the band's centre, with its own perspective(), so the
+    // band stays one flat layer. Negative N bends the other way (the ends come forward).
+    curve = parseFloat((/[?&]curve=(-?[\d.]+)/.exec(location.search) || [])[1]);
+    if (isNaN(curve)) curve = parseFloat(hero.getAttribute('data-band-curve')) || 0;
+    if (curve && !reduced) {
+      var crow = qs('.band_row:not(.is-names)', hero), cscroll = crow && qs('[data-marquee-scroll-target]', crow);
+      var persp = 1400, sign = curve < 0 ? -1 : 1, step = Math.abs(curve);
+      var bend = function () {
+        if (cscroll && !hidden && !narrow()) {
+          var center = band.offsetWidth / 2, sx = parseFloat(gsap.getProperty(cscroll, 'x')) || 0;
+          qsa('[data-marquee-collection-target]', crow).forEach(function (list) {
+            var lx = list.offsetLeft + (parseFloat(gsap.getProperty(list, 'xPercent')) || 0) / 100 * list.offsetWidth + sx;
+            qsa('.band_panel', list).forEach(function (pnl) {
+              var pitch = pnl.offsetWidth * 1.0625;
+              var theta = Math.max(-75, Math.min(75, (lx + pnl.offsetLeft + pnl.offsetWidth / 2 - center) / pitch * step));
+              var R = pitch / Math.sin(step * Math.PI / 180);
+              var z = -sign * R * (1 - Math.cos(theta * Math.PI / 180));
+              pnl.style.transition = 'box-shadow .6s';
+              pnl.style.transform = 'perspective(' + persp + 'px) translateZ(' + z.toFixed(1) + 'px) rotateY(' + (-sign * theta).toFixed(2) + 'deg)';
+            });
+          });
+        }
+        requestAnimationFrame(bend);
+      };
+      requestAnimationFrame(bend);
+    }
 
     // ---- the opening, in order: the band rises, the title letters come up like the old hero,
     // the eyebrow and the buttons follow, the scroll line, and last the logo and the burger.
@@ -2123,7 +2149,7 @@
         if (scrollLine) scrollLine.classList.add('is-ready');
         nav.forEach(function (el) { gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out', clearProps: 'opacity' }); });
         // the reveal transitions have run; hand the elements to the scroll fade
-        setTimeout(function () { [stage, copy].forEach(function (el) { if (el) el.style.transition = 'none'; }); fadeBehind(); }, 1900);
+        setTimeout(function () { if (copy) copy.style.transition = 'none'; fadeBehind(); }, 1900);
       };
       if (reduced || !window.gsap || typeof SplitText === 'undefined') return done();
       var chars = title ? split(title).chars : [];
