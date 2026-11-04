@@ -3258,7 +3258,11 @@
       // every clip starts from its first frame as the band reveals, so the visitor sees each opening
       // (Echo's own loader, say) instead of whatever was playing behind the black
       qsa('video', hero).forEach(function (v) { try { v.currentTime = 0; } catch (e) {} if (v.paused && !hidden && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
-      [stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
+      // home-v4 (Rimbo): the copy first, then the cards. The stage keeps its own rise (the Designer's is-ready
+      // transition) but starts it once the title is nearly in, with every frame empty; then each clip grows
+      // from one pixel at the centre of its frame to fill it, the middle card first and the rest following outward.
+      var cardsAfter = !!slider && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      [cardsAfter ? null : stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
         if (scrollLine) scrollLine.classList.add('is-ready');
@@ -3269,10 +3273,18 @@
       };
       if (reduced || !window.gsap || typeof SplitText === 'undefined') return done();
       var chars = title ? split(title).chars : [];
-      gsap.timeline({ delay: 0.3, onComplete: done })
+      var tl = gsap.timeline({ delay: 0.3, onComplete: done })
         .from(chars, heroCharsIn(), 0)
         .from(eyebrow, { opacity: 0, y: 8, duration: 0.8, ease: 'expo.out' }, 0.35)
         .from(buttons, { opacity: 0, y: 14, duration: 0.9, ease: 'expo.out', stagger: 0.08, clearProps: 'opacity,transform' }, 0.55);
+      if (cardsAfter) {
+        var cx = window.innerWidth / 2;
+        var medias = qsa('.band_panel-media', hero).map(function (m) { var r = m.getBoundingClientRect(); return { el: m, d: Math.abs(r.left + r.width / 2 - cx) }; })
+          .sort(function (a, b) { return a.d - b.d; }).map(function (x) { return x.el; }); // nearest the middle first
+        gsap.set(medias, { scale: 0.002, transformOrigin: '50% 50%' }); // one pixel, in the centre of the frame
+        tl.call(function () { if (stage) stage.classList.add('is-ready'); }, null, 0.9)
+          .to(medias, { scale: 1, duration: 1, ease: 'expo.out', stagger: 0.09, clearProps: 'transform' }, 1.5);
+      }
     };
     var ready = function () {
       var tries = 0;
