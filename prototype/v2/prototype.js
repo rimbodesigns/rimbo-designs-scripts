@@ -26,15 +26,17 @@
     anapana: { name: 'Anapana', img: CDN + '6821a12565a36dfb5f0179c3_Anapana.avif', href: 'https://www.rimbodesigns.com/work/anapana' },
     dieronesie: { name: 'Dieronesie', video: '/media/dieronesie.mp4', rate: 1.5, img: CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif', href: 'https://www.rimbodesigns.com/work/dieronesie-retreat-festival-ceremony' },
     sandra: { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
-    course: { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: DFS_COVER, href: 'https://www.digital-fengshui.com/' },
+    course: { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: '/media/dfs-course-cover.jpg', href: 'https://www.digital-fengshui.com/' },
     pooh: { name: 'Pooh Balance', img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif', href: 'https://www.rimbodesigns.com/work/pooh-balance' },
     echo: { name: 'Echo Creative Agency', video: '/media/echo.mp4', rate: 1.5, img: '/media/echo/echo-preview-a.jpg', href: 'https://echocreativeagency.nl/' }
   };
   function cover(w) { return { name: w.name, img: w.img, href: w.href }; }
-  // upper row, moves left: Innergym, Charlie's, the DFS course and Echo play
+  // Both rows slide the same way at the same pace, the lower one shifted by half a row: a project
+  // and its twin stay five panels apart for good (rows moving against each other put the same
+  // image above itself every so often). ?opposite brings the counter-moving rows back to compare.
+  var opposite = /[?&]opposite/.test(location.search);
   var rowA = [W.innergym, W.nathan, W.charlies, W.anapana, W.course, W.sandra, cover(W.dieronesie), W.pooh, cover(W.dfs), W.echo];
-  // lower row, moves right: DFS and Dieronesie play; the order keeps each project away from its twin above
-  var rowB = [W.dfs, W.pooh, cover(W.charlies), cover(W.echo), W.sandra, W.dieronesie, W.nathan, cover(W.course), W.anapana, cover(W.innergym)];
+  var rowB = [W.sandra, W.dieronesie, W.pooh, W.dfs, cover(W.echo), cover(W.innergym), W.nathan, cover(W.charlies), W.anapana, cover(W.course)];
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
@@ -52,7 +54,7 @@
 
   // button styles to compare: ?buttons=a (ghost), b (solid + glow), c (text + line), d (coral outline)
   var buttonVariant = (/[?&]buttons=([a-d])/.exec(location.search) || [])[1] || 'b';
-  // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt
+  // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt, ?opposite (rows against each other)
   var noClips = /[?&]noclips/.test(location.search);
   if (/[?&]nograin/.test(location.search)) document.documentElement.classList.add('v2-nograin');
   if (/[?&]noblur/.test(location.search)) document.documentElement.classList.add('v2-noblur');
@@ -64,7 +66,7 @@
     '<div class="v2-hero_stage" aria-hidden="true"><div class="v2-band">' +
       row(names, 'left', 55, 'v2-band_edge') +
       row(rowA.map(function (w) { return panel(w, noClips); }), 'left', 90) +
-      row(rowB.map(function (w) { return panel(w, noClips); }), 'right', 95) +
+      row(rowB.map(function (w) { return panel(w, noClips); }), opposite ? 'right' : 'left', 90) +
     '</div><div class="v2-edgeblur"></div></div>' +
     '<div class="v2-hero_copy">' +
       '<span class="v2-eyebrow">Branding <i>·</i> Design <i>·</i> Development</span>' +
