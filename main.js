@@ -2410,6 +2410,254 @@
   }
 
   // =========================================================
+  // SCROLL RULER — blog posts (/post/…): Osmo Supply "Scroll Ruler" (docs/osmo/scroll-ruler.md)
+  // A fixed ruler on the left that shows how far you are through the article. Its parts are
+  // the rich text's H2s, its labels a short version of their text.
+  // initScrollRuler() below is Osmo's code as Osmo wrote it; ours is the rest of this section:
+  // the markup and theme, naming the H2s, hiding the labels where they would cover the text,
+  // and fading the ruler out before and after the article.
+  // =========================================================
+
+  // Osmo's markup, unchanged. If the Blog posts template ever gets it as an embed, that one is used.
+  var SCROLL_RULER_HTML =
+    '<nav data-scroll-ruler-init data-scroll-ruler-parts="[data-scroll-ruler-name]" aria-label="Page progress" class="scroll-ruler">' +
+      '<div data-scroll-ruler-list aria-hidden="true" class="scroll-ruler__list">' +
+        '<div data-scroll-ruler-tick class="scroll-ruler__tick"></div>' +
+      '</div>' +
+      '<div data-scroll-ruler-labels class="scroll-ruler__labels">' +
+        '<button data-scroll-ruler-label type="button" class="scroll-ruler__label">Label</button>' +
+      '</div>' +
+    '</nav>';
+
+  // Osmo's CSS, with RM Mono in place of Haffer Mono. The site's theme comes after it.
+  var SCROLL_RULER_CSS = [
+    '.scroll-ruler { --scroll-ruler-color: #f2f2f2; --scroll-ruler-accent: #ff5a36; z-index: 50; color: var(--scroll-ruler-color); padding-left: 1.25em; padding-right: 2.5em; position: fixed; top: 20svh; bottom: 20svh; left: 0; cursor: pointer; touch-action: manipulation; user-select: none; transition: opacity 0.6s ease; }',
+    '.scroll-ruler[data-scroll-ruler-status="idle"] { opacity: 0.4; }',
+    '.scroll-ruler__list { flex-direction: column; justify-content: space-between; align-items: flex-start; height: 100%; display: flex; }',
+    '.scroll-ruler__tick { opacity: 0.3; transform-origin: 0%; background-color: currentColor; width: 0.75em; height: 1px; }',
+    '.scroll-ruler__tick[data-scroll-ruler-size="mid"] { width: 1.125em; }',
+    '.scroll-ruler__tick[data-scroll-ruler-size="major"] { width: 1.5em; }',
+    '.scroll-ruler__tick[data-scroll-ruler-status="passed"] { opacity: 0.9; }',
+    '.scroll-ruler__tick[data-scroll-ruler-status="current"] { opacity: 1; background-color: var(--scroll-ruler-accent); }',
+    '.scroll-ruler__labels { pointer-events: none; position: absolute; inset: 0%; }',
+    '.scroll-ruler__label { pointer-events: auto; opacity: 0.45; color: inherit; white-space: nowrap; background-color: transparent; border-style: none; padding: 0.375em 0.5em; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: 0.6875em; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; position: absolute; top: 0; left: 4.25em; cursor: pointer; }',
+    '.scroll-ruler__label:hover { opacity: 1; }',
+    '.scroll-ruler__label:focus-visible { opacity: 1; outline: 1px solid currentColor; outline-offset: 0.125em; }',
+    '.scroll-ruler__label[data-scroll-ruler-status="active"] { opacity: 1; color: var(--scroll-ruler-accent); }',
+    '@media (max-width: 767px) { .scroll-ruler__labels { display: none; } }',
+
+    // ---- the site's theme
+    // Like the fixed nav (.mix_blend), the ruler is white with mix-blend-mode: difference, so it reads
+    // dark on the beige page and light over a dark screenshot. Difference also turns the accent around:
+    // #00a19a over the beige (#f8f5ee) comes out as the link red (#ff5454); over black it shows as itself.
+    '.scroll-ruler { --scroll-ruler-color: #fff; --scroll-ruler-accent: #00a19a; mix-blend-mode: difference; }',
+    // a bit taller and tighter labels, so short sections (a list under an H2) still get their label:
+    // Osmo hides a label that would touch the one above it
+    '.scroll-ruler { top: 15svh; bottom: 15svh; }',
+    '.scroll-ruler__label { padding-top: 0.25em; padding-bottom: 0.25em; }',
+    // too narrow for the labels next to the text: ticks only (they stay in the layout, so Osmo can still measure them)
+    '.scroll-ruler.is-compact .scroll-ruler__labels { visibility: hidden; }',
+    // phones: the text starts 5vw (about 19px) from the edge, so the ticks get small enough to stay in
+    // that gutter, also when the wave stretches them (Osmo sizes everything in em)
+    '@media (max-width: 767px) { .scroll-ruler { font-size: 4.5px; padding-left: 4px; padding-right: 0; } }',
+    // on touch screens and narrow windows the ruler sits over the text, so it only shows, it doesn't take taps
+    '@media (hover: none), (max-width: 991px) { .scroll-ruler { pointer-events: none; } }',
+    // before and after the article (the intro, the newsletter, the footer) it is gone
+    '.scroll-ruler.is-out { opacity: 0; pointer-events: none; }',
+    '.scroll-ruler.is-out .scroll-ruler__label { pointer-events: none; }',
+    // the ruler takes over from the old red progress bar along the top
+    '.scroll_progress_indicatror { display: none; }'
+  ].join('\n');
+
+  // "Webflow vs WordPress: the comparison" → "Webflow vs WordPress", "Which one should you choose?" → "Which one"
+  function scrollRulerLabel(text) {
+    var STOP = /^(a|an|the|to|of|for|and|or|in|on|at|by|with|from|your|you|is|are|should|can|de|het|een|van|voor|en|op|met|je|jouw|zijn)$/i;
+    var t = text.replace(/\s+/g, ' ').trim();
+    var head = t.split(/[:?!.—–(]/)[0].trim(); // only what comes before a colon or question mark
+    var words = (head || t).split(' ').slice(0, 3);
+    while (words.length > 1 && STOP.test(words[words.length - 1])) words.pop(); // no "Which one should"
+    return words.join(' ');
+  }
+
+  function rdScrollRuler() {
+    // Only on staging and localhost until Rimbo gives the go: live and staging share the footer
+    // tag, so a live publish must not bring it along by accident. Remove this line to go live.
+    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
+    if (window.Webflow && Webflow.env && Webflow.env('editor') !== undefined) return;
+
+    var article = qs('.richtextstyling');
+    // "{skip}" typed in an H2 keeps it off the ruler (the marker itself is taken out of the heading).
+    // Same marker as Osmo's Table of Contents; such a heading also gets data-toc-ignore, so a TOC skips it too.
+    var headings = article ? qsa('h2', article).filter(function (h) {
+      if (h.textContent.indexOf('{skip}') !== -1) {
+        var walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), node;
+        while ((node = walker.nextNode())) node.textContent = node.textContent.replace('{skip}', '').replace(/\s+$/, '');
+        h.setAttribute('data-toc-ignore', '');
+        return false;
+      }
+      return h.textContent.trim();
+    }) : [];
+    if (headings.length < 2) return; // nothing to divide
+
+    // Rich text can't get attributes in the Designer, so the H2s get their names here
+    headings.forEach(function (h) {
+      if (!h.hasAttribute('data-scroll-ruler-name')) h.setAttribute('data-scroll-ruler-name', scrollRulerLabel(h.textContent));
+    });
+
+    if (!qs('#rd-scroll-ruler-css')) {
+      var style = document.createElement('style');
+      style.id = 'rd-scroll-ruler-css';
+      style.textContent = SCROLL_RULER_CSS;
+      document.head.appendChild(style);
+    }
+    var root = qs('[data-scroll-ruler-init]');
+    if (!root) {
+      document.body.insertAdjacentHTML('beforeend', SCROLL_RULER_HTML);
+      root = qs('[data-scroll-ruler-init]');
+    }
+    root.classList.add('is-out'); // fades in when the article comes on screen
+
+    initScrollRuler();
+
+    // Labels only where they fit between the screen edge and the text (with room for the wave
+    // that pushes them right); otherwise just the ticks
+    var labelWrap = qs('[data-scroll-ruler-labels]', root);
+    function fitLabels() {
+      root.classList.remove('is-compact');
+      var right = 0;
+      qsa('[data-scroll-ruler-label]', labelWrap).forEach(function (l) {
+        if (!l.hidden) right = Math.max(right, l.offsetLeft + l.offsetWidth);
+      });
+      var room = headings[0].getBoundingClientRect().left;
+      if (!right || right + 64 > room) root.classList.add('is-compact');
+    }
+    fitLabels();
+    var fitTimer;
+    window.addEventListener('resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(fitLabels, 150); });
+
+    // On screen only while the article is: in once its top is in view, out once its end has
+    // passed the bottom of the ruler (80% down), so it never sits over the newsletter or footer
+    var box = article.closest('.richtextbox') || article;
+    if (typeof ScrollTrigger !== 'undefined') {
+      ScrollTrigger.create({
+        trigger: box,
+        start: 'top bottom',
+        end: 'bottom 80%',
+        onToggle: function (self) { root.classList.toggle('is-out', !self.isActive); }
+      });
+    } else {
+      root.classList.remove('is-out');
+    }
+
+    // Osmo's code, as it came (only its DOMContentLoaded line is left out: rdScrollRuler calls it,
+    // after the H2s have their names)
+    function initScrollRuler() {
+      document.querySelectorAll("[data-scroll-ruler-init]").forEach((root) => {
+        const tickCount = 65;
+        const waveSize = 0.6;
+        const waveWidth = 0.035;
+        const speedBoost = 1;
+        const cursorSize = 1.2;
+        const cursorWidth = 0.06;
+        const idleDelay = 1.2;
+        const list = root.querySelector("[data-scroll-ruler-list]");
+        const tickBlueprint = list.querySelector("[data-scroll-ruler-tick]");
+        const labelWrap = root.querySelector("[data-scroll-ruler-labels]");
+        const labelBlueprint = labelWrap ? labelWrap.querySelector("[data-scroll-ruler-label]") : null;
+        const partSelector = root.getAttribute("data-scroll-ruler-parts");
+        const parts = partSelector ? [...document.querySelectorAll(partSelector)] : [];
+        const usingParts = parts.length > 0;
+        if (!usingParts) root.setAttribute("aria-hidden", "true");
+        tickBlueprint.remove();
+        if (labelBlueprint) labelBlueprint.remove();
+        const ticks = [];
+        for (let i = 0; i < tickCount; i++) { const tick = tickBlueprint.cloneNode(true); list.appendChild(tick); ticks.push(tick); }
+        const tickSetters = ticks.map((tick) => gsap.quickSetter(tick, "scaleX"));
+        const tickPositions = ticks.map((tick, index) => index / (tickCount - 1));
+        const tickStatus = ticks.map(() => "");
+        const values = ticks.map(() => 0);
+        const labels = [];
+        if (usingParts && labelBlueprint) {
+          parts.forEach((part, partIndex) => {
+            const label = labelBlueprint.cloneNode(true);
+            label.textContent = part.getAttribute("data-scroll-ruler-name") || String(partIndex + 1).padStart(2, "0");
+            label.addEventListener("click", (event) => { event.stopPropagation(); scrollToPart(partIndex); });
+            labelWrap.appendChild(label);
+            labels.push({ element: label, partIndex: partIndex, tickIndex: 0, tickWidth: 0, setX: gsap.quickSetter(label, "x", "px") });
+          });
+        }
+        let rangeStart = 0; let rangeLength = 1; let partStarts = []; let lastScroll = window.scrollY; let speed = 0; let currentIndex = null; let activePart = null; let pointerPosition = 0.5; let cursorTarget = 0; let cursorStrength = 0; let lastActive = 0; let rootStatus = ""; let reduceMotion = false;
+        function gaussian(distance, width) { return Math.exp(-(distance * distance) / (2 * width * width)); }
+        function measure() {
+          const scrollY = window.scrollY;
+          if (usingParts) {
+            const tops = parts.map((part) => part.getBoundingClientRect().top + scrollY);
+            const end = parts[parts.length - 1].getBoundingClientRect().bottom + scrollY;
+            rangeStart = Math.max(tops[0], window.innerHeight / 2);
+            rangeLength = Math.max(Math.min(end, document.documentElement.scrollHeight - window.innerHeight / 2) - rangeStart, 1);
+            partStarts = tops.map((top) => gsap.utils.clamp(0, 1, (top - rangeStart) / rangeLength));
+          } else { rangeStart = 0; rangeLength = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1); }
+          const partTicks = partStarts.map((start) => Math.round(start * (tickCount - 1)));
+          ticks.forEach((tick, index) => { let size = index % 5 === 0 ? "mid" : "minor"; if (usingParts ? partTicks.includes(index) : index % 10 === 0) size = "major"; tick.setAttribute("data-scroll-ruler-size", size); });
+          let lastLabelY = -Infinity;
+          labels.forEach((label) => {
+            const tick = ticks[partTicks[label.partIndex]];
+            const y = tick.offsetTop + tick.offsetHeight / 2;
+            label.element.hidden = false; label.tickIndex = partTicks[label.partIndex]; label.tickWidth = tick.offsetWidth;
+            if (y - lastLabelY < label.element.offsetHeight * 1.1) { label.element.hidden = true; return; }
+            lastLabelY = y;
+            gsap.set(label.element, { y: y, yPercent: -50 });
+          });
+          currentIndex = null;
+        }
+        function scrollToPosition(top) { window.scrollTo({ top: top, behavior: reduceMotion ? "auto" : "smooth" }); }
+        function scrollToPart(partIndex) { scrollToPosition(parts[partIndex].getBoundingClientRect().top + window.scrollY); }
+        function findPart(position) { let partIndex = 0; partStarts.forEach((start, index) => { if (start <= position) partIndex = index; }); return partIndex; }
+        function update(time) {
+          const frame = Math.min(gsap.ticker.deltaRatio(60), 3);
+          const scrollY = window.scrollY; const scrollDelta = scrollY - lastScroll; lastScroll = scrollY;
+          const speedNow = reduceMotion ? 0 : Math.min(Math.abs(scrollDelta) / window.innerHeight / frame / 0.04, 1);
+          const speedEase = speedNow > speed ? 0.3 : 0.05;
+          speed += (speedNow - speed) * Math.min(speedEase * frame, 1);
+          const rawMarker = usingParts ? (scrollY + window.innerHeight / 2 - rangeStart) / rangeLength : scrollY / rangeLength;
+          const marker = gsap.utils.clamp(0, 1, rawMarker);
+          const insideRange = rawMarker >= 0 && rawMarker <= 1;
+          cursorStrength += (cursorTarget - cursorStrength) * Math.min(0.15 * frame, 1);
+          const waveAmount = waveSize * (1 + speedBoost * speed);
+          const waveSpread = waveWidth * (1 + speedBoost * 0.8 * speed);
+          const follow = reduceMotion ? 1 : Math.min(0.2 * frame, 1);
+          for (let i = 0; i < tickCount; i++) {
+            let target = waveAmount * gaussian(tickPositions[i] - marker, waveSpread);
+            if (cursorSize > 0) target += cursorSize * cursorStrength * gaussian(tickPositions[i] - pointerPosition, cursorWidth);
+            values[i] += (target - values[i]) * follow;
+            tickSetters[i](1 + values[i]);
+          }
+          const nextIndex = insideRange ? Math.round(marker * (tickCount - 1)) : -1;
+          if (nextIndex !== currentIndex) {
+            currentIndex = nextIndex;
+            ticks.forEach((tick, index) => { let status = "upcoming"; if (index === currentIndex) status = "current"; else if (rawMarker > 0 && tickPositions[index] <= marker) status = "passed"; if (tickStatus[index] === status) return; tickStatus[index] = status; tick.setAttribute("data-scroll-ruler-status", status); });
+          }
+          const nextPart = usingParts && insideRange ? findPart(marker) : -1;
+          if (nextPart !== activePart) { activePart = nextPart; labels.forEach((label) => { label.element.setAttribute("data-scroll-ruler-status", label.partIndex === activePart ? "active" : "inactive"); }); }
+          labels.forEach((label) => label.setX(values[label.tickIndex] * label.tickWidth));
+          if (speed > 0.02 || cursorStrength > 0.1 || root.matches(":focus-within")) lastActive = time;
+          const nextStatus = time - lastActive < idleDelay ? "active" : "idle";
+          if (nextStatus !== rootStatus) { rootStatus = nextStatus; root.setAttribute("data-scroll-ruler-status", rootStatus); }
+        }
+        window.addEventListener("pointermove", (event) => { if (event.pointerType !== "mouse") return; const rect = list.getBoundingClientRect(); const reach = rect.height * 0.25; const distance = Math.max(event.clientX - rect.left - root.offsetWidth * 0.5, 0); cursorTarget = gsap.utils.clamp(0, 1, 1 - distance / reach); pointerPosition = (event.clientY - rect.top) / rect.height; });
+        document.documentElement.addEventListener("pointerleave", () => { cursorTarget = 0; });
+        root.addEventListener("click", (event) => { const rect = list.getBoundingClientRect(); const position = gsap.utils.clamp(0, 1, (event.clientY - rect.top) / rect.height); if (usingParts) scrollToPart(findPart(position)); else scrollToPosition(position * rangeLength); });
+        gsap.matchMedia().add("(prefers-reduced-motion: reduce)", () => { reduceMotion = true; return () => { reduceMotion = false; }; });
+        let resizeTimer;
+        const resizeObserver = new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(measure, 100); });
+        resizeObserver.observe(document.body); resizeObserver.observe(root);
+        measure();
+        gsap.ticker.add(update);
+      });
+    }
+  }
+
+  // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
   // runs on its own, so a missing element on one page can't stop the rest.
@@ -2439,6 +2687,7 @@
   else if (path === '/branding-brilliance-newsletter' || path === '/call-is-booked') run('newsletter', rdNewsletter);
   else if (path === '/resources') run('resources', rdResources);
   else if (path === '/rimbo-quiz') run('quiz', rdQuiz);
+  else if (path.indexOf('/post/') === 0) run('scroll ruler', rdScrollRuler);
 
   // These two replace code that still sits in Webflow for now, so they wait for
   // the whole page and check whether that old code has run first.

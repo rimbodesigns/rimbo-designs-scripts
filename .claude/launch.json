@@ -16,6 +16,16 @@
         "web-inspiration/tools/serve.mjs"
       ],
       "port": 8767
+    },
+    {
+      "name": "blog-post",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=8790",
+        "node",
+        "prototype/server.js"
+      ],
+      "port": 8790
     }
   ]
 }

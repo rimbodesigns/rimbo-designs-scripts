@@ -30,6 +30,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdQuiz` | `/rimbo-quiz` | 35662 QUIZ .js |
 | `rdLetterReveal` | `/audit`, `/my-story` | the anime.js page code on those pages |
 | `rdGlassCarousel` | any page with `[data-glass-carousel]` (new site) | Osmo Liquid Glass Carousel; each image (or a muted looping `<video>`) grows into its place once the text is in, then the row rolls left on its own; loads three.js only there |
+| `rdScrollRuler` | `/post/…` (staging and localhost only until Rimbo's go) | Osmo Scroll Ruler (`docs/osmo/scroll-ruler.md`): a fixed progress ruler on the left, the rich text's H2s are its parts; `{skip}` in an H2 leaves it out. Try it locally: `node prototype/post/sync.js <slug>`, then the `blog-post` preview (port 8790) at `/post/<slug>` |
 
 Still inline in Webflow: Google Tag Manager (site head), the Lenis CSS (site head),
 the Finsweet attributes, Cal.com on /contact, and the SEO/JSON-LD blocks on the
