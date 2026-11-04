@@ -14,18 +14,17 @@
   });
 
   // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt,
-  // ?nodrag, ?noloader (band at once), ?tinko (the Meet Tinko clip on the band, not approved yet)
+  // ?nodrag, ?noloader (band at once)
   var noClips = /[?&]noclips/.test(location.search);
   if (/[?&]nograin/.test(location.search)) document.documentElement.classList.add('v2-nograin');
   if (/[?&]noblur/.test(location.search)) document.documentElement.classList.add('v2-noblur');
   var noTilt = /[?&]notilt/.test(location.search);
   var noDrag = /[?&]nodrag/.test(location.search);
   var noLoader = /[?&]noloader/.test(location.search);
-  var withTinko = /[?&]tinko/.test(location.search);
 
   // ---- the work on the band: only the projects Rimbo approved (older work stays out; Pooh Balance
-  // cut on 2026-11-04). Clips where there is one, covers for the rest. Sandra and Nathan stay static
-  // on purpose (their clips were recorded and set aside).
+  // cut on 2026-11-04, Meet Tinko in its place). Clips where there is one, covers for the rest. Sandra
+  // and Nathan stay static on purpose (their clips were recorded and set aside).
   var CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
   var DFS_COVER = CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif';
   var W = {
@@ -38,17 +37,15 @@
     sandra: { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
     course: { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: '/media/dfs-course-cover.jpg', href: 'https://www.digital-fengshui.com/' },
     echo: { name: 'Echo Creative Agency', video: '/media/echo.mp4', rate: 1.5, img: '/media/echo/echo-preview-a.jpg', href: 'https://echocreativeagency.nl/' },
-    // Rimbo's own suggestion for Pooh's spot; on the band with ?tinko until he has seen it
     tinko: { name: 'Meet Tinko', video: '/media/tinko.mp4', rate: 1.5, img: '/media/tinko-cover.jpg', href: 'https://www.digital-fengshui.com/tinko' }
   };
-  if (!withTinko) delete W.tinko;
   // ---- which projects, in which order: the ranking tool (/rank, prototype/v2/rank.html) saves
   // { order, hidden } in localStorage; without it the default order applies. The rows move against
   // each other (Rimbo missed that when it was gone), so a project lives on ONE row only: ranks
   // 1, 3, 5 ... on the upper row, 2, 4, 6 ... on the lower one. Along a row it repeats at a fixed
-  // distance (the loop), so a project never sits next to its own copy.
-  var DEFAULT_ORDER = ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan'];
-  if (withTinko) DEFAULT_ORDER.push('tinko');
+  // distance (the loop), so a project never sits next to its own copy. Ten projects keep the rows at
+  // five each: with four, a row's loop is short enough that the same project shows twice on screen.
+  var DEFAULT_ORDER = ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko'];
   var rank = null;
   try { rank = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
   var order = ((rank && rank.order) || DEFAULT_ORDER).filter(function (k) { return W[k]; });
