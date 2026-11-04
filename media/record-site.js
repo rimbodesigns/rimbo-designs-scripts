@@ -4,8 +4,10 @@
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 const { execSync } = require('child_process');
-const [url, out, toArg, secArg, flag] = process.argv.slice(2);
-if (!url || !out) { console.log('usage: node media/record-site.js <url> <out.mp4> [scrollTo] [seconds] [--night]'); process.exit(1); }
+const args = process.argv.slice(2);
+const hideSel = (args.find(a => a.startsWith('--hide=')) || '').slice(7); // --hide=".popup,.cookie" keeps those elements out of the clip
+const [url, out, toArg, secArg, flag] = args.filter(a => !a.startsWith('--hide='));
+if (!url || !out) { console.log('usage: node media/record-site.js <url> <out.mp4> [scrollTo] [seconds] [--night] [--hide=<css selector>]'); process.exit(1); }
 const SCROLL_TO = +toArg || 4500, SECONDS = +secArg || 25, FPS = 30, STEP = 1000 / FPS;
 const LEAD = 1.0, TAIL = 1.5; // still at the top, still at the end
 const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -24,6 +26,7 @@ const frames = fs.mkdtempSync('/tmp/clip-');
   const page = await context.newPage();
   await page.route(/memberstack|googletagmanager|google-analytics|hotjar|clarity|facebook/i, r => r.abort());
   await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 });
+  if (hideSel) await page.addStyleTag({ content: hideSel + ' { display: none !important; }' });
   // warm up: load animations done, every image on the path fetched, back to the top
   await page.evaluate(() => { for (let i = 0; i < 240; i++) window.__step(1000 / 30); });
   await page.evaluate(y => { if (window.lenis) window.lenis.scrollTo(y, { immediate: true }); else window.scrollTo(0, y); }, SCROLL_TO + 1200);
