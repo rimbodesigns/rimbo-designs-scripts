@@ -41,7 +41,8 @@
     sandra: { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
     course: { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: '/media/dfs-course-cover.jpg', href: 'https://www.digital-fengshui.com/' },
     echo: { name: 'Echo Creative Agency', video: '/media/echo.mp4', rate: 1.5, img: '/media/echo/echo-preview-a.jpg', href: 'https://echocreativeagency.nl/' },
-    tinko: { name: 'Meet Tinko', video: '/media/tinko.mp4', rate: 1.5, img: '/media/tinko-cover.jpg', href: 'https://www.digital-fengshui.com/tinko' }
+    tinko: { name: 'Meet Tinko', video: '/media/tinko.mp4', rate: 1.5, img: '/media/tinko-cover.jpg', href: 'https://www.digital-fengshui.com/tinko' },
+    echotour: { name: 'Echo Creative Agency · in use', video: '/media/echo-tour.mp4', rate: 1.5, img: '/media/echo/echo-preview-hover.jpg', href: 'https://echocreativeagency.nl/' }
   };
   // ---- which projects, in which order: the ranking tool (/rank, prototype/v2/rank.html) saves
   // { order, hidden } in localStorage; without it the default order applies. The rows move against
@@ -50,7 +51,7 @@
   // goes up as well: the upper row is the far one, more of it is on screen, so that is where a short
   // loop shows the same project twice (Rimbo saw it there). Along a row a project repeats at a fixed
   // distance (the loop), never next to its own copy.
-  var DEFAULT_ORDER = ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko'];
+  var DEFAULT_ORDER = ['echo', 'dfs', 'echotour', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko']; // the two Echo clips land on different rows
   var rank = null;
   try { rank = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
   var order = ((rank && rank.order) || DEFAULT_ORDER).filter(function (k) { return W[k]; });

@@ -1903,6 +1903,196 @@
   //      poses and cycles through them at 9 fps, like a line traced three times. Off under
   //      prefers-reduced-motion.
   // =========================================================
+
+  // =========================================================
+  // BAND — the new home opening on /home-copy: a band of work sliding by in perspective.
+  // The shell (section [data-band] with the stage, copy, scroll line and loader) is static in
+  // Webflow; this builds the three marquee rows into [data-band-rows] before initMarquees runs,
+  // then tilts the band with the pointer, lets it drag, plays the clips and runs the loader.
+  // Ported from prototype/v2/prototype.js (the local prototype keeps the switches and ranking tool).
+  // =========================================================
+  var BAND_MEDIA = window.BAND_MEDIA_BASE || 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.0/media/'; // the local harness (prototype/band) sets BAND_MEDIA_BASE = '/media/'
+  var BAND_CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
+  var BAND_WORK = [ // the approved projects, in order (odd ranks on the upper row, even on the lower)
+    { name: 'Echo Creative Agency', video: BAND_MEDIA + 'echo.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-a.jpg' },
+    { name: 'Digital Feng Shui', video: BAND_MEDIA + 'dfs-home-test.mp4', rate: 2, img: BAND_CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif' },
+    { name: 'Echo Creative Agency · in use', video: BAND_MEDIA + 'echo-tour.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-hover.jpg' },
+    { name: 'Innergym', video: BAND_MEDIA + 'innergym.mp4', rate: 1.5, img: BAND_MEDIA + 'innergym-cover.jpg' },
+    { name: "Charlie's Angels", video: BAND_MEDIA + 'charlies-angels.mp4', rate: 1.5, img: BAND_CDN + '6811f08989345b3409601f8b_Charlies_angels.avif' },
+    { name: 'Dieronesie', video: BAND_MEDIA + 'dieronesie.mp4', rate: 1.5, img: BAND_CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif' },
+    { name: 'Digital Feng Shui · course', video: BAND_MEDIA + 'dfs-home.mp4', rate: 1.5, img: BAND_MEDIA + 'dfs-course-cover.jpg' },
+    { name: 'Sandra Dreisbach', img: BAND_CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif' },
+    { name: 'Anapana', img: BAND_CDN + '6821a12565a36dfb5f0179c3_Anapana.avif' },
+    { name: 'Nathan Rajac', img: BAND_CDN + '67e3d914128c8952d1dd6523_Nathan4.avif' },
+    { name: 'Meet Tinko', video: BAND_MEDIA + 'tinko.mp4', rate: 1.5, img: BAND_MEDIA + 'tinko-cover.jpg' }
+  ];
+
+  function rdBand() {
+    var hero = qs('[data-band]');
+    var rowsHost = hero && qs('[data-band-rows]', hero);
+    if (!hero || !rowsHost) return;
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ---- rows: a project lives on ONE row (odd ranks up, even down; with an even count the last
+    // one goes up too, the far row shows more of itself). Along a row it repeats at a fixed distance.
+    var rowA = [], rowB = [];
+    BAND_WORK.forEach(function (w, i) { (i % 2 === 0 || (i === BAND_WORK.length - 1 && BAND_WORK.length % 2 === 0) ? rowA : rowB).push(w); });
+    function copies(len) { return len >= 6 ? 1 : (len >= 4 ? 2 : 3); } // the loop needs more content than the band is wide
+    function panel(w) {
+      var media = w.video
+        ? '<video class="band_panel-media" muted loop playsinline autoplay preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
+        : '<img class="band_panel-media" src="' + w.img + '" alt="" loading="eager" draggable="false">';
+      return '<div class="band_panel" aria-label="' + w.name + '">' + media + '<span class="band_panel-label">' + w.name + '</span></div>';
+    }
+    function row(items, direction, speed, cls, dup) {
+      return '<div class="band_row ' + (cls || '') + '" data-marquee-scroll-direction-target data-marquee-speed="' + speed + '" data-marquee-direction="' + direction + '" data-marquee-duplicate="' + (dup || 1) + '" data-marquee-scroll-speed="0">' +
+        '<div class="band_row-scroll" data-marquee-scroll-target><div class="band_row-list" data-marquee-collection-target>' + items.join('') + '</div></div></div>';
+    }
+    var names = BAND_WORK.map(function (w) { return '<span class="band_edge-name">' + w.name + '</span>'; });
+    rowsHost.innerHTML =
+      row(names, 'left', 55, 'band_edge') +
+      row(rowA.map(panel), 'left', 18 * rowA.length, '', copies(rowA.length)) +
+      row(rowB.map(panel), 'right', 19 * rowB.length, '', copies(rowB.length));
+
+    var stage = qs('.band_stage', hero);
+    var band = rowsHost;
+
+    // ---- the band tilts with the pointer (one flat layer, so this is one transform a frame)
+    if (!reduced && window.matchMedia('(pointer: fine)').matches) {
+      var tx = 0, tz = 0, gx = 0, gz = 0, raf = null;
+      var settle = function () {
+        tx += (gx - tx) * 0.05; tz += (gz - tz) * 0.05;
+        band.style.setProperty('--tilt-x', tx.toFixed(3) + 'deg');
+        band.style.setProperty('--tilt-z', tz.toFixed(3) + 'deg');
+        raf = (Math.abs(gx - tx) > 0.002 || Math.abs(gz - tz) > 0.002) ? requestAnimationFrame(settle) : null;
+      };
+      hero.addEventListener('mousemove', function (e) {
+        var r = hero.getBoundingClientRect();
+        var nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
+        gx = -ny * 10; gz = nx * 7; // ±5° around x, ±3.5° around z
+        if (!raf) raf = requestAnimationFrame(settle);
+      });
+      hero.addEventListener('mouseleave', function () { gx = 0; gz = 0; if (!raf) raf = requestAnimationFrame(settle); });
+    }
+
+    // ---- drag the band: a grab hand, all rows follow the pointer along the band, a flick keeps
+    // going and dies out; while held the rows' own motion eases to a stop and picks up after.
+    // The rows are the Osmo marquees from initMarquees: a looping xPercent tween per list.
+    if (stage) {
+      var dragRows = null, axis = null, lastX = 0, lastY = 0, lastT = 0, vel = 0, inertia = null, dragging = false;
+      var rowsOf = function () {
+        return qsa('.band_row', hero).map(function (r) {
+          var list = qs('[data-marquee-collection-target]', r);
+          var tween = (window.gsap && list) ? gsap.getTweensOf(list).filter(function (t) { return t.duration() > 0; })[0] : null;
+          if (tween && r.__base == null) r.__base = tween.timeScale() || 1;
+          return { el: r, tween: tween, width: list ? list.offsetWidth : 0 };
+        });
+      };
+      var rowAxis = function (px, py) { // the band's x axis on screen near the pointer, and band px per screen px
+        var list = qs('.band_row:not(.band_edge) .band_row-list', hero);
+        var ps = list ? list.children : [], best = -1, bd = Infinity;
+        for (var i = 0; i < ps.length - 1; i++) {
+          var c = ps[i].getBoundingClientRect(), d = Math.hypot(c.left + c.width / 2 - px, c.top + c.height / 2 - py);
+          if (d < bd) { bd = d; best = i; }
+        }
+        if (best < 0) return null;
+        var a = ps[best].getBoundingClientRect(), b = ps[best + 1].getBoundingClientRect();
+        var vx = (b.left + b.width / 2) - (a.left + a.width / 2), vy = (b.top + b.height / 2) - (a.top + a.height / 2);
+        var len = Math.hypot(vx, vy), bandPx = ps[best + 1].offsetLeft - ps[best].offsetLeft;
+        return len ? { x: vx / len, y: vy / len, scale: bandPx / len } : null;
+      };
+      var shift = function (px) {
+        dragRows.forEach(function (r) {
+          if (!r.tween || !r.width) return;
+          var p = r.tween.progress() - px / r.width;
+          r.tween.progress(p - Math.floor(p));
+        });
+      };
+      var stop = function () {
+        if (!dragging) return;
+        dragging = false; hero.classList.remove('is-dragging');
+        var v = Math.max(-3, Math.min(3, vel)), prev = performance.now();
+        var step = function (now) {
+          var dt = Math.min(50, now - prev); prev = now;
+          shift(v * dt); v *= Math.pow(0.95, dt / 16.7);
+          inertia = Math.abs(v) > 0.005 ? requestAnimationFrame(step) : null;
+        };
+        if (inertia) cancelAnimationFrame(inertia);
+        inertia = requestAnimationFrame(step);
+        dragRows.forEach(function (r) { if (r.tween) gsap.to(r.tween, { timeScale: r.el.__base, duration: 1.6, ease: 'power2.out', overwrite: true }); });
+      };
+      stage.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0) return;
+        dragRows = rowsOf(); axis = rowAxis(e.clientX, e.clientY);
+        if (!axis || !dragRows.some(function (r) { return r.tween; })) return;
+        dragging = true; hero.classList.add('is-dragging');
+        try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+        lastX = e.clientX; lastY = e.clientY; lastT = e.timeStamp; vel = 0;
+        if (inertia) { cancelAnimationFrame(inertia); inertia = null; }
+        dragRows.forEach(function (r) { if (r.tween) gsap.to(r.tween, { timeScale: 0, duration: 0.4, ease: 'power2.out', overwrite: true }); });
+        e.preventDefault();
+      });
+      stage.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        var dx = e.clientX - lastX, dy = e.clientY - lastY, dt = e.timeStamp - lastT;
+        var along = (dx * axis.x + dy * axis.y) * axis.scale;
+        shift(along);
+        if (dt > 0) vel = 0.7 * (along / dt) + 0.3 * vel;
+        lastX = e.clientX; lastY = e.clientY; lastT = e.timeStamp;
+      });
+      stage.addEventListener('pointerup', stop);
+      stage.addEventListener('pointercancel', stop);
+      stage.addEventListener('lostpointercapture', stop);
+    }
+
+    // ---- clips: the marquee clones the rows, so tune every video once (re-touching one makes it hiccup)
+    function tune() {
+      qsa('video', hero).forEach(function (v) {
+        if (v.__tuned) return;
+        v.__tuned = true;
+        var rate = parseFloat(v.getAttribute('data-rate')) || 1.5;
+        v.muted = true; v.loop = true; v.playsInline = true;
+        var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
+        if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
+        if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      });
+    }
+    tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
+
+    // ---- loader: a dark cover while the covers and clips get ready, a counter and a line bottom-left,
+    // then html.band-ready brings the band up. Never under 1.3 s, never over 5 s.
+    var loader = qs('.band_loader', hero);
+    var ready = function () {
+      document.documentElement.classList.add('band-ready');
+      if (loader) setTimeout(function () { loader.remove(); }, 1200);
+    };
+    if (!loader) { ready(); return; }
+    var num = qs('.band_loader-n', loader), bar = qs('.band_loader-fill', loader);
+    var t0 = performance.now(), shown = 0;
+    var readiness = function () {
+      var seen = {}, total = 0, done = 0;
+      qsa('.band_panel-media', hero).forEach(function (m) {
+        var key = m.currentSrc || m.getAttribute('src');
+        var ok = (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0);
+        if (!seen[key]) seen[key] = { ok: ok }; else if (ok) seen[key].ok = true;
+      });
+      for (var k in seen) { total++; if (seen[k].ok) done++; }
+      return total ? done / total : 1;
+    };
+    var tick = function () {
+      var elapsed = performance.now() - t0;
+      var target = Math.max(readiness() * 100, Math.min(90, elapsed / 1300 * 90));
+      if (elapsed > 5000) target = 100;
+      shown += (target - shown) * 0.09;
+      if (target >= 100 && shown > 99.3) shown = 100;
+      if (num) num.textContent = (shown < 9.5 ? '0' : '') + Math.round(shown);
+      if (bar) bar.style.transform = 'scaleX(' + (shown / 100).toFixed(3) + ')';
+      if (shown >= 100) { setTimeout(ready, 350); return; }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
   function rdButtons() {
     var buttons = qsa('.btn');
     if (!buttons.length) return;
@@ -2113,12 +2303,14 @@
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
+  run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
 
-  if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
+  if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
+  else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
   else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);
   else if (path === '/work') run('work', rdWork);
   else if (path.indexOf('/work/') === 0) run('case study', rdWorkItem);
