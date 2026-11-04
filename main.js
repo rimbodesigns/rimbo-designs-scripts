@@ -1285,7 +1285,7 @@
     var introDelay = 1.6; // seconds after the page is ready, so the text comes first
     var introDuration = 1.1; // seconds for one image to grow
     var introEase = 'expo.out';
-    var introSpread = 0.06; // delay per panel away from the middle, as a share of the intro
+    var introSpread = 0.09; // delay per panel away from the middle, as a share of the intro (about 0.1 s, like the cards on home-v4)
     var introCaptionDelay = 0.6; // the caption follows after this many seconds
 
     // Autoplay: the row rolls left on its own and pauses while you touch it
@@ -1872,11 +1872,15 @@
             return;
           }
 
-          // Intro: each image grows in place, from nothing to its full size, the middle one first
-          var grow = 1;
+          // Intro: the row expands from the middle — every image starts as a point at the centre and slides
+          // out to its own place while it grows, the middle one first and its neighbours following (like the
+          // cards on home-v4). While they still overlap, the ones nearer the middle draw in front.
+          var grow = 1, depth = 0;
           if (!introDone) {
             var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
             grow = gsap.utils.clamp(0, 1, (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread));
+            centerX *= grow;
+            depth = -ring * 0.01;
           }
 
           var shrink = (1 - 0.25 * scrollEnergy) * grow;
@@ -1891,7 +1895,7 @@
           }
 
           p.mesh.visible = true;
-          p.mesh.position.set(centerX, 0, 0);
+          p.mesh.position.set(centerX, 0, depth);
           p.mesh.scale.set(w, h, 1);
 
           var sx = centerX + W / 2;
@@ -3318,11 +3322,15 @@
       // centre to full size, the middle card first and the rest following outward.
       // The wheel (home-v3) does not wait: it rolls in with the reveal instead (rollWheelIn above).
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
+      // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
+      var glassAfter = !!qs('[data-glass-carousel]', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
-      [cardsAfter ? null : stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
+      [(cardsAfter || glassAfter) ? null : stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
         if (scrollLine) scrollLine.classList.add('is-ready');
+        window.dispatchEvent(new CustomEvent('band:stage-in')); // the stage is in by now whichever way it opened (a glass carousel waits for this)
         autoStep(); startDrift();
         nav.forEach(function (el) { gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out', clearProps: 'opacity' }); });
         // the reveal transitions have run; hand the elements to the scroll fade
@@ -3342,6 +3350,10 @@
         if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the Designer's rise + fade are off: the cards are the entrance
         tl.call(function () { if (stage) stage.classList.add('is-ready'); }, null, 0.98)
           .to(panels, { scale: 1, duration: 1.1, ease: 'expo.out', stagger: 0.1, clearProps: 'transform' }, 1);
+      }
+      if (glassAfter) {
+        if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // no rise and no fade: the canvases expanding from the middle are the entrance
+        tl.call(function () { if (stage) stage.classList.add('is-ready'); window.dispatchEvent(new CustomEvent('band:stage-in')); }, null, 0.98);
       }
     };
     var ready = function () {
