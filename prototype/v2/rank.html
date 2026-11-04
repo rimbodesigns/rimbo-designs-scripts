@@ -43,7 +43,7 @@
 <body>
 <div class="wrap">
   <h1>Rank the band</h1>
-  <p class="lead">Drag to order. Odd ranks go on the upper row, even ranks on the lower one, so each project lives on one row and repeats there at a fixed distance, never next to its own copy. Hide what shouldn't be there. The band reads this the moment you reload it.</p>
+  <p class="lead">Drag to order. Odd ranks go on the upper row, even ranks on the lower one, and with an even count the last one goes up too: the upper row is the far one, more of it is on screen, so it needs the longer loop. Each project lives on one row and repeats there at a fixed distance, never next to its own copy. Hide what shouldn't be there. The band reads this the moment you reload it.</p>
   <div class="mono">Projects</div>
   <ol id="list"></ol>
   <div class="controls">
@@ -93,7 +93,9 @@
   // the same split the band makes (prototype.js): odd ranks up, even ranks down
   function split() {
     var visible = state.order.filter(function (k) { return state.hidden.indexOf(k) < 0; });
-    return { n: visible.length, A: visible.filter(function (k, i) { return i % 2 === 0; }), B: visible.filter(function (k, i) { return i % 2 === 1; }) };
+    var A = [], B = [];
+    visible.forEach(function (k, i) { (i % 2 === 0 || (i === visible.length - 1 && visible.length % 2 === 0) ? A : B).push(k); });
+    return { n: visible.length, A: A, B: B };
   }
 
   var list = document.getElementById('list');

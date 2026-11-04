@@ -42,9 +42,10 @@
   // ---- which projects, in which order: the ranking tool (/rank, prototype/v2/rank.html) saves
   // { order, hidden } in localStorage; without it the default order applies. The rows move against
   // each other (Rimbo missed that when it was gone), so a project lives on ONE row only: ranks
-  // 1, 3, 5 ... on the upper row, 2, 4, 6 ... on the lower one. Along a row it repeats at a fixed
-  // distance (the loop), so a project never sits next to its own copy. Ten projects keep the rows at
-  // five each: with four, a row's loop is short enough that the same project shows twice on screen.
+  // 1, 3, 5 ... on the upper row, 2, 4, 6 ... on the lower one, and with an even count the last one
+  // goes up as well: the upper row is the far one, more of it is on screen, so that is where a short
+  // loop shows the same project twice (Rimbo saw it there). Along a row a project repeats at a fixed
+  // distance (the loop), never next to its own copy.
   var DEFAULT_ORDER = ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko'];
   var rank = null;
   try { rank = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
@@ -53,7 +54,8 @@
   var hidden = (rank && rank.hidden) || [];
   var visible = order.filter(function (k) { return hidden.indexOf(k) < 0; });
   if (visible.length < 2) visible = DEFAULT_ORDER.slice();
-  var keysA = visible.filter(function (k, i) { return i % 2 === 0; }), keysB = visible.filter(function (k, i) { return i % 2 === 1; });
+  var keysA = [], keysB = [];
+  visible.forEach(function (k, i) { (i % 2 === 0 || (i === visible.length - 1 && visible.length % 2 === 0) ? keysA : keysB).push(k); });
   var rowA = keysA.map(function (k) { return W[k]; }), rowB = keysB.map(function (k) { return W[k]; });
   // the marquee needs more content than the band is wide (250vw, 340vw on phones): copies per row
   function copies(len) { return len >= 6 ? 1 : (len >= 4 ? 2 : 3); }
