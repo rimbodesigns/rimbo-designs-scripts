@@ -1,0 +1,142 @@
+/* The new /resources header and filter. Build this in the Designer (class names are the ones to create).
+   Osmo's multi filter drives the states through [data-filter-status]. */
+:root {
+  --rs-ink: var(--color--black, #131313);
+  --rs-paper: var(--color--rimbobage, #efeeec);
+  --rs-red: #c90f0f;
+  --rs-ease: cubic-bezier(0.625, 0.05, 0, 1);
+}
+
+/* header: title on the left, everything you can do on the right */
+.rs-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem 4rem;
+  margin: 0 5vw;
+  padding: 11rem 0 3rem;
+}
+.rs-title {
+  margin: 0;
+  color: var(--rs-ink);
+  font-family: var(--font--big-bold);
+  font-size: clamp(3rem, 7vw, 7.5rem);
+  font-weight: 900;
+  line-height: 0.9;
+  text-align: left;
+  white-space: nowrap;
+  flex: none;
+  overflow: hidden;
+}
+.rs-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1.25rem;
+  min-width: 30rem;
+  padding-bottom: 0.4rem;
+}
+.rs-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.rs-count {
+  margin: 0;
+  color: var(--rs-ink);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* language: a two-way switch, on the same line as the count */
+.rs-lang {
+  display: inline-flex;
+  padding: 0.1875rem;
+  border: 0.0625rem solid var(--rs-ink);
+  border-radius: 0.3125rem;
+}
+.rs-lang__a {
+  padding: 0.4rem 0.75rem 0.3rem;
+  border-radius: 0.1875rem;
+  color: var(--rs-ink);
+  font-family: 'GRIFTER BOLD', sans-serif;
+  font-size: 0.75rem;
+  line-height: 1;
+  text-decoration: none;
+  transition: background-color 0.4s var(--rs-ease), color 0.4s var(--rs-ease);
+}
+.rs-lang__a.w--current { background-color: var(--rs-ink); color: var(--rs-paper); }
+.rs-lang__a:not(.w--current):hover { background-color: color-mix(in srgb, var(--rs-ink) 12%, transparent); }
+
+/* filter chips (multi select) */
+.rs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.rs-chip,
+.rs-reset {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  padding: 0.9375rem 1.125rem 0.625rem;
+  border: 0.0625rem solid var(--rs-ink);
+  border-radius: 0.3125rem;
+  background-color: transparent;
+  color: var(--rs-ink);
+  font-family: 'GRIFTER BOLD', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 0.875rem;
+  cursor: pointer;
+  transition: color 0.4s var(--rs-ease), background-color 0.4s var(--rs-ease), border-color 0.4s var(--rs-ease);
+}
+.rs-chip:hover { background-color: color-mix(in srgb, var(--rs-ink) 10%, transparent); }
+.rs-chip[data-filter-status="active"] { background-color: var(--rs-ink); color: var(--rs-paper); }
+.rs-chip:focus-visible,
+.rs-reset:focus-visible { outline: 0.125rem solid #4d65ff; outline-offset: 0.125rem; }
+
+/* reset only shows while something is filtered; it keeps its place so the row does not jump */
+.rs-reset {
+  border-color: var(--rs-red);
+  background-color: color-mix(in srgb, var(--rs-red) 6%, transparent);
+  color: var(--rs-red);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s var(--rs-ease), visibility 0.4s var(--rs-ease), background-color 0.4s var(--rs-ease);
+}
+.rs-reset[data-filter-status="active"] { opacity: 1; visibility: visible; }
+.rs-meta .rs-reset { padding: 0.5rem 0.75rem 0.375rem; font-size: 0.75rem; line-height: 0.75rem; }
+.rs-reset:hover { background-color: color-mix(in srgb, var(--rs-red) 14%, transparent); }
+
+/* cards: Osmo's states */
+.post[data-filter-status="active"] {
+  transition: opacity 0.6s var(--rs-ease), transform 0.6s var(--rs-ease);
+  transform: scale(1) rotate(0.001deg);
+  opacity: 1;
+  visibility: visible;
+  position: relative;
+}
+.post[data-filter-status="transition-out"] {
+  transition: opacity 0.45s var(--rs-ease), transform 0.45s var(--rs-ease);
+  transform: scale(0.9) rotate(0.001deg);
+  opacity: 0;
+  visibility: visible;
+}
+.post[data-filter-status="not-active"] {
+  transform: scale(0.9) rotate(0.001deg);
+  opacity: 0;
+  visibility: hidden;
+  position: absolute;
+}
+
+@media screen and (max-width: 991px) {
+  .rs-head { flex-direction: column; align-items: flex-start; padding-top: 8rem; }
+  .rs-tools { align-items: flex-start; min-width: 0; }
+  .rs-chips { justify-content: flex-start; }
+}
+@media screen and (max-width: 479px) {
+  .rs-title { font-size: 12vw; }
+  .rs-meta { width: 100%; justify-content: space-between; }
+}

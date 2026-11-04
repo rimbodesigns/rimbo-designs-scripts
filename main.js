@@ -721,8 +721,180 @@
   function rdResources() {
     gsap.timeline()
       .from(split('#HeroTitle').chars, { duration: 0.6, ease: 'expo.out', yPercent: 100, stagger: 0.03 })
-      .from(byId('First_content'), { opacity: 0, filter: 'blur(5px)', duration: 0.6 }, '<50%')
-      .from(byId('original'), { opacity: 0, filter: 'blur(5px)', duration: 1 });
+      .from(byId('First_content'), { opacity: 0, filter: 'blur(5px)', duration: 0.6 }, '<50%');
+    run('resources filter', rdMultiFilter);
+    run('queued reveal', rdQueuedReveal);
+  }
+
+  // Queued scroll reveal, from Osmo Supply as it came: cards that enter the screen wait their turn and
+  // rise in one after the other. Needs [data-queued-reveal-group] with [data-queued-reveal-item]s (or
+  // [data-queued-reveal-children]). On /resources the item is the card's link, not the filtered .post,
+  // so the filter's own scale/fade and this reveal never fight over one transform.
+  function rdQueuedReveal() {
+    if (!window.ScrollTrigger || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    gsap.registerPlugin(ScrollTrigger);
+    var queue = [];
+    var isRunning = false;
+
+    document.querySelectorAll('[data-queued-reveal-group]').forEach(function (group) {
+      var items = group.hasAttribute('data-queued-reveal-children') ? [].slice.call(group.children) : [].slice.call(group.querySelectorAll('[data-queued-reveal-item]'));
+      if (!items.length) return;
+      items.forEach(function (item) {
+        if (item.getBoundingClientRect().bottom <= 0) return;
+        gsap.set(item, { autoAlpha: 0, y: '4em' }); // hidden state on load
+        ScrollTrigger.create({
+          trigger: item,
+          start: 'top 100%', // reveal offset
+          once: true,
+          onEnter: function () {
+            queue.push(item);
+            if (queue.length > 12) reveal(queue.shift()); // max queue length
+            if (!isRunning) { isRunning = true; gsap.delayedCall(0.1, revealNext); } // delay
+          }
+        });
+      });
+    });
+
+    function reveal(item) {
+      gsap.to(item, { autoAlpha: 1, duration: 1.2, ease: 'power1.out', clearProps: 'opacity, visibility' });
+      gsap.to(item, { y: '0em', duration: 1.2, ease: 'expo.out', clearProps: 'transform' });
+    }
+    function revealNext() {
+      var item = queue.shift();
+      if (!item) { isRunning = false; return; }
+      reveal(item);
+      gsap.delayedCall(0.075, revealNext); // stagger
+    }
+  }
+
+  // Multi filter (multi match), from Osmo Supply. Needs [data-filter-group] on the page, so the old
+  // Finsweet filter on /resources keeps working until the Designer is rebuilt with the new attributes.
+  // The filter logic is Osmo's as it came; the count at the bottom is ours ([data-filter-count="shown|total"]).
+  function rdMultiFilter() {
+    var transitionDelay = 300;
+    var groups = [].slice.call(document.querySelectorAll('[data-filter-group]'));
+    groups.forEach(function (group) {
+      var targetMatch = (group.getAttribute('data-filter-target-match') || 'multi').trim().toLowerCase(); // 'single' | 'multi'
+      var nameMatch = (group.getAttribute('data-filter-name-match') || 'multi').trim().toLowerCase();     // 'single' | 'multi'
+      var buttons = [].slice.call(group.querySelectorAll('[data-filter-target]'));
+      var items = [].slice.call(group.querySelectorAll('[data-filter-name]'));
+
+      // Collect tokens from children if present
+      items.forEach(function (item) {
+        var collectors = item.querySelectorAll('[data-filter-name-collect]');
+        if (!collectors.length) return;
+        var seen = new Set(), tokens = [];
+        collectors.forEach(function (c) {
+          var v = (c.getAttribute('data-filter-name-collect') || '').trim().toLowerCase();
+          if (v && !seen.has(v)) { seen.add(v); tokens.push(v); }
+        });
+        if (tokens.length) item.setAttribute('data-filter-name', tokens.join(' '));
+      });
+
+      // Cache item tokens
+      var itemTokens = new Map();
+      items.forEach(function (el) {
+        var raw = (el.getAttribute('data-filter-name') || '').trim().toLowerCase();
+        itemTokens.set(el, new Set(raw ? raw.split(/\s+/).filter(Boolean) : []));
+      });
+
+      function setItemState(el, on) {
+        var next = on ? 'active' : 'not-active';
+        if (el.getAttribute('data-filter-status') !== next) {
+          el.setAttribute('data-filter-status', next);
+          el.setAttribute('aria-hidden', on ? 'false' : 'true');
+        }
+      }
+      function setButtonState(btn, on) {
+        var next = on ? 'active' : 'not-active';
+        if (btn.getAttribute('data-filter-status') !== next) {
+          btn.setAttribute('data-filter-status', next);
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        }
+      }
+
+      // Active tags model
+      var activeTags = targetMatch === 'single' ? null : new Set(['all']);
+      function hasRealActive() {
+        if (targetMatch === 'single') return activeTags !== null;
+        return activeTags.size > 0 && !activeTags.has('all');
+      }
+      function resetAll() {
+        if (targetMatch === 'single') activeTags = null;
+        else { activeTags.clear(); activeTags.add('all'); }
+      }
+
+      // Matching logic
+      function itemMatches(el) {
+        if (!hasRealActive()) return true;
+        var tokens = itemTokens.get(el);
+        if (targetMatch === 'single') return tokens.has(activeTags);
+        var selected = Array.from(activeTags);
+        if (nameMatch === 'single') { // AND: must contain all selected
+          for (var i = 0; i < selected.length; i++) if (!tokens.has(selected[i])) return false;
+          return true;
+        }
+        for (var j = 0; j < selected.length; j++) if (tokens.has(selected[j])) return true; // OR: any selected
+        return false;
+      }
+
+      function paint(rawTarget) {
+        var target = (rawTarget || '').trim().toLowerCase();
+        if ((target === 'all' || target === 'reset') && !hasRealActive()) return;
+
+        if (target === 'all' || target === 'reset') resetAll();
+        else if (targetMatch === 'single') activeTags = target;
+        else {
+          if (activeTags.has('all')) activeTags.delete('all');
+          if (activeTags.has(target)) activeTags.delete(target);
+          else activeTags.add(target);
+          if (activeTags.size === 0) resetAll();
+        }
+
+        // Update items
+        items.forEach(function (el) {
+          if (el._ft) clearTimeout(el._ft);
+          var next = itemMatches(el);
+          var cur = el.getAttribute('data-filter-status');
+          if (cur === 'active' && transitionDelay > 0) {
+            el.setAttribute('data-filter-status', 'transition-out');
+            el._ft = setTimeout(function () { setItemState(el, next); el._ft = null; }, transitionDelay);
+          } else if (transitionDelay > 0) {
+            el._ft = setTimeout(function () { setItemState(el, next); el._ft = null; }, transitionDelay);
+          } else {
+            setItemState(el, next);
+          }
+        });
+
+        // Update buttons
+        buttons.forEach(function (btn) {
+          var t = (btn.getAttribute('data-filter-target') || '').trim().toLowerCase();
+          var on = false;
+          if (t === 'all') on = !hasRealActive();
+          else if (t === 'reset') on = hasRealActive();
+          else on = targetMatch === 'single' ? activeTags === t : activeTags.has(t);
+          setButtonState(btn, on);
+        });
+        showCount();
+      }
+
+      // Ours: "3 of 10", counted on what the filter has settled on, not on the fade-out in between
+      var shown = group.querySelectorAll('[data-filter-count="shown"]');
+      var total = group.querySelectorAll('[data-filter-count="total"]');
+      function showCount() {
+        var n = items.filter(function (el) { return itemMatches(el); }).length;
+        shown.forEach(function (s) { s.textContent = n; });
+        total.forEach(function (s) { s.textContent = items.length; });
+      }
+
+      group.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-filter-target]');
+        if (btn && group.contains(btn)) paint(btn.getAttribute('data-filter-target'));
+      });
+
+      paint('all');
+      showCount();
+    });
   }
 
   // =========================================================

@@ -12,6 +12,7 @@ const server = http.createServer((req, res) => {
     if (p === '/rank') p = '/prototype/v2/rank.html';                             // the ranking tool for the band
     if (p === '/buttons') p = '/prototype/buttons';                              // the button lab
     if (/^\/post\/[\w-]+\/?$/.test(p)) p = '/prototype/post/' + p.split('/')[2] + '.html'; // blog post copies (prototype/post/sync.js)
+    if (/^\/resources\/?$/.test(p)) p = '/prototype/resources/index.html';          // the blog overview prototype (prototype/resources/sync.js)
     let file = path.join(root, p);
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
       // a folder: send the browser to the slash form first, so the page's relative css/js resolve inside it
