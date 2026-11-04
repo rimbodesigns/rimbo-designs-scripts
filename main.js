@@ -2908,14 +2908,51 @@
       if (qs('[data-radial-slider-init]', hero)) initRadialCardsSlider();
       if (qs('[data-spatial-slider-init]', hero)) initSpatialCardsSlider();
     };
-    osmoInit();
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // ---- the stepped auto-advance on the spatial slider (home-v4; Rimbo: "a 1, 2, 3, 4, 5 switch"): every few
+    // seconds the slider moves one card on, as if Next were pressed on a timer. It goes through the slider's own
+    // Next control: a hidden button added before Osmo's init, which wires it like any other control (and again
+    // after a width change), so each step is the slider's own click tween. ?step=N (or data-band-step="N" on the
+    // section) sets the seconds per step, 0 switches it off; off under prefers-reduced-motion. Clock: autoStep below.
+    var slider = band ? null : qs('[data-spatial-slider-init]', hero);
+    var stepEvery = parseFloat((/[?&]step=([\d.]+)/.exec(location.search) || [])[1]);
+    if (isNaN(stepEvery)) stepEvery = parseFloat(hero.getAttribute('data-band-step'));
+    if (isNaN(stepEvery)) stepEvery = 3.5;
+    var stepNext = null;
+    if (slider && stepEvery > 0 && !reduced) {
+      stepNext = document.createElement('button');
+      stepNext.type = 'button'; stepNext.tabIndex = -1;
+      stepNext.setAttribute('data-spatial-slider-control', 'next'); stepNext.setAttribute('aria-hidden', 'true');
+      stepNext.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;overflow:hidden;pointer-events:none';
+      slider.appendChild(stepNext);
+    }
+    osmoInit();
     var narrow = function () { return window.innerWidth < 992; };
     var copy = qs('.band_copy', hero), title = qs('.band_title', hero), eyebrow = qs('.band_eyebrow', hero);
     var curve = 0; // set below (the curve experiment)
     var buttons = qsa('.btn', copy || hero), scrollLine = qs('.band_scroll', hero), loader = qs('.band_loader', hero);
     var nav = [byId('FIXED_NAV'), qs('.burgermenu'), qs('.bold-nav-full__bar')].filter(Boolean); // the old or the new (rdNavFull) logo + burger
     var hidden = false;
+
+    // ---- the auto-advance clock (started by the opening, once the copy is in): a step every stepEvery seconds.
+    // It holds while the pointer is over the cards, while a drag or its throw runs, while the page is hidden
+    // (background tab) or the hero has scrolled away; every hold restarts the wait, so a step never lands right
+    // after a hand has let go or the pointer has left.
+    var autoStep = function () {
+      if (!stepNext) return;
+      var zone = qs('[data-spatial-slider-collection]', slider) || slider, over = false;
+      zone.addEventListener('pointerenter', function () { over = true; });
+      zone.addEventListener('pointerleave', function () { over = false; });
+      var wait = stepEvery * 1000, due = performance.now() + wait;
+      setInterval(function () {
+        var d = slider._spatialSliderDraggable, now = performance.now();
+        var held = over || hidden || document.hidden || (d && (d.isPressed || d.isDragging || d.isThrowing));
+        if (held) { due = now + wait; return; }
+        if (now < due) return;
+        due = now + wait;
+        stepNext.click();
+      }, 200);
+    };
 
     // ---- clips: play every video once (the marquee clones the row after this; re-touching a running video makes it hiccup)
     function tune() {
@@ -3220,6 +3257,7 @@
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
         if (scrollLine) scrollLine.classList.add('is-ready');
+        autoStep();
         nav.forEach(function (el) { gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out', clearProps: 'opacity' }); });
         // the reveal transitions have run; hand the elements to the scroll fade
         setTimeout(function () { if (copy) copy.style.transition = 'none'; fadeBehind(); }, 1900);
