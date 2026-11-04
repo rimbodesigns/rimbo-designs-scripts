@@ -2107,7 +2107,7 @@
         v.muted = true; v.loop = true; v.playsInline = true;
         var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
         if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
-        if (v.paused && !hidden) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+        if (v.paused && !hidden && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
       });
     }
     tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
@@ -2122,21 +2122,50 @@
         c.className = v.className; c.setAttribute('aria-hidden', 'true');
         c.width = 640; c.height = 627;
         v.parentNode.replaceChild(c, v);
+        c.__master = masters[src];
         (masters[src].__canvases = masters[src].__canvases || []).push(c);
       });
-      var painters = Object.keys(masters).map(function (k) { return masters[k]; }).filter(function (m) { return m.__canvases; });
-      if (!painters.length) return;
-      var paint = function () {
-        if (!hidden) painters.forEach(function (m) {
-          if (m.readyState < 2) return;
-          m.__canvases.forEach(function (c) {
-            if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
-            c.getContext('2d').drawImage(m, 0, 0);
-          });
+      var all = Object.keys(masters).map(function (k) { return masters[k]; });
+      var paintClones = function (m) {
+        if (m.readyState < 2 || !m.__canvases) return;
+        m.__canvases.forEach(function (c) {
+          if (c.__vis === false) return; // off-screen clone: nothing to show
+          if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
+          c.getContext('2d').drawImage(m, 0, 0);
         });
-        requestAnimationFrame(paint);
       };
-      requestAnimationFrame(paint);
+      // ---- only what is on screen costs anything: a clip decodes while one of its panels (master or clone)
+      // is near the viewport, and a clone is repainted only while it is on screen and only when the master
+      // presents a new frame (requestVideoFrameCallback), not on every display refresh
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          var touched = [];
+          entries.forEach(function (en) {
+            var media = qs('.band_panel-media', en.target);
+            if (!media) return;
+            media.__vis = en.isIntersecting;
+            var m = media.__master || media;
+            if (touched.indexOf(m) < 0) touched.push(m);
+          });
+          touched.forEach(function (m) {
+            var shown = (m.__vis !== false ? 1 : 0) + (m.__canvases || []).filter(function (c) { return c.__vis !== false; }).length;
+            m.__off = shown === 0;
+            if (m.__off) { if (!m.paused) m.pause(); }
+            else if (m.paused && !hidden && m.__tuned) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
+          });
+        }, { rootMargin: '10% 20%', threshold: 0 });
+        qsa('.band_panel', hero).forEach(function (p) { io.observe(p); });
+      }
+      var painters = all.filter(function (m) { return m.__canvases; });
+      if (!painters.length) return;
+      var rafOnes = [];
+      painters.forEach(function (m) {
+        if (!m.requestVideoFrameCallback) { rafOnes.push(m); return; }
+        var arm = function () { m.requestVideoFrameCallback(function () { if (!hidden) paintClones(m); arm(); }); };
+        arm(); // stays armed across pauses: it only fires when a frame is presented
+        m.addEventListener('seeked', function () { if (!hidden) paintClones(m); }); // the restart at the reveal shows frame 0 on the clones too
+      });
+      if (rafOnes.length) (function paint() { if (!hidden) rafOnes.forEach(paintClones); requestAnimationFrame(paint); })();
     }
     setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
 
@@ -2297,7 +2326,7 @@
       ScrollTrigger.create({
         trigger: scrollRef, start: 'top top', end: 'bottom top',
         onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
-        onEnterBack: function () { hidden = false; hero.style.visibility = ''; qsa('video', hero).forEach(function (v) { if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }); }
+        onEnterBack: function () { hidden = false; hero.style.visibility = ''; qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }); }
       });
     };
 
@@ -2339,7 +2368,7 @@
       if (opened) return; opened = true;
       // every clip starts from its first frame as the band reveals, so the visitor sees each opening
       // (Echo's own loader, say) instead of whatever was playing behind the black
-      qsa('video', hero).forEach(function (v) { try { v.currentTime = 0; } catch (e) {} if (v.paused && !hidden) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
+      qsa('video', hero).forEach(function (v) { try { v.currentTime = 0; } catch (e) {} if (v.paused && !hidden && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
       [stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
