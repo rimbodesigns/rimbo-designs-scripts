@@ -3199,10 +3199,11 @@
   // =========================================================
   // FULL SCREEN NAV — /home-copy and /resources: Osmo Supply "Bold Full Screen Navigation".
   // Osmo's markup, CSS and toggle logic as Osmo wrote them (class names kept); ours is the rest:
-  // - the bar is the site's logo + burger; the logo fades away while the menu is open
+  // - the bar is the site's logo + burger, visible the whole time
   // - the links are read from the existing burger menu (so Dutch follows along), in Integral
   //   capitals, minus Home (the logo goes home), Contact (the email sits at the bottom) and the
-  //   page you are on; under them one "Get started" button (the global .btn)
+  //   page you are on; the last link is "Get started" (to /contact until the get-started page exists)
+  // - the tile is frosted glass: the site's cream, see-through and blurred, like the old menu
   // - the bottom row is Amsterdam's local time in the middle and the email on the right
   // The old burger / fixed nav are hidden on these pages. Lenis stops while the menu is open.
   // =========================================================
@@ -3224,20 +3225,19 @@
       { href: prefix + '/service', text: 'Service' }, { href: prefix + '/work', text: 'Work' },
       { href: prefix + '/resources', text: 'Resources' }
     ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
-    var cta = { href: prefix + '/contact', text: nl ? 'Aan de slag' : 'Get started' }; // TODO: the get-started page once it exists
+    items.push({ href: prefix + '/contact', text: nl ? 'Aan de slag' : 'Get started' }); // TODO: the get-started page once it exists
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
 
     var ease = 'cubic-bezier(.7, 0, .3, 1)';
     var css = [
       // the old navigation steps aside on these pages
       '#FIXED_NAV, #Top_Nav, .burgermenu, .nav { display: none !important; }',
-      '.bold-nav-full { --nf-bg: #262425; --nf-ink: #f3efe9; z-index: 1000; pointer-events: none; position: fixed; inset: 0; color: var(--nf-ink); }',
+      '.bold-nav-full { --nf-bg: rgba(248, 245, 238, .8); --nf-ink: #131313; z-index: 1000; pointer-events: none; position: fixed; inset: 0; color: var(--nf-ink); }',
       // the bar: same place and size as the old fixed nav (logo 72px, 5% in, 5rem high)
       // the bar is its own fixed layer (not inside the nav), so difference blends it with the page: dark on cream, light on dark
       '.bold-nav-full__bar { z-index: 1001; pointer-events: none; justify-content: space-between; align-items: center; width: 100%; height: 5rem; padding: 0 5%; display: flex; position: fixed; top: 0; left: 0; mix-blend-mode: difference; }',
       '.bold-nav-full__logo { pointer-events: auto; display: block; width: 72px; line-height: 0; transition: opacity .5s ' + ease + '; }',
       '.bold-nav-full__logo img { width: 100%; height: auto; display: block; }',
-      '[data-navigation-status="active"] .bold-nav-full__logo { opacity: 0; pointer-events: none; }',
       '.bold-nav-full__hamburger { pointer-events: auto; color: #fff; cursor: pointer; background-color: #0000; justify-content: center; align-items: center; width: 3em; height: 3em; margin-right: -.5em; display: flex; position: relative; overflow: hidden; border: none; font: inherit; padding: 0; }',
       '.bold-nav-full__hamburger:focus { outline: none; } .bold-nav-full__hamburger:focus-visible, .bold-nav-full__logo:focus-visible { outline: 1px solid #fff; outline-offset: 4px; border-radius: 2px; }',
       '.bold-nav-full__hamburger-bar { background-color: currentColor; width: 1.5em; height: .125em; position: absolute; transition: transform 0.5s ' + ease + '; }',
@@ -3251,22 +3251,18 @@
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(.7, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(.7, 1); }',
       // the tile wipes down from the top (Osmo's straight clip-path)
-      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; transition: clip-path 1s cubic-bezier(.9, 0, .1, 1), visibility 0s 1s; clip-path: polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%); visibility: hidden; }',
+      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; transition: clip-path 1s cubic-bezier(.9, 0, .1, 1), visibility 0s 1s; clip-path: polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%); visibility: hidden; }',
       '[data-navigation-status="active"] .bold-nav-full__tile { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); visibility: visible; transition: clip-path 1s cubic-bezier(.9, 0, .1, 1), visibility 0s; }',
       '.bold-nav-full__ul { flex-flow: column; align-items: center; margin: 0; padding: 0; display: flex; list-style: none; }',
       '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity 0.5s ' + ease + '; }',
       '.bold-nav-full__link { color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: calc(3.2vw + 3.2vh); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; transform: translateY(100%) rotate(5deg); transition: transform 0.75s ' + ease + '; }',
-      '.bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.1s; } .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.05s; } .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0s; }',
+      '.bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.15s; } .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.1s; } .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.05s; } .bold-nav-full__li:nth-child(4) .bold-nav-full__link { transition-delay: 0s; }',
       '[data-navigation-status="active"] .bold-nav-full__link { transform: translateY(0%) rotate(0.001deg); }',
-      '[data-navigation-status="active"] .bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.3s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.35s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.4s; }',
+      '[data-navigation-status="active"] .bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.3s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.35s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.4s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(4) .bold-nav-full__link { transition-delay: 0.45s; }',
       '.bold-nav-full__link-text { text-shadow: 0 1.15em 0; display: block; position: relative; transition: transform 0.5s ' + ease + '; transform: translateY(0%) rotate(0.001deg); }',
       '.bold-nav-full__link:hover .bold-nav-full__link-text { transform: translateY(-100%) rotate(0.001deg); }',
       '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li { opacity: 0.15; }',
       '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li:hover { opacity: 1; }',
-      // the button rises in after the links
-      '.bold-nav-full__cta { margin-top: 2.5rem; opacity: 0; transform: translateY(1rem); transition: opacity .4s ease, transform .75s ' + ease + '; }',
-      '.bold-nav-full__cta .btn { font-size: .85rem; }',
-      '[data-navigation-status="active"] .bold-nav-full__cta { opacity: 1; transform: none; transition-delay: .5s; }',
       // bottom row: time in the middle, email on the right
       '.bold-nav__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; padding: 0 5% 2.25rem; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; opacity: 0; transition: opacity .3s ease; }',
       '[data-navigation-status="active"] .bold-nav__bottom { opacity: 1; transition: opacity .6s ease .6s; }',
@@ -3275,7 +3271,7 @@
       '.bold-nav__mail { grid-column: 3; justify-self: end; opacity: .5; transition: opacity .3s; }',
       '.bold-nav__mail:hover { opacity: 1; }',
       '@media (max-width: 767px) { .bold-nav-full__link { font-size: 11vw; } .bold-nav__bottom { grid-template-columns: 1fr; justify-items: center; gap: .6em; padding-bottom: 1.75rem; } .bold-nav__time, .bold-nav__mail { grid-column: 1; justify-self: center; } }',
-      '@media (prefers-reduced-motion: reduce) { .bold-nav-full__tile, .bold-nav-full__link, .bold-nav-full__cta, .bold-nav__bottom { transition-duration: 0s !important; transition-delay: 0s !important; } }'
+      '@media (prefers-reduced-motion: reduce) { .bold-nav-full__tile, .bold-nav-full__link, .bold-nav__bottom { transition-duration: 0s !important; transition-delay: 0s !important; } }'
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
@@ -3296,7 +3292,6 @@
       '<button data-navigation-toggle="toggle" class="bold-nav-full__hamburger" aria-label="Menu" aria-expanded="false"><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div></button>';
     nav.innerHTML =
       '<div class="bold-nav-full__tile"><ul class="bold-nav-full__ul">' + lis + '</ul>' +
-        '<div class="bold-nav-full__cta"><a href="' + cta.href + '" class="btn"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">' + cta.text + '</div></div></div></div></a></div>' +
         '<div class="bold-nav__bottom"><p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></div></div>';
     document.body.appendChild(nav);
     document.body.appendChild(bar);
@@ -3340,7 +3335,7 @@
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
   var navFull = path === '/home-copy' || path === '/resources'; // the new menu, page by page until Rimbo's go
-  if (navFull) run('full screen nav', rdNavFull); // before rdButtons, so its Get started button gets the .btn behaviour
+  if (navFull) run('full screen nav', rdNavFull);
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
