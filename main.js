@@ -2153,7 +2153,7 @@
             if (m.__off) { if (!m.paused) m.pause(); }
             else if (m.paused && !hidden && m.__tuned) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
           });
-        }, { rootMargin: '10% 20%', threshold: 0 });
+        }, { rootMargin: '5% 10%', threshold: 0 }); // a panel resumes ~150 px before its edge enters: 1.5 s of lead at the band's pace
         qsa('.band_panel', hero).forEach(function (p) { io.observe(p); });
       }
       var painters = all.filter(function (m) { return m.__canvases; });
