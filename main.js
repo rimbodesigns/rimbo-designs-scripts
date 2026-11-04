@@ -2109,9 +2109,10 @@
     };
 
     // ---- the curve (experiment): with ?curve=N (or data-band-curve="N" on the section) the panels
-    // sit on an arc instead of a straight line: each turns away (rotateY) and recedes (translateZ)
-    // by N degrees per panel of distance from the band's centre, with its own perspective(), so the
-    // band stays one flat layer. Negative N bends the other way (the ends come forward).
+    // sit on an arc instead of a straight line: each recedes (translateZ) and turns (rotateY) by N
+    // degrees per panel of distance from the band's centre, with its own perspective(), so the band
+    // stays one flat layer. The ends always go back (coming forward puts a panel in the camera);
+    // negative N only flips which way the panels face.
     curve = parseFloat((/[?&]curve=(-?[\d.]+)/.exec(location.search) || [])[1]);
     if (isNaN(curve)) curve = parseFloat(hero.getAttribute('data-band-curve')) || 0;
     if (curve && !reduced) {
@@ -2124,9 +2125,9 @@
             var lx = list.offsetLeft + (parseFloat(gsap.getProperty(list, 'xPercent')) || 0) / 100 * list.offsetWidth + sx;
             qsa('.band_panel', list).forEach(function (pnl) {
               var pitch = pnl.offsetWidth * 1.0625;
-              var theta = Math.max(-75, Math.min(75, (lx + pnl.offsetLeft + pnl.offsetWidth / 2 - center) / pitch * step));
+              var theta = Math.max(-70, Math.min(70, (lx + pnl.offsetLeft + pnl.offsetWidth / 2 - center) / pitch * step));
               var R = pitch / Math.sin(step * Math.PI / 180);
-              var z = -sign * R * (1 - Math.cos(theta * Math.PI / 180));
+              var z = -R * (1 - Math.cos(theta * Math.PI / 180));
               pnl.style.transition = 'box-shadow .6s';
               pnl.style.transform = 'perspective(' + persp + 'px) translateZ(' + z.toFixed(1) + 'px) rotateY(' + (-sign * theta).toFixed(2) + 'deg)';
             });
