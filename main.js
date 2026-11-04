@@ -3578,7 +3578,15 @@
     '.scroll-ruler.is-out { opacity: 0; pointer-events: none; }',
     '.scroll-ruler.is-out .scroll-ruler__label { pointer-events: none; }',
     // the ruler takes over from the old red progress bar along the top
-    '.scroll_progress_indicatror { display: none; }'
+    '.scroll_progress_indicatror { display: none; }',
+    // one language for the tick lengths: long = an H2 (Osmo), medium = an H3 (.is-sub, set by rdScrollRuler),
+    // short = the rest (Osmo's every-5th medium tick meant nothing in an article); the current tick is 2px
+    '.scroll-ruler__tick[data-scroll-ruler-size="mid"] { width: .75em; }',
+    '.scroll-ruler__tick.is-sub:not([data-scroll-ruler-size="major"]) { width: 1.125em; }',
+    '.scroll-ruler__tick[data-scroll-ruler-status="current"] { height: 2px; }',
+    // where the labels don't fit next to the text, and on tablets and phones, no ruler (the hero has the sections list)
+    '.scroll-ruler.is-compact { display: none; }',
+    '@media (max-width: 991px) { .scroll-ruler { display: none; } }'
   ].join('\n');
 
   // Short labels from the H2s: "Webflow vs WordPress: the comparison" → "Webflow vs WordPress",
@@ -3709,6 +3717,22 @@
       });
     }
     placeLeftOut();
+    // H3s get a medium tick, at the same place along the ruler as Osmo puts the parts
+    var subHeads = qsa('h3', article);
+    function markSubs() {
+      var sy = window.scrollY, lastPart = parts.length - 1;
+      var start = Math.max(parts[0].getBoundingClientRect().top + sy, window.innerHeight / 2);
+      var end = parts[lastPart].getBoundingClientRect().bottom + sy;
+      var length = Math.max(Math.min(end, document.documentElement.scrollHeight - window.innerHeight / 2) - start, 1);
+      ticks.forEach(function (t) { t.classList.remove('is-sub'); });
+      subHeads.forEach(function (h) {
+        var at = (h.getBoundingClientRect().top + sy - start) / length;
+        if (at < 0 || at > 1) return;
+        var t = ticks[Math.round(at * (ticks.length - 1))];
+        if (t) t.classList.add('is-sub');
+      });
+    }
+    markSubs();
     // Clicks on the ruler, seen before Osmo's own handlers (its labels stop the click from bubbling):
     // - a mouse click leaves the label focused, which keeps the ruler awake (Osmo counts focus as
     //   activity), so a clicked label lets go of focus; keyboard users keep theirs
@@ -3767,7 +3791,7 @@
     var placeTimer;
     var relayout = new ResizeObserver(function () {
       clearTimeout(placeTimer);
-      placeTimer = setTimeout(function () { placeLeftOut(); if (st) st.refresh(); }, 250);
+      placeTimer = setTimeout(function () { placeLeftOut(); markSubs(); if (st) st.refresh(); }, 250);
     });
     relayout.observe(document.body);
     relayout.observe(root);
@@ -3876,6 +3900,321 @@
         resizeObserver.observe(document.body); resizeObserver.observe(root);
         measure();
         gsap.ticker.add(update);
+      });
+    }
+  }
+
+  // =========================================================
+  // POST REFRESH — the new blog post page (/post/…), staging and localhost only until Rimbo's go
+  // Built from the sketch Rimbo approved (prototype/post-refresh, docs/blog-post-layout-proposal.md):
+  // no boxed menu, a left-aligned hero with the author block and the sections on the right, calmer
+  // reading styles, one "start a project" block instead of the newsletter, then "Keep reading".
+  // It lives here, not in the Designer, so a live publish can't take it along before he says go;
+  // once approved, the structure moves into the Blog posts template.
+  // Runs before the buttons and the ruler: they pick up what it builds.
+  // =========================================================
+  var POST_REFRESH_CSS = [
+    '.rf { --rf-ink: #131313; --rf-ink-60: rgba(19, 19, 19, .6); --rf-red: #ff5454; --rf-red-text: #c0362c; --rf-coral: #ff7373; --rf-dark: #0c0c0c; --rf-col: 40rem; --rf-mono: var(--font--rm-mono, "Rm Mono", monospace); }',
+
+    // grain: the site's own GRAIN_EFFECT style, under the content, half the home's strength
+    '.rf .rf-grain { opacity: .03; z-index: -1; }',
+
+    // header: no boxed menu; the logo and burger stay where they are, on screen from the start
+    '.rf #Top_Nav { display: none !important; }',
+    '.rf #FIXED_NAV { transform: none !important; }',
+
+    // hero: two columns, a little narrower than the cover so the cover is the widest thing on screen
+    '.rf .blog_intro { margin-top: 0; padding-top: 168px; }',
+    '.rf .blog_intro .container-20 { display: block; width: min(58rem, 100vw - 20rem); max-width: none; }',
+    '.rf .blog_catagory, .rf .blog_intro .divider { display: none !important; }',
+    '.rf-hero { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; column-gap: 3rem; align-items: start; }',
+    '.rf-hero__main { min-width: 0; }',
+    '.rf-eyebrow { display: flex; align-items: center; gap: 10px; font-family: var(--rf-mono); font-size: 12px; line-height: 1; letter-spacing: .08em; text-transform: uppercase; color: var(--rf-ink-60); }',
+    '.rf-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rf-coral); flex: none; }',
+    '.rf .h1_small { text-align: left; max-width: 32rem; width: auto; margin: 28px 0 0; font-size: 2.75rem; line-height: 1.04; color: var(--rf-ink); text-wrap: balance; }',
+    '.rf .summary.padding-section-medium.custom { padding: 0; margin: 32px 0 0; max-width: 36rem; width: 100%; line-height: normal; display: block; }',
+    '.rf .sumary { font-family: var(--font--body-font); font-weight: 400; font-size: 1.3125rem; line-height: 1.5; color: var(--rf-ink); text-align: left; width: 100%; margin: 0; }',
+
+    // right column: the author on one row (square photo, name and date, LinkedIn and X on the right), then the sections
+    '.rf-hero__side { padding-top: 2px; }',
+    '.rf .rl_blogpost1_content-top { max-width: none; width: 100%; margin: 0; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }',
+    '.rf .rl_blogpost1_content-top .author-wrapper { margin: 0; gap: 14px; }',
+    '.rf .rl_blogpost1_date-wrapper, .rf .rl_blogpost1_date-wrapper > *, .rf .rl_blogpost1_author-text { white-space: nowrap; }',
+    '.rf .rl_blogpost1_share { display: flex; align-items: center; gap: 12px; margin: 0; }',
+    '.rf .rl_blogpost1_social-link { display: flex; }',
+    '.rf .rl_blogpost1_social-icon { margin: 0; width: 20px; height: 20px; }',
+    '.rf .rl_blogpost1_social-icon svg { width: 20px; height: 20px; display: block; }',
+    '.rf-toc { margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(19, 19, 19, .12); }',
+    '.rf-toc summary { display: flex; list-style: none; cursor: pointer; margin-bottom: 14px; }',
+    '.rf-toc summary::-webkit-details-marker { display: none; }',
+    '.rf-toc ol { list-style: none; margin: 0; padding: 0; counter-reset: rftoc; }',
+    '.rf-toc li { counter-increment: rftoc; margin: 0; }',
+    '.rf-toc a { display: flex; gap: 12px; padding: 5px 0; font-size: 15px; line-height: 1.35; color: var(--rf-ink); text-decoration: none; }',
+    '.rf-toc a::before { content: counter(rftoc, decimal-leading-zero); flex: none; padding-top: 2px; font-family: var(--rf-mono); font-size: 12px; color: var(--rf-red-text); }',
+    '.rf-toc a:hover span { text-decoration: underline; text-decoration-color: var(--rf-red); text-underline-offset: .2em; }',
+    '@media (min-width: 1200px) { .rf-toc summary { cursor: default; } }',
+
+    '.rf .cover_holder { margin-top: 64px; }',
+    '.rf .cover_image { width: min(64rem, 100vw - 16rem); height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: .25rem; }',
+    '.rf .richtextbox { margin-top: 72px; }',
+
+    '@media (max-width: 1199px) {' +
+      ' .rf-hero { grid-template-columns: 1fr; }' +
+      ' .rf-hero__side { margin-top: 32px; max-width: 28rem; }' +
+      ' .rf .h1_small { max-width: 40rem; }' +
+      // below 1200px the sections fold away under one line; the whole row is the tap target
+      ' .rf-toc { margin-top: 20px; padding: 0; border-bottom: 1px solid rgba(19, 19, 19, .12); }' +
+      ' .rf-toc summary { margin: 0; padding: 14px 0; justify-content: space-between; }' +
+      ' .rf-toc summary::after { content: "+"; font-size: 16px; color: var(--rf-ink); }' +
+      ' .rf-toc[open] summary::after { content: "–"; }' +
+      ' .rf-toc[open] ol { margin: -2px 0 14px; }' +
+    ' }',
+    '@media (max-width: 991px) {' +
+      ' .rf .blog_intro .container-20 { width: 90vw; }' +
+      ' .rf .cover_image { width: 90vw; }' +
+    ' }',
+    '@media (max-width: 767px) {' +
+      ' .rf .blog_intro { padding-top: 104px; }' +
+      ' .rf .h1_small { font-size: 2rem; line-height: 1.05; margin-top: 20px; }' +
+      ' .rf .summary.padding-section-medium.custom { margin-top: 24px; }' +
+      ' .rf .sumary { font-size: 1.125rem; line-height: 1.5; }' +
+      ' .rf-hero__side { margin-top: 28px; max-width: none; }' +
+      ' .rf .cover_holder { margin-top: 32px; }' +
+      ' .rf .cover_image { width: 100vw; border-radius: 0; }' +
+      ' .rf .richtextbox { margin-top: 48px; }' +
+    ' }',
+
+    // reading: dark links with a red underline, a calmer type scale
+    '.rf .richtextstyling a { color: var(--rf-ink); text-decoration: underline; text-decoration-color: var(--rf-red); text-decoration-thickness: 1px; text-underline-offset: .2em; }',
+    '.rf .richtextstyling a:hover { color: var(--rf-ink); text-decoration-thickness: 2px; }',
+    '.rf .richtextstyling h2, .rf .richtextstyling h3 { color: var(--rf-ink); text-wrap: balance; }',
+    '.rf .richtextstyling h2 { font-size: 2.25rem; line-height: 1.15; margin-top: 4rem; margin-bottom: 1rem; }',
+    '.rf .richtextstyling h3 { font-size: 1.5rem; line-height: 1.2; margin-top: 2.5rem; margin-bottom: .5rem; }',
+    '.rf .richtextstyling h4 { font-family: var(--rf-mono); font-size: .8125rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 400; color: var(--rf-ink); margin-top: 2rem; margin-bottom: .5rem; display: flex; align-items: center; gap: 10px; }',
+    '.rf .richtextstyling h4::before { content: ""; width: 6px; height: 6px; background: var(--rf-coral); flex: none; }',
+    '.rf .richtextstyling p { line-height: 1.6; }',
+    '.rf .richtextstyling li { line-height: 1.6; margin-bottom: .5rem; }',
+    '.rf .richtextstyling ul, .rf .richtextstyling ol { padding-left: 1.5rem; }',
+    '.rf .richtextstyling ul li::marker { color: var(--rf-red); }',
+    '.rf .richtextstyling ol { list-style: decimal-leading-zero; padding-left: 2.25rem; overflow: visible; }',
+    '.rf .richtextstyling ol li::marker { font-family: var(--rf-mono); color: var(--rf-red-text); font-size: .9em; }',
+    '.rf .richtextstyling figure img { outline: 1px solid rgba(19, 19, 19, .08); outline-offset: -1px; }',
+    '.rf .richtextstyling figcaption { text-align: left; font-size: .875rem; line-height: 1.45; color: #6b6b6b; margin-top: .75rem; }',
+    '.rf .richtextstyling figcaption a { color: inherit; }',
+    '@media (min-width: 1280px) { .rf .richtextstyling img { max-width: 52rem; } }',
+    '@media (min-width: 992px) and (max-width: 1279px) { .rf .richtextstyling img { max-width: var(--rf-col); } }',
+    '@media (max-width: 767px) {' +
+      ' .rf .richtextstyling p, .rf .richtextstyling li { font-size: 1.125rem; }' +
+      ' .rf .richtextstyling h2 { font-size: 1.625rem; margin-top: 3.5rem; margin-bottom: .75rem; }' +
+      ' .rf .richtextstyling h3 { font-size: 1.25rem; line-height: 1.25; margin-top: 2.5rem; }' +
+      ' .rf .richtextstyling img { max-width: 100vw; }' +
+      ' .rf .richtextstyling figcaption { padding: 0 5vw; }' +
+    ' }',
+
+    // no back-to-top button
+    '.rf .back-to-top { display: none !important; }',
+    '.rf .richtextstyling h2[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }',
+
+    // end of the page: one project block, then keep reading (the dark post cards from rdPostCards)
+    '.rf .lead_mag { display: none; }',
+    '.rf [data-component]:has(> .cta_container) { display: none; }',
+    '.rf-project { position: relative; overflow: hidden; display: flex; gap: 2rem; align-items: flex-start; width: min(52rem, 100vw - 16rem); margin: 6rem auto 0; padding: 2.5rem; background: var(--rf-dark); color: #f8f5ee; border-radius: .25rem; }',
+    '.rf-project::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .06; background: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e1ea39aa716d6f6bddcb07_GRAIN%20V1.gif) repeat; }',
+    '.rf-project__img { width: 7.5rem; height: 7.5rem; object-fit: cover; border-radius: 50%; flex: none; }',
+    '.rf-project .rf-eyebrow { color: #a4a4a4; }',
+    '.rf-project__title { font-family: var(--font--display-font); font-size: 2rem; line-height: 1.15; color: #f8f5ee; margin: .875rem 0 1rem; }',
+    '.rf-project__text { font-size: 1.125rem; line-height: 1.55; color: #cfcfcf; max-width: 34rem; margin: 0 0 1.75rem; }',
+    '.rf-project__actions { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; position: relative; z-index: 1; }',
+    '.rf-mail { font-family: var(--rf-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #a4a4a4; text-decoration: underline; text-underline-offset: .35em; }',
+    '.rf-mail:hover { color: #f8f5ee; }',
+    '@media (max-width: 767px) {' +
+      ' .rf-project { flex-direction: column; gap: 1rem; padding: 1.5rem; width: 90vw; margin-top: 4rem; }' +
+      ' .rf-project__img { width: 3.5rem; height: 3.5rem; }' +
+      ' .rf-project__title { font-size: 1.625rem; }' +
+      ' .rf-project__actions { flex-direction: column; align-items: stretch; gap: 1rem; }' +
+      ' .rf-project__actions .btn { justify-content: center; min-height: 48px; }' +
+    ' }',
+    '@media (min-width: 768px) and (max-width: 991px) { .rf-project { width: 90vw; } }',
+    '.rf .blog_section .padding-section-large { padding-top: 8rem; }',
+    '.rf .blog_section .blog_highlight { align-items: stretch; }',
+    '.rf .blog_section .blog_text { display: block; margin-bottom: 2rem; }',
+    '.rf-kr-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }',
+    '.rf-kr-title { font-family: var(--font--display-font); font-size: 2.25rem; line-height: 1.15; margin: .75rem 0 0; color: var(--rf-ink); }',
+    '.rf-kr-all { font-family: var(--rf-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--rf-ink); text-decoration: underline; text-decoration-color: var(--rf-red); text-underline-offset: .35em; white-space: nowrap; padding: 8px 0; }',
+    '.rf .rf-hide { display: none !important; }',
+    '@media (min-width: 992px) { .rf .blog_section .blog_list.rf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rf .blog_section .blog_list.rf-two .blog_container { width: 100%; } }',
+    '.rf .blog_section .btn-animate-chars { display: none; }', // "See All Resources": the header row has "All articles"
+    '@media (max-width: 767px) {' +
+      ' .rf .blog_section .padding-section-large { padding-top: 5rem; }' +
+      ' .rf-kr-head { flex-direction: column; align-items: flex-start; }' +
+      ' .rf-kr-title { font-size: 1.625rem; }' +
+    ' }'
+  ].join('\n');
+
+  var POST_REFRESH_CAL = 'https://cal.com/rimbo-designs/45-minute-discovery-call?overlayCalendar=true&layout=month_view';
+
+  // Scrolls to a section heading from the "In this article" list
+  function postJumpTo(h) {
+    var off = window.matchMedia('(max-width: 1199px)').matches ? 80 : 32; // narrow: clear of the logo and burger (they end at 58px)
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    qsa('.richtextstyling img[loading="lazy"]').forEach(function (img) { img.loading = 'eager'; }); // so they stop moving the target
+    var tries = 0;
+    function done() {
+      if (Math.abs(h.getBoundingClientRect().top - off) > 2 && tries++ < 3) { setTimeout(function () { go(false); }, 80); return; }
+      if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex', '-1');
+      h.focus({ preventScroll: true });
+    }
+    function go(first) {
+      if (window.lenis && window.lenis.scrollTo) {
+        if (reduce) { window.lenis.scrollTo(h, { offset: -off, immediate: true }); setTimeout(done, 120); }
+        else window.lenis.scrollTo(h, { offset: -off, duration: first ? 1.4 : 0.6, onComplete: done });
+      } else {
+        window.scrollTo({ top: h.getBoundingClientRect().top + window.scrollY - off, behavior: reduce ? 'auto' : 'smooth' });
+        setTimeout(done, reduce ? 120 : 900);
+      }
+    }
+    go(true);
+  }
+
+  function rdPostRefresh() {
+    // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
+    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
+    if (window.Webflow && Webflow.env && Webflow.env('editor') !== undefined) return;
+    var container = qs('.blog_intro .container-20');
+    var h1 = qs('.blog_intro .h1_small');
+    if (!container || !h1 || document.documentElement.classList.contains('rf')) return;
+    document.documentElement.classList.add('rf');
+
+    var style = document.createElement('style');
+    style.id = 'rd-post-refresh-css';
+    style.textContent = POST_REFRESH_CSS;
+    document.head.appendChild(style);
+
+    var grain = document.createElement('div');
+    grain.className = 'grain rf-grain';
+    grain.setAttribute('aria-hidden', 'true');
+    document.body.insertBefore(grain, document.body.firstChild);
+
+    // ---- hero
+    var cat = qs('.blog_catagory .blogcatagory');
+    var category = cat ? cat.textContent.trim() : '';
+    var eyebrow = document.createElement('div');
+    eyebrow.className = 'rf-eyebrow rf-hero-eyebrow';
+    eyebrow.innerHTML = '<span class="rf-dot"></span>';
+    eyebrow.appendChild(document.createTextNode('Article' + (category ? ' · ' + category : '')));
+
+    // the summary is a lead paragraph, not a second heading above the article (one H1, then the article's H2s)
+    var summary = qs('.blog_intro .summary');
+    var summaryHeading = summary && qs('h2.sumary', summary);
+    if (summaryHeading) {
+      var lead = document.createElement('p');
+      Array.prototype.slice.call(summaryHeading.attributes).forEach(function (a) { lead.setAttribute(a.name, a.value); }); // keeps the Webflow entrance (data-w-id)
+      while (summaryHeading.firstChild) lead.appendChild(summaryHeading.firstChild);
+      summaryHeading.parentNode.replaceChild(lead, summaryHeading);
+    }
+
+    var author = qs('.rl_blogpost1_content-top');
+    var hero = document.createElement('div'); hero.className = 'rf-hero';
+    var main = document.createElement('div'); main.className = 'rf-hero__main';
+    var side = document.createElement('aside'); side.className = 'rf-hero__side'; side.setAttribute('aria-label', 'About this article');
+    main.appendChild(eyebrow); main.appendChild(h1); if (summary) main.appendChild(summary);
+    if (author) side.appendChild(author);
+
+    // the sections, with the ruler's short names; open next to the title, folded below 992px
+    var article = qs('.richtextstyling');
+    var sections = article ? qsa('h2', article).filter(function (h) { return h.textContent.trim() && h.textContent.indexOf('{skip}') === -1; }) : [];
+
+    // the closing "Questions? Let's talk" section makes way for the project block below the article
+    var last = sections[sections.length - 1];
+    if (last && /^questions\?/i.test(last.textContent.trim())) {
+      while (last.nextSibling) last.parentNode.removeChild(last.nextSibling);
+      last.parentNode.removeChild(last);
+      sections.pop();
+    }
+    if (sections.length > 1) {
+      var toc = document.createElement('details');
+      toc.className = 'rf-toc';
+      toc.innerHTML = '<summary class="rf-eyebrow">In this article</summary><ol></ol>';
+      var ol = qs('ol', toc);
+      var used = {};
+      sections.forEach(function (h) {
+        var text = (h.innerText || h.textContent).replace(/\s*\{skip\}/, '').replace(/\s+/g, ' ').trim();
+        // a shareable address per section (#what-is-webflow), kept if the heading already has one
+        if (!h.id) {
+          var slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+          var id = slug, n = 2;
+          while (used[id] || document.getElementById(id)) id = slug + '-' + n++;
+          h.id = id;
+        }
+        used[h.id] = true;
+        var a = document.createElement('a');
+        a.href = '#' + h.id;
+        var label = document.createElement('span');
+        label.textContent = text.split(/:\s/)[0]; // the whole heading, up to a colon: there is room for it here
+        a.appendChild(label);
+        a.addEventListener('click', function (e) {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; // new tab / window keeps the plain link
+          e.preventDefault();
+          if (history.replaceState) history.replaceState(null, '', '#' + h.id);
+          postJumpTo(h);
+        });
+        var li = document.createElement('li');
+        li.appendChild(a);
+        ol.appendChild(li);
+      });
+      // open next to the title from 1200px and it stays open there; folded below, and in step when the
+      // window is resized or a tablet is turned
+      var wide = window.matchMedia('(min-width: 1200px)');
+      toc.open = wide.matches;
+      var follow = function () { toc.open = wide.matches; };
+      if (wide.addEventListener) wide.addEventListener('change', follow); else if (wide.addListener) wide.addListener(follow);
+      qs('summary', toc).addEventListener('click', function (e) { if (wide.matches) e.preventDefault(); });
+      side.appendChild(toc);
+      // arriving with a section address (#what-is-webflow): go there once the page has settled
+      if (location.hash.length > 1) {
+        var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        if (target && article.contains(target)) window.addEventListener('load', function () { setTimeout(function () { postJumpTo(target); }, 300); });
+      }
+    }
+    hero.appendChild(main); hero.appendChild(side);
+    container.appendChild(hero);
+
+    // ---- end of the page: one project block, then keep reading
+    var box = qs('.richtextbox');
+    if (box) box.insertAdjacentHTML('afterend',
+      '<section class="rf-project" aria-labelledby="rf-project-title">' +
+        '<img class="rf-project__img" src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66dadf02f072700e68299232_384.avif" alt="Rimbout Bobeldijk" loading="lazy">' +
+        '<div class="rf-project__body">' +
+          '<div class="rf-eyebrow">Start a project</div>' +
+          '<h2 class="rf-project__title" id="rf-project-title">Got a project in mind?</h2>' +
+          '<p class="rf-project__text">I\'m Rimbout. I design and build brands and Webflow sites, one project at a time. Book a free 45-minute call and we\'ll look at what you need. No pitch, just honest advice.</p>' +
+          '<div class="rf-project__actions">' +
+            '<a rel="noopener" target="_blank" data-btn-alt="45 min · free" href="' + POST_REFRESH_CAL + '" class="btn w-inline-block"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">Book a call</div></div></div></div></a>' +
+            '<a class="rf-mail" href="mailto:hello@rimbodesigns.com">Or email hello@rimbodesigns.com</a>' +
+          '</div>' +
+        '</div>' +
+      '</section>');
+
+    // keep reading: these are the highlighted posts, not this post's category, so the heading stays general
+    var text = qs('.blog_section .blog_text');
+    if (text) text.innerHTML =
+      '<div class="rf-kr-head"><div><div class="rf-eyebrow">Keep reading</div><h2 class="rf-kr-title">More articles</h2></div>' +
+      '<a class="rf-kr-all" href="/resources">All articles →</a></div>';
+    var current = qs('.blog_section .w--current');
+    if (current && current.closest('.post')) {
+      current.closest('.post').classList.add('rf-hide');
+      var list = current.closest('.blog_list');
+      if (list && qsa('.post', list).length - 1 === 2) list.classList.add('rf-two');
+    }
+
+    // the burger is the only menu at the top now, so it must work from the keyboard too
+    var burger = qs('#FIXED_NAV .burgermenu');
+    if (burger && !burger.hasAttribute('tabindex')) {
+      burger.setAttribute('role', 'button');
+      burger.setAttribute('tabindex', '0');
+      if (!burger.getAttribute('aria-label')) burger.setAttribute('aria-label', 'Menu');
+      burger.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); burger.click(); }
       });
     }
   }
@@ -4222,6 +4561,7 @@
 
   var navFull = path === '/home-copy' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go
   if (navFull) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
+  if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
   run('buttons', rdButtons);
