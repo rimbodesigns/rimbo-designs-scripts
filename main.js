@@ -3171,33 +3171,60 @@
   }
 
   // =========================================================
-  // POST CARDS — the three highlighted posts on the home page and under every post (.blog_highlight)
-  // The dark panel gets the same space above and below, and the title only the height it needs. The
-  // subtext no longer waits under the card's edge for the old hover slide (which needed a big gap under
-  // the title so it wouldn't peek out): on hover it fades in over the bottom of the image instead, so the
-  // card never changes size. Resources has its own cards (.is-resources) and is left alone.
+  // POST CARDS — the highlighted posts (home, under every post: .blog_highlight) and Resources (.is-resources)
+  // At rest the dark panel has the same space above the date as below the title, and the title only the
+  // height it needs. The subtext waits just under the title, invisible, so no sliver of it can ever show
+  // however the spacing works out. On hover the panel slides up by exactly the subtext's height
+  // (--rd-sub, measured below) while the subtext fades in close under the title; the card keeps its size.
+  // This replaces the Webflow hover that slid the panel by a fixed amount.
   // =========================================================
-  var POST_CARDS_CSS = [
-    '.blog_highlight .blog_list { align-items: stretch; }',
-    '.blog_highlight .post { height: auto; }',
-    '.blog_highlight .blog_container { height: 100%; }',
-    // the old hover slid this panel up (Webflow interaction): it stays put now
-    '.blog_highlight .blog_content { position: relative; top: auto; height: auto; flex: 1 1 auto; justify-content: center; padding: 1.25rem; transform: none !important; }', // centred, so a card next to a longer title keeps as much space above as below
-    '.blog_highlight .blog_title { height: auto; margin-bottom: 0; }',
-    '.blog_highlight .paragraph-46 { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0; padding: 3rem 1.25rem 1rem; color: #f8f5ee; background: linear-gradient(to top, rgba(12, 12, 12, .88), rgba(12, 12, 12, 0)); opacity: 0; transform: translateY(.5rem); transition: opacity .35s ease, transform .35s ease; pointer-events: none; }',
-    '.blog_highlight .post:hover .paragraph-46, .blog_highlight .blog_container:focus-visible .paragraph-46 { opacity: 1; transform: none; }',
-    '@media (hover: none) { .blog_highlight .post:hover .paragraph-46 { opacity: 0; } }',
-    '@media (prefers-reduced-motion: reduce) { .blog_highlight .paragraph-46 { transform: none; transition: opacity .2s linear; } }'
-  ].join('\n');
+  var POST_CARD_SCOPES = ['.blog_highlight', '.is-resources'];
+  var POST_CARDS_CSS = (function () {
+    function rules(x) {
+      return [
+        x + ' .blog_list { align-items: stretch; }',
+        x + ' .post { height: auto; }',
+        x + ' .blog_container { height: 100%; }',
+        // centred, so a card next to a longer title keeps as much space above as below
+        x + ' .blog_content { position: relative; top: auto; height: auto; flex: 1 1 auto; justify-content: center; padding: 1.25rem; transform: none !important; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }',
+        x + ' .blog_title { height: auto; margin-bottom: 0; }',
+        x + ' .paragraph-46 { position: absolute; left: 1.25rem; right: 1.25rem; top: var(--rd-sub-top, calc(100% - .75rem)); margin: 0; opacity: 0; transition: opacity .35s ease; pointer-events: none; }',
+        x + ' .post:hover .blog_content, ' + x + ' .blog_container:focus-visible .blog_content { transform: translateY(calc(-1 * var(--rd-sub, 0px))) !important; }',
+        x + ' .post:hover .paragraph-46, ' + x + ' .blog_container:focus-visible .paragraph-46 { opacity: 1; transition: opacity .35s ease .1s; }',
+        '@media (hover: none) { ' + x + ' .post:hover .blog_content { transform: none !important; } ' + x + ' .post:hover .paragraph-46 { opacity: 0; } }',
+        '@media (prefers-reduced-motion: reduce) { ' + x + ' .blog_content { transition: none; } }'
+      ];
+    }
+    return POST_CARD_SCOPES.map(rules).reduce(function (all, r) { return all.concat(r); }, []).join('\n');
+  })();
 
   function rdPostCards() {
     // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
     if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
-    if (!qs('.blog_highlight .post') || qs('#rd-post-cards-css')) return;
-    var style = document.createElement('style');
-    style.id = 'rd-post-cards-css';
-    style.textContent = POST_CARDS_CSS;
-    document.head.appendChild(style);
+    var selector = POST_CARD_SCOPES.map(function (x) { return x + ' .post'; }).join(', ');
+    if (!qs(selector)) return;
+    if (!qs('#rd-post-cards-css')) {
+      var style = document.createElement('style');
+      style.id = 'rd-post-cards-css';
+      style.textContent = POST_CARDS_CSS;
+      document.head.appendChild(style);
+    }
+    // Per card: the subtext starts 8px under its own title (--rd-sub-top), and on hover the panel slides up
+    // just far enough to leave 20px under the subtext (--rd-sub). Measured, because a card next to a longer
+    // title has its text centred, not at the bottom.
+    function measure() {
+      qsa(selector).forEach(function (post) {
+        var panel = qs('.blog_content', post), title = qs('.blog_title', post), sub = qs('.paragraph-46', post);
+        if (!panel || !title || !sub || !sub.offsetHeight) { post.style.setProperty('--rd-sub', '0px'); return; }
+        var top = title.offsetTop + title.offsetHeight + 8;
+        post.style.setProperty('--rd-sub-top', top + 'px');
+        post.style.setProperty('--rd-sub', Math.max(0, top + sub.offsetHeight + 20 - panel.offsetHeight) + 'px');
+      });
+    }
+    measure();
+    var timer;
+    window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(measure, 150); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); // the subtext rewraps once the font is in
   }
 
   // =========================================================
