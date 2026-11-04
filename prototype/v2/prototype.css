@@ -9,7 +9,8 @@
 
 /* ---- HERO: the band ---- */
 .v2-hero { position: relative; height: 100svh; min-height: 36rem; overflow: hidden; background: var(--color--black); color: var(--color--rimbobage); }
-.v2-hero_stage { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 50% 45%; }
+.v2-hero_stage { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 50% 45%; cursor: grab; touch-action: pan-y; opacity: 0; transform: translateY(5vw); transition: opacity 1.2s ease-out, transform 1.8s cubic-bezier(.625, .05, 0, 1); }
+html.v2-ready .v2-hero_stage { opacity: 1; transform: none; }
 /* the band falls to the right (like the Figma), which leaves the top-right corner for the copy and the bottom-left for the hint */
 .v2-band { position: absolute; left: 50%; top: 50%; width: 250vw; --tilt-x: 0deg; --tilt-z: 0deg; transform: translate(-50%, -50%) translateY(10vw) rotateX(calc(56deg + var(--tilt-x))) rotateZ(calc(27deg + var(--tilt-z))); transform-style: flat; backface-visibility: hidden; display: grid; gap: 1.5vw; }
 .v2-band_edge { display: flex; overflow: visible; margin-bottom: .2vw; }
@@ -19,7 +20,7 @@
 .v2-row { overflow: visible; }
 .v2-row_scroll { display: flex; }
 .v2-row_list { display: flex; flex-shrink: 0; gap: 1.5vw; padding-right: 1.5vw; will-change: transform; }
-.v2-panel { position: relative; display: block; flex: none; width: 20vw; cursor: default; user-select: none; -webkit-user-drag: none; aspect-ratio: 1.02; border-radius: .4vw; overflow: hidden; background: #161616; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); transition: transform .6s cubic-bezier(.625, .05, 0, 1), box-shadow .6s cubic-bezier(.625, .05, 0, 1); }
+.v2-panel { position: relative; display: block; flex: none; width: 20vw; cursor: inherit; user-select: none; -webkit-user-drag: none; aspect-ratio: 1.02; border-radius: .4vw; overflow: hidden; background: #161616; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); transition: transform .6s cubic-bezier(.625, .05, 0, 1), box-shadow .6s cubic-bezier(.625, .05, 0, 1); }
 .v2-panel:hover { transform: translateY(-1.2vw) scale(1.035); box-shadow: 0 3vw 5vw rgba(0, 0, 0, .7); z-index: 2; }
 .v2-panel_media { transition: filter .6s; }
 .v2-panel:hover .v2-panel_media { filter: brightness(1.08); }
@@ -28,6 +29,13 @@
 .v2-panel_label { position: absolute; left: .8vw; bottom: .8vw; padding: .45em .7em .4em; border-radius: .25em; background: rgba(12, 12, 12, .78); font-family: "RM MONO", monospace; font-size: .62vw; letter-spacing: .16em; text-transform: uppercase; color: var(--color--rimbobage); opacity: 0; transform: translateY(.3em); transition: opacity .3s, transform .5s cubic-bezier(.625, .05, 0, 1); pointer-events: none; }
 .v2-panel:hover .v2-panel_label { transform: none; }
 .v2-panel:hover .v2-panel_label { opacity: 1; }
+
+/* while the hand holds the band: grabbing, no lift under the pointer, nothing selectable */
+.v2-hero.is-dragging { user-select: none; }
+.v2-hero.is-dragging .v2-hero_stage { cursor: grabbing; }
+.v2-hero.is-dragging .v2-panel:hover { transform: none; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); z-index: auto; }
+.v2-hero.is-dragging .v2-panel:hover .v2-panel_label { opacity: 0; }
+.v2-hero.is-dragging .v2-panel:hover .v2-panel_media { filter: none; }
 
 /* the left edge: the far end of the band goes out of focus and into the dark */
 .v2-edgeblur { position: absolute; left: 0; top: 0; bottom: 0; width: 34%; z-index: 1; pointer-events: none; -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px); -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, .85) 30%, rgba(0, 0, 0, .35) 65%, transparent 100%); mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, .85) 30%, rgba(0, 0, 0, .35) 65%, transparent 100%); }
@@ -39,8 +47,18 @@ html.v2-noblur .v2-edgeblur { display: none; }
 .v2-hero_stage::before { top: 0; background: linear-gradient(var(--color--black), transparent); }
 .v2-hero_stage::after { bottom: 0; background: linear-gradient(transparent, var(--color--black)); }
 
-/* ---- scroll line, bottom-left under the logo: a thin line a light runs down, "scroll" beside it; fades in once the band has settled ---- */
-.v2-scroll { position: absolute; left: 5vw; bottom: clamp(1.5rem, 5vh, 3rem); z-index: 2; display: flex; align-items: center; gap: .9rem; opacity: 0; transform: translateY(.4rem); animation: v2-scroll-in 1.2s cubic-bezier(.625, .05, 0, 1) 2.4s forwards; pointer-events: none; }
+/* ---- loader: a dark cover over the hero while the clips get going; a counter and a line bottom-left, where the scroll line then takes over ---- */
+.v2-loader { position: absolute; inset: 0; z-index: 4; background: var(--color--black); transition: opacity .9s ease-out; }
+html.v2-ready .v2-loader { opacity: 0; pointer-events: none; }
+.v2-loader_box { position: absolute; left: 5vw; bottom: clamp(1.5rem, 5vh, 3rem); width: clamp(11rem, 14vw, 13rem); display: flex; flex-direction: column; gap: .75rem; }
+.v2-loader_t { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; white-space: nowrap; font-family: "RM MONO", monospace; font-size: .62rem; letter-spacing: .22em; text-transform: uppercase; color: var(--color--text-on-black); }
+.v2-loader_n { color: var(--color--rimbobage); font-variant-numeric: tabular-nums; }
+.v2-loader_bar { display: block; height: 1px; background: rgba(248, 245, 238, .16); overflow: hidden; }
+.v2-loader_bar i { display: block; height: 100%; background: var(--color--rimbobage); transform: scaleX(0); transform-origin: left; }
+
+/* ---- scroll line, bottom-left under the logo: a thin line a light runs down, "scroll" beside it; fades in once the band has come up ---- */
+.v2-scroll { position: absolute; left: 5vw; bottom: clamp(1.5rem, 5vh, 3rem); z-index: 2; display: flex; align-items: center; gap: .9rem; opacity: 0; transform: translateY(.4rem); pointer-events: none; }
+html.v2-ready .v2-scroll { animation: v2-scroll-in 1.2s cubic-bezier(.625, .05, 0, 1) 1.6s forwards; }
 .v2-scroll_line { position: relative; display: block; width: 1px; height: 2.8rem; background: rgba(248, 245, 238, .16); overflow: hidden; }
 .v2-scroll_line i { position: absolute; left: 0; top: 0; width: 100%; height: 45%; background: var(--color--rimbobage); animation: v2-scroll-run 2.1s cubic-bezier(.65, 0, .35, 1) infinite; }
 .v2-scroll_t { font-family: "RM MONO", monospace; font-size: .62rem; letter-spacing: .22em; text-transform: uppercase; color: var(--color--text-on-black); }
@@ -48,7 +66,8 @@ html.v2-noblur .v2-edgeblur { display: none; }
 @keyframes v2-scroll-run { 0% { transform: translateY(-100%); } 60%, 100% { transform: translateY(230%); } }
 
 /* ---- copy in the top corner ---- */
-.v2-hero_copy { position: absolute; right: clamp(1.5rem, 5vw, 5rem); top: clamp(6rem, 15vh, 9rem); z-index: 2; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 1.1rem; max-width: 34rem; }
+.v2-hero_copy { position: absolute; right: clamp(1.5rem, 5vw, 5rem); top: clamp(6rem, 15vh, 9rem); z-index: 2; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 1.1rem; max-width: 34rem; opacity: 0; transform: translateY(.8rem); transition: opacity 1s ease-out .35s, transform 1.4s cubic-bezier(.625, .05, 0, 1) .35s; }
+html.v2-ready .v2-hero_copy { opacity: 1; transform: none; }
 .v2-hero_copy::before { content: ""; position: absolute; inset: -6rem -8rem -5rem -10rem; z-index: -1; background: radial-gradient(ellipse at 70% 40%, rgba(12, 12, 12, .95) 0%, rgba(12, 12, 12, .7) 45%, rgba(12, 12, 12, 0) 72%); pointer-events: none; }
 .v2-eyebrow { font-family: "RM MONO", monospace; font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--color--text-on-black); }
 .v2-eyebrow i { font-style: normal; color: var(--color--brand); margin: 0 .5em; }
@@ -87,8 +106,13 @@ html.v2-noblur .v2-edgeblur { display: none; }
   .v2-hero_copy { right: 1.25rem; left: 1.25rem; top: auto; bottom: clamp(3rem, 9vh, 6rem); align-items: flex-start; text-align: left; max-width: none; gap: 1rem; }
   .v2-hero_copy::before { display: none; }
   .v2-scroll { display: none; } /* the copy sits there on narrow screens */
+  .v2-loader_box { left: 1.25rem; bottom: clamp(3rem, 9vh, 6rem); }
   .v2-title { font-size: clamp(2.2rem, 9vw, 4rem); }
 }
 
-/* test switches: ?nograin hides the grain, ?noclips shows covers only, ?noblur drops the edge blur (see prototype.js) */
+@media (prefers-reduced-motion: reduce) {
+  .v2-hero_stage, .v2-hero_copy { transform: none; transition: opacity .6s; }
+}
+
+/* test switches: ?nograin hides the grain, ?noclips shows covers only, ?noblur drops the edge blur, ?notilt, ?nodrag, ?noloader, ?tinko (see prototype.js) */
 html.v2-nograin .grain { display: none !important; }
