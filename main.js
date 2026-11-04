@@ -764,14 +764,7 @@
           if (reduce) return;
           e.preventDefault();
           setActive(i);
-          var page = qs('.main-wrapper') || document.body;
-          // the pill slides (0.5s); the page starts fading halfway, then the other language loads
-          setTimeout(function () {
-            page.style.transition = 'opacity 0.3s ' + ease + ', transform 0.3s ' + ease;
-            page.style.opacity = '0';
-            page.style.transform = 'translateY(-0.5rem)';
-          }, 200);
-          setTimeout(function () { window.location.href = a.href; }, 520);
+          rdLeave(a.href, 200); // the pill slides (0.5s); the page fade starts partway through it
         });
         // Osmo's keyboard: left/right moves between the languages
         a.addEventListener('keydown', function (e) {
@@ -782,13 +775,62 @@
         });
       });
 
-      // back/forward cache: coming back must show the page and the pill as they were
-      window.addEventListener('pageshow', function (e) {
-        if (!e.persisted) return;
-        var page = qs('.main-wrapper') || document.body;
-        page.style.transition = page.style.opacity = page.style.transform = '';
-        setActive(current);
+      // back/forward cache: coming back must show the pill as it was (rdPageTransition restores the page)
+      window.addEventListener('pageshow', function (e) { if (e.persisted) setActive(current); });
+    });
+  }
+
+  // =========================================================
+  // PAGE TRANSITION — every page
+  // Clicking a link to another page on this site fades the page content (.main-wrapper, and the menu panel
+  // if it is open) out and up a little, then opens the link. The grain, logo and burger stay put, and the
+  // browser keeps the faded page on screen until the next one paints, whose own intro then brings it in.
+  // Skipped for: other sites, new-tab/modified clicks, downloads, #anchors on the same page, mailto/tel,
+  // links whose click another script already handled, [data-no-transition], and reduced motion.
+  // =========================================================
+  var LEAVE_MS = 320;
+  var leaving = false;
+  var faded = []; // [element, its inline styles before the fade]
+  function leaveTargets() {
+    return [qs('.main-wrapper') || document.body].concat(qsa('.nav').filter(function (n) { return getComputedStyle(n).opacity !== '0'; }));
+  }
+  function rdLeave(href, delay) {
+    if (leaving) return;
+    leaving = true;
+    var ease = 'cubic-bezier(0.625, 0.05, 0, 1)';
+    setTimeout(function () {
+      leaveTargets().forEach(function (el) {
+        faded.push([el, { transition: el.style.transition, opacity: el.style.opacity, transform: el.style.transform, pointerEvents: el.style.pointerEvents }]);
+        el.style.transition = 'opacity ' + LEAVE_MS + 'ms ' + ease + ', transform ' + LEAVE_MS + 'ms ' + ease;
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-0.5rem)';
+        el.style.pointerEvents = 'none';
       });
+      setTimeout(function () { window.location.href = href; }, LEAVE_MS + 20);
+    }, delay || 0);
+  }
+  function rdPageTransition() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.hasAttribute('download') || a.closest('[data-no-transition]')) return;
+      if (a.target && a.target !== '_self') return;
+      var raw = a.getAttribute('href') || '';
+      if (!raw || raw.charAt(0) === '#' || /^(mailto|tel|javascript):/i.test(raw)) return;
+      var url;
+      try { url = new URL(a.href, location.href); } catch (err) { return; }
+      if (url.origin !== location.origin) return;
+      if (url.pathname === location.pathname && url.search === location.search) return; // same page (an #anchor or a reload)
+      e.preventDefault();
+      rdLeave(url.href);
+    });
+    // back/forward cache: a page we left by fading must come back visible
+    window.addEventListener('pageshow', function (e) {
+      if (!e.persisted) return;
+      leaving = false;
+      faded.forEach(function (f) { Object.keys(f[1]).forEach(function (k) { f[0].style[k] = f[1][k]; }); });
+      faded = [];
     });
   }
 
@@ -3154,6 +3196,102 @@
     cover.classList.add('is-hue-drift');
   }
 
+
+  // =========================================================
+  // FULL SCREEN NAV — /home-copy: Osmo Supply "Bold Full Screen Navigation".
+  // Osmo's markup, CSS and toggle logic as Osmo wrote them (class names kept); ours is the rest:
+  // the links are read from the existing burger menu (so Dutch and any new page follow along),
+  // the colours are the site's, the footer shows Amsterdam's local time, and the old burger /
+  // fixed nav are hidden on this page. Lenis stops while the menu is open.
+  // =========================================================
+  function rdNavFull() {
+    if (qs('.bold-nav-full')) return;
+    var source = qsa('.pop-up_nav_menu .nav_link');
+    var items = source.length ? source.map(function (a) {
+      return { href: a.getAttribute('href') || '#', text: a.textContent.trim() };
+    }) : [
+      { href: '/', text: 'Home' }, { href: '/work', text: 'Work' }, { href: '/service', text: 'Services' },
+      { href: '/resources', text: 'Resources' }, { href: '/contact', text: 'Contact' }
+    ];
+    var here = location.pathname.replace(/\/+$/, '') || '/';
+    function current(href) {
+      var h = href.replace(/^https?:\/\/[^/]+/, '').replace(/\/+$/, '') || '/';
+      return h === here || (here === '/home-copy' && h === '/');
+    }
+
+    var css = [
+      // the old navigation steps aside on this page
+      '#FIXED_NAV, #Top_Nav, .burgermenu, .nav { display: none !important; }',
+      '.bold-nav-full { --nf-bg: #262425; --nf-ink: #f3efe9; --nf-accent: #f3562e; z-index: 1000; pointer-events: none; position: fixed; inset: 0; color: var(--nf-ink); }',
+      '.bold-nav-full__bar { z-index: 1; justify-content: space-between; align-items: center; width: 100%; padding: 2.5em; display: flex; position: absolute; mix-blend-mode: difference; }',
+      '.bold-nav-full__logo { pointer-events: auto; color: #fff; font-size: 1.5em; letter-spacing: -0.02em; text-decoration: none; }',
+      '.bold-nav-full__hamburger { pointer-events: auto; color: #fff; cursor: pointer; background-color: #0000; justify-content: center; align-items: center; width: 3em; height: 3em; display: flex; position: relative; overflow: hidden; border: none; font: inherit; padding: 0; }',
+      '.bold-nav-full__hamburger-bar { background-color: currentColor; width: 2em; height: .125em; position: absolute; transition: transform 0.5s cubic-bezier(.7, 0, .3, 1); }',
+      '.bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(1, 1) rotate(0.001deg); }',
+      '.bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(1, 1) rotate(0.001deg); }',
+      '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(.5, 1) rotate(0.001deg); }',
+      '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(.5, 1) rotate(0.001deg); }',
+      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(1, 1); }',
+      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(2) { transform: translate(-150%, 0) rotate(0.001deg) scale(1, 1); }',
+      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(1, 1); }',
+      '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(.7, 1); }',
+      '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(.7, 1); }',
+      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; transition: clip-path 1s cubic-bezier(.9, 0, .1, 1); clip-path: polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%); visibility: hidden; }',
+      '[data-navigation-status="active"] .bold-nav-full__tile { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); visibility: visible; }',
+      '.bold-nav-full__ul { flex-flow: column; align-items: center; margin: 0; padding: 0; display: flex; list-style: none; }',
+      '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity 0.5s cubic-bezier(.7, 0, .3, 1); }',
+      '.bold-nav-full__link { color: var(--nf-ink); letter-spacing: -.04em; padding-left: .075em; padding-right: .075em; font-size: calc(3.4vw + 3.4vh); font-weight: 400; line-height: 1.1; text-transform: capitalize; text-decoration: none; transform: translateY(100%) rotate(5deg); transition: transform 0.75s cubic-bezier(.7, 0, .3, 1); }',
+      '.bold-nav-full__link.is--current { color: var(--nf-accent); }',
+      '.bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.2s; } .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.15s; } .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.1s; } .bold-nav-full__li:nth-child(4) .bold-nav-full__link { transition-delay: 0.05s; } .bold-nav-full__li:nth-child(5) .bold-nav-full__link { transition-delay: 0.025s; } .bold-nav-full__li:nth-child(6) .bold-nav-full__link { transition-delay: 0s; }',
+      '[data-navigation-status="active"] .bold-nav-full__link { transform: translateY(0%) rotate(0.001deg); }',
+      '[data-navigation-status="active"] .bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.3s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.35s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.4s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(4) .bold-nav-full__link { transition-delay: 0.45s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(5) .bold-nav-full__link { transition-delay: 0.5s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(6) .bold-nav-full__link { transition-delay: 0.55s; }',
+      '.bold-nav-full__link-text { text-shadow: 0 1.1em 0; display: block; position: relative; transition: transform 0.5s cubic-bezier(.7, 0, .3, 1); transform: translateY(0%) rotate(0.001deg); }',
+      '.bold-nav-full__link:hover .bold-nav-full__link-text { transform: translateY(-100%) rotate(0.001deg); }',
+      '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li { opacity: 0.15; }',
+      '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li:hover { opacity: 1; }',
+      '.bold-nav__bottom { justify-content: space-between; align-items: center; width: 100%; padding: 2.25em 2.5em; display: flex; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: 0.8em; letter-spacing: 0.06em; text-transform: uppercase; }',
+      '.bold-nav__word { opacity: .5; margin: 0; position: relative; color: inherit; text-decoration: none; transition: opacity .3s; }',
+      'a.bold-nav__word:hover { opacity: 1; }',
+      '@media (max-width: 700px) { .bold-nav-full__bar { padding: 1.25em; } .bold-nav__bottom { flex-direction: column; gap: .6em; padding: 1.5em; } .bold-nav-full__link { font-size: 13vw; } }'
+    ].join('\n');
+    var style = document.createElement('style');
+    style.textContent = css;
+    document.head.appendChild(style);
+
+    var lis = items.map(function (it) {
+      return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link' + (current(it.href) ? ' is--current' : '') + '"><span class="bold-nav-full__link-text">' + it.text + '</span></a></li>';
+    }).join('');
+    var nav = document.createElement('nav');
+    nav.className = 'bold-nav-full';
+    nav.setAttribute('data-navigation-status', 'not-active');
+    nav.setAttribute('aria-label', 'Main');
+    nav.innerHTML =
+      '<div class="bold-nav-full__bar"><a href="/" class="bold-nav-full__logo">Rimbo</a>' +
+        '<button data-navigation-toggle="toggle" class="bold-nav-full__hamburger" aria-label="Menu" aria-expanded="false"><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div></button></div>' +
+      '<div class="bold-nav-full__tile"><ul class="bold-nav-full__ul">' + lis + '</ul>' +
+        '<div class="bold-nav__bottom"><p class="bold-nav__word">Rimbo Designs</p><p class="bold-nav__word">Netherlands · <span data-nav-clock>--:--</span></p><a class="bold-nav__word" href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></div></div>';
+    document.body.appendChild(nav);
+
+    // Osmo's toggle logic (toggle, close, Esc), plus Lenis stop/start and aria
+    var btn = qs('[data-navigation-toggle="toggle"]', nav);
+    function set(active) {
+      nav.setAttribute('data-navigation-status', active ? 'active' : 'not-active');
+      btn.setAttribute('aria-expanded', active ? 'true' : 'false');
+      if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
+    }
+    btn.addEventListener('click', function () { set(nav.getAttribute('data-navigation-status') === 'not-active'); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && nav.getAttribute('data-navigation-status') === 'active') set(false);
+    });
+    qsa('.bold-nav-full__link', nav).forEach(function (a) {
+      a.addEventListener('click', function () { if ((a.getAttribute('href') || '').charAt(0) === '#') set(false); });
+    });
+
+    var clock = qs('[data-nav-clock]', nav);
+    function tick() { clock.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }); }
+    tick(); setInterval(tick, 15000);
+  }
+
   // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
@@ -3175,6 +3313,8 @@
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
+  run('page transition', rdPageTransition);
+  if (path === '/home-copy') run('full screen nav', rdNavFull); // the redesign test page only, for now
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
