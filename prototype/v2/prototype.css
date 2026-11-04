@@ -110,9 +110,24 @@ html.v2-ready .v2-hero_copy { opacity: 1; transform: none; }
   .v2-title { font-size: clamp(2.2rem, 9vw, 4rem); }
 }
 
+/* ---- one band (?one): a single row of bigger panels, the top of the ranking ---- */
+html.v2-one .v2-panel { width: 32vw; border-radius: .5vw; }
+html.v2-one .v2-row_list { gap: 2vw; padding-right: 2vw; }
+html.v2-one .v2-band { gap: 2vw; transform: translate(-50%, -50%) translateY(8vw) rotateX(calc(56deg + var(--tilt-x))) rotateZ(calc(27deg + var(--tilt-z))); }
+html.v2-one .v2-band_edge { margin-bottom: .4vw; }
+html.v2-one .v2-edge_name { font-size: .85vw; padding-right: 4vw; }
+html.v2-one .v2-panel_label { font-size: .8vw; left: 1.1vw; bottom: 1.1vw; }
+html.v2-one .v2-panel:hover { transform: translateY(-1.6vw) scale(1.03); }
+@media (max-width: 991px) {
+  html.v2-one .v2-panel { width: 54vw; }
+  html.v2-one .v2-band { gap: 3vw; transform: translate(-50%, -50%) translateY(-2vw) rotateX(56deg) rotateZ(27deg); }
+  html.v2-one .v2-edge_name { font-size: 1.8vw; }
+  html.v2-one .v2-panel_label { font-size: 1.6vw; left: 1.6vw; bottom: 1.4vw; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v2-hero_stage, .v2-hero_copy { transform: none; transition: opacity .6s; }
 }
 
-/* test switches: ?nograin hides the grain, ?noclips shows covers only, ?noblur drops the edge blur, ?notilt, ?nodrag, ?noloader, ?tinko (see prototype.js) */
+/* test switches: ?nograin hides the grain, ?noclips shows covers only, ?noblur drops the edge blur, ?notilt, ?nodrag, ?noloader, ?one=N (see prototype.js) */
 html.v2-nograin .grain { display: none !important; }

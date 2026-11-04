@@ -14,13 +14,17 @@
   });
 
   // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt,
-  // ?nodrag, ?noloader (band at once)
+  // ?nodrag, ?noloader (band at once), ?one or ?one=N (ONE band: a single row of bigger panels with
+  // the top N of the ranking, 6 by default, to see how a trimmed best-of-the-best feels)
   var noClips = /[?&]noclips/.test(location.search);
   if (/[?&]nograin/.test(location.search)) document.documentElement.classList.add('v2-nograin');
   if (/[?&]noblur/.test(location.search)) document.documentElement.classList.add('v2-noblur');
   var noTilt = /[?&]notilt/.test(location.search);
   var noDrag = /[?&]nodrag/.test(location.search);
   var noLoader = /[?&]noloader/.test(location.search);
+  var oneMatch = /[?&]one(?:=(\d+))?(?:&|$)/.exec(location.search);
+  var oneN = oneMatch ? Math.max(2, parseInt(oneMatch[1], 10) || 6) : 0;
+  if (oneN) document.documentElement.classList.add('v2-one');
 
   // ---- the work on the band: only the projects Rimbo approved (older work stays out; Pooh Balance
   // cut on 2026-11-04, Meet Tinko in its place). Clips where there is one, covers for the rest. Sandra
@@ -55,10 +59,12 @@
   var visible = order.filter(function (k) { return hidden.indexOf(k) < 0; });
   if (visible.length < 2) visible = DEFAULT_ORDER.slice();
   var keysA = [], keysB = [];
-  visible.forEach(function (k, i) { (i % 2 === 0 || (i === visible.length - 1 && visible.length % 2 === 0) ? keysA : keysB).push(k); });
+  if (oneN) { visible = visible.slice(0, oneN); keysA = visible.slice(); } // one band: the top of the ranking, one row
+  else visible.forEach(function (k, i) { (i % 2 === 0 || (i === visible.length - 1 && visible.length % 2 === 0) ? keysA : keysB).push(k); });
   var rowA = keysA.map(function (k) { return W[k]; }), rowB = keysB.map(function (k) { return W[k]; });
-  // the marquee needs more content than the band is wide (250vw, 340vw on phones): copies per row
-  function copies(len) { return len >= 6 ? 1 : (len >= 4 ? 2 : 3); }
+  // the marquee needs more content than the band is wide (250vw, 340vw on phones): copies per row.
+  // In one-band mode the panels are 32vw + 2vw, so the copies follow from the list width.
+  function copies(len) { return oneN ? Math.max(1, Math.ceil(250 / (len * 34))) : (len >= 6 ? 1 : (len >= 4 ? 2 : 3)); }
   window.v2Band = { order: visible, rowA: keysA, rowB: keysB }; // read-only peek for debugging
 
   function panel(w, coverOnly) {
@@ -84,7 +90,7 @@
     '<div class="v2-hero_stage" aria-hidden="true"><div class="v2-band">' +
       row(names, 'left', 55, 'v2-band_edge') +
       row(rowA.map(function (w) { return panel(w, noClips); }), 'left', 18 * rowA.length, '', copies(rowA.length)) +
-      row(rowB.map(function (w) { return panel(w, noClips); }), 'right', 19 * rowB.length, '', copies(rowB.length)) +
+      (rowB.length ? row(rowB.map(function (w) { return panel(w, noClips); }), 'right', 19 * rowB.length, '', copies(rowB.length)) : '') +
     '</div><div class="v2-edgeblur"></div></div>' +
     '<div class="v2-scroll" aria-hidden="true"><span class="v2-scroll_line"><i></i></span><span class="v2-scroll_t">Scroll</span></div>' +
     '<div class="v2-hero_copy">' +
