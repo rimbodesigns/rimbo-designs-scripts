@@ -51,7 +51,7 @@
   // goes up as well: the upper row is the far one, more of it is on screen, so that is where a short
   // loop shows the same project twice (Rimbo saw it there). Along a row a project repeats at a fixed
   // distance (the loop), never next to its own copy.
-  var DEFAULT_ORDER = ['echo', 'dfs', 'echotour', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko']; // the two Echo clips land on different rows
+  var DEFAULT_ORDER = ['echo', 'dfs', 'tinko', 'innergym', 'echotour', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan']; // upper row: Echo, Tinko, Echo in use ... (Tinko sits between the two Echo panels)
   var rank = null;
   try { rank = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
   var order = ((rank && rank.order) || DEFAULT_ORDER).filter(function (k) { return W[k]; });
@@ -218,6 +218,35 @@
   }
   tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
 
+  // ---- one download and one decoder per clip: the marquee clones every panel, so the clones' videos
+  // become canvases painted from the first (master) video each frame. 8 clips, 8 decoders, not 19.
+  function dedupeClips() {
+    var masters = {};
+    Array.prototype.slice.call(hero.querySelectorAll('video')).forEach(function (v) {
+      var src = v.getAttribute('src');
+      if (!masters[src]) { masters[src] = v; return; }
+      var c = document.createElement('canvas');
+      c.className = v.className; c.setAttribute('aria-hidden', 'true');
+      c.width = 640; c.height = 627;
+      v.parentNode.replaceChild(c, v);
+      (masters[src].__canvases = masters[src].__canvases || []).push(c);
+    });
+    var painters = Object.keys(masters).map(function (k) { return masters[k]; }).filter(function (m) { return m.__canvases; });
+    if (!painters.length) return;
+    var paint = function () {
+      painters.forEach(function (m) {
+        if (m.readyState < 2) return;
+        m.__canvases.forEach(function (c) {
+          if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
+          c.getContext('2d').drawImage(m, 0, 0);
+        });
+      });
+      requestAnimationFrame(paint);
+    };
+    requestAnimationFrame(paint);
+  }
+  setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
+
   // ---- the loader: the clips start under a dark cover (that was the lag he saw), a counter and
   // a thin line fill up as the covers and clips get ready, then html.v2-ready brings the band up.
   // Never shorter than 1.3 s (so it reads), never longer than 5 s (a slow clip must not hold the page).
@@ -233,6 +262,7 @@
     var readiness = function () { // one unit per distinct cover and clip; a clip is ready once it can play on
       var seen = {}, total = 0, done = 0;
       hero.querySelectorAll('.v2-panel_media').forEach(function (m) {
+        if (m.tagName === 'CANVAS') return; // painted from a master video, counted there
         var key = m.currentSrc || m.getAttribute('src');
         if (seen[key]) { if (!seen[key].ok) seen[key].ok = (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0); return; }
         seen[key] = { ok: (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0) };
