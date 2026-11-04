@@ -3083,6 +3083,7 @@
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
+    var exitTilt = kind === 'spatial' ? param('exit', 'exit', 18) : 0; // home-v4: degrees the drum leans back (and recedes) as the hero leaves, the 3D exit (0 = flat)
     var scrolled = false; // the hero has started to scroll away: the auto-step clock holds, the drum belongs to the scroll
     var stepNext = null;
     if (slider && stepEvery > 0 && !reduced) {
@@ -3419,6 +3420,9 @@
       if (wheel && spin) { // the wheel turns with the scroll: spin degrees over the first screen, back again on the way up
         var spun = 0;
         ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
+      }
+      if (!reduced && slider && kind === 'spatial' && exitTilt) { // home-v4, the 3D exit: as the hero leaves, the whole drum leans back and recedes, in step with the scroll
+        gsap.to(slider, { rotationX: exitTilt, z: -exitTilt * 20, transformPerspective: 1400, transformOrigin: '50% 100%', ease: 'none', scrollTrigger: { trigger: scrollRef, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } });
       }
       if (drumTurn && !reduced && slider && kind === 'spatial') { // home-v4: the drum turns with the scroll, drumTurn cards over the first screen, and settles on a card back at the top
         var turned = 0;
