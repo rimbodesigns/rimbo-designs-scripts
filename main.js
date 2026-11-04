@@ -465,6 +465,10 @@
     if (typeof Lenis === 'undefined') return;                            // library not loaded
     if (window.Webflow && Webflow.env('editor') !== undefined) return;   // never inside the Webflow editor
 
+    // The phone browser's bottom bar sliding away on the first scroll changes the viewport height;
+    // ScrollTrigger must not treat that as a resize (it recalculates and the page jumps)
+    if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.config({ ignoreMobileResize: true });
+
     // Until the old "LENIS SCROLL JS" block is deleted from the Webflow footer it
     // still creates `lenis` and wires the buttons below, so then we only reuse it.
     var instance = typeof lenis !== 'undefined' && lenis ? lenis : null;
@@ -892,6 +896,8 @@
 
     var panelHeight = 0.55; // 1 is the full height of the section (78svh on the test page, so this is about 43svh)
     var panelGap = 40; // px between images
+    var panelHeightNarrow = 0.86; // below 768px the centre panel takes most of the screen
+    var panelGapNarrow = 14;
     var wheel = 'horizontal'; // "horizontal" | "all" | "off"
 
     // Oval size
@@ -944,6 +950,7 @@
 
     var textureDetail = 1.5; // texture resolution over the size it is drawn at
     var panelWidthMax = 0.78; // the widest image never passes this share of the section width
+    var panelWidthMaxNarrow = 0.94;
     var narrowBreakpoint = 768;
 
     var repeats = 4;
@@ -1311,7 +1318,9 @@
       function measurePanel() {
         var widest = 1;
         for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
-        panelH = Math.min(H * panelShare, (W * panelWidthMax) / widest);
+        var phone = W < narrowBreakpoint;
+        panelGap = phone ? panelGapNarrow : 40;
+        panelH = Math.min(H * (phone ? Math.max(panelShare, panelHeightNarrow) : panelShare), (W * (phone ? panelWidthMaxNarrow : panelWidthMax)) / widest);
         wrapper.style.setProperty('--glass-carousel-panel', Math.round(panelH) + 'px'); // the CSS puts the caption under the row
       }
       measurePanel();
