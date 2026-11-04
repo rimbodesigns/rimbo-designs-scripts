@@ -2935,6 +2935,9 @@
       return isNaN(v) ? fallback : v;
     };
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
+    var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
+    var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
+    var scrolled = false; // the hero has started to scroll away: the auto-step clock holds, the drum belongs to the scroll
     var stepNext = null;
     if (slider && stepEvery > 0 && !reduced) {
       stepNext = document.createElement('button');
@@ -2963,7 +2966,7 @@
       var wait = stepEvery * 1000, due = performance.now() + wait;
       setInterval(function () {
         var d = slider['_' + kind + 'SliderDraggable'], now = performance.now();
-        var held = over || hidden || document.hidden || (d && (d.isPressed || d.isDragging || d.isThrowing));
+        var held = over || hidden || document.hidden || scrolled || (d && (d.isPressed || d.isDragging || d.isThrowing));
         if (held) { due = now + wait; return; }
         if (now < due) return;
         due = now + wait;
@@ -2996,6 +2999,29 @@
       var wzone = qs('[data-radial-slider-collection]', wheel) || wheel;
       wzone.addEventListener('pointerdown', function () { if (wheel._radialSliderProxy) gsap.killTweensOf(wheel._radialSliderProxy); }, true); // a hand on the wheel ends the roll-in or a step where it is
     }
+    // ---- home-v4: moving the drum from outside a drag, through the slider's own proxy and Draggable (Osmo's code untouched:
+    // its render is the Draggable's onDrag, its step distance is read off its snap)
+    var drumStep = function () { // the slider's step in px: the smallest value its snap rounds up to a step
+      var d = slider && slider._spatialSliderDraggable, snap = d && d.vars && d.vars.snap;
+      if (typeof snap !== 'function') return 0;
+      var lo = 0, hi = 4000;
+      for (var i = 0; i < 40 && hi - lo > 0.05; i++) { var mid = (lo + hi) / 2; if (snap(mid) > 0) hi = mid; else lo = mid; }
+      return snap(hi);
+    };
+    var turnDrum = function (cards) { // turn the drum by a number of cards: the proxy moves, the Draggable syncs to it, the cards follow
+      var d = slider && kind === 'spatial' && slider._spatialSliderDraggable, proxy = slider && slider._spatialSliderProxy, render = d && d.vars && d.vars.onDrag, step = drumStep();
+      if (!d || !proxy || !render || !step || !cards) return;
+      gsap.getTweensOf(proxy).forEach(function (t) { t.progress(1); }); // a step under way lands first, so the turn adds to whole cards
+      gsap.set(proxy, { x: (parseFloat(gsap.getProperty(proxy, 'x')) || 0) - cards * step });
+      d.update(); render();
+    };
+    var settleDrum = function () { // back at the top of the page: the drum eases onto the nearest card
+      var d = slider && kind === 'spatial' && slider._spatialSliderDraggable, proxy = slider && slider._spatialSliderProxy, render = d && d.vars && d.vars.onDrag, snap = d && d.vars && d.vars.snap;
+      if (!d || !proxy || !render || typeof snap !== 'function' || d.isPressed || d.isDragging || d.isThrowing) return;
+      var x = parseFloat(gsap.getProperty(proxy, 'x')) || 0, to = snap(x);
+      if (Math.abs(to - x) < 0.5) return;
+      gsap.to(proxy, { x: to, duration: 0.6, ease: 'power2.out', onUpdate: render, onComplete: function () { d.update(); render(); } });
+    };
     var rollWheelIn = function () { // called by the opening: the wheel is already turned on by rollIn; this rolls it back to rest
       var proxy = wheel && wheel._radialSliderProxy, d = wheel && wheel._radialSliderDraggable, render = wheel && wheel._radialSliderRender;
       if (!rollIn || !proxy || !d || !render) return;
@@ -3243,10 +3269,23 @@
     });
     var fadeBehind = function () {
       if (!window.ScrollTrigger) return;
-      var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
+      var quick = function () { return '+=' + Math.round(window.innerHeight * fadeFrac); }; // gone within the first fifth of a screen (fadeFrac)
       if (wheel && spin) { // the wheel turns with the scroll: spin degrees over the first screen, back again on the way up
         var spun = 0;
         ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
+      }
+      if (drumTurn && !reduced && slider && kind === 'spatial') { // home-v4: the drum turns with the scroll, drumTurn cards over the first screen, and settles on a card back at the top
+        var turned = 0;
+        ScrollTrigger.create({
+          trigger: scrollRef, start: 'top top', end: 'bottom top',
+          onUpdate: function (st) {
+            scrolled = st.progress > 0.02;
+            var d = slider._spatialSliderDraggable, want = drumTurn * st.progress;
+            if (d && (d.isPressed || d.isDragging || d.isThrowing)) { turned = want; return; } // a hand on the drum wins; the scroll picks up from wherever it lands
+            turnDrum(want - turned); turned = want;
+            if (st.progress <= 0) settleDrum();
+          }
+        });
       }
       if (copy) {
         gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
