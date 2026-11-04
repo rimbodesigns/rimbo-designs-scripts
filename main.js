@@ -1331,15 +1331,15 @@
     var arcNarrow = 14; // below 768px: degrees per panel, hub distance and panel width (V3's phone wheel)
     var arcRadiusNarrow = 4.25;
     var panelWidthNarrowWheel = 0.62;
-    // The wheel's opening (Rimbo, 2026-11-05: "the first one has to come in, and after that it's just always kind of
-    // circular"): once the title is in, the top card alone slides in fast from beyond the right edge straight to its
-    // place, then the others grow in at their places on the circle, nearest first, and from that moment the wheel
-    // only ever turns (the drift, or the stepped turn). ?rollin=90 brings back the earlier roll-in instead.
-    var flyDuration = 0.9; // s, the first card's slide
+    // The wheel's opening, V3's roll-in: the wheel waits turned arcRollIn degrees on and rolls back to rest while the
+    // stage fades in and the title rises. (Rimbo tried the other opening on 2026-11-05 — the top card alone slides in
+    // from the right, then the others grow in at their places, then the wheel turns — and sent it back: "not working,
+    // revert". It is still here behind ?rollin=0.)
+    var flyDuration = 0.9; // s, the first card's slide (the ?rollin=0 opening)
     var fillStart = 0.5; // s after the first card sets off, the others begin to grow in
     var fillStagger = 0.1; // s per card away from the top
     var fillDuration = 0.8; // s for one card to grow
-    var arcRollIn = 0; // the earlier opening: the wheel waits turned this many degrees on and rolls back to rest (0 = off)
+    var arcRollIn = 90; // the opening: the wheel waits turned this many degrees on and rolls back to rest (0 = the fly-in above)
     var arcRollDuration = 3.6; // seconds, a long even slow-down while the stage fades in and the title rises
     var arcDrift = 3; // degrees a second at rest, the same way round as the opening (0 = off; replaces autoDrift on the wheel); it eases up to speed over about a second and a half
     var arcStep = 0; // seconds between stepped turns of one card (V4's "1, 2, 3" clock) instead of the drift; 0 = drift (?step=3.5 to try)
@@ -3515,8 +3515,8 @@
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
-      // (The wheel version too: its first card flies in once the stage is shown, Rimbo 2026-11-05.)
-      var glassAfter = !!qs('[data-glass-carousel]', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      // The glass wheel (data-glass-carousel-arc) opens like V3 instead: the stage with the reveal, rolling in (Rimbo, 2026-11-05: the title-first fly-in was sent back).
+      var glassAfter = !!qs('[data-glass-carousel]:not([data-glass-carousel-arc])', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
       var stageNow = !(cardsAfter || glassAfter);
       [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
