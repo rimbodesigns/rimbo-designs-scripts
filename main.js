@@ -542,14 +542,16 @@
   // SERVICE — /service and every /locations/… page (was Slater 35312 SERVICE.js)
   // =========================================================
   function rdService() {
-    var tl = gsap.timeline()
-      .from(split('#HeroTitle').chars, heroCharsIn(0.33), 'pair')
-      .from(byId('DARK_section'), { duration: 1.4, y: '50vh', ease: 'power2.out' }, 'pair')
-      .from(byId('First_content'), { y: 50, opacity: 0, scale: 0.95, filter: 'blur(5px)', duration: 1, ease: 'expo.out' })
-      .from(split('#Special_text').chars, heroCharsIn(), 'pair2');
+    // each step only when its element is on the page: the new /locations/… template is one hero panel
+    // (#HeroTitle + #text_local) without the dark section, so its text comes in right after the title
+    var dark = byId('DARK_section'), first = byId('First_content'), special = byId('Special_text');
+    var tl = gsap.timeline().from(split('#HeroTitle').chars, heroCharsIn(0.33), 'pair');
+    if (dark) tl.from(dark, { duration: 1.4, y: '50vh', ease: 'power2.out' }, 'pair');
+    if (first) tl.from(first, { y: 50, opacity: 0, scale: 0.95, filter: 'blur(5px)', duration: 1, ease: 'expo.out' });
+    if (special) tl.from(split(special).chars, heroCharsIn(), 'pair2');
 
     var local = byId('text_local'); // only the /locations/… pages have this line
-    if (local) tl.from(local, { duration: 0.8, opacity: 0, ease: 'expo.out' }, 'pair2');
+    if (local) tl.from(local, { duration: 0.8, opacity: 0, ease: 'expo.out' }, dark ? 'pair2' : 0.5);
 
     qsa('[data-tabs="wrapper"]').forEach(initTabs);
   }
