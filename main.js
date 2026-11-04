@@ -2094,18 +2094,20 @@
       return true;
     };
 
-    // ---- the old hero's move, as Rimbo wants it now: the band stays, the copy is not pinned. It rides
-    // the page scroll (the spacer scrolls, the copy moves up with it) and, sitting behind the stage,
-    // slides away behind the panels; the next section then covers the band. Off-screen, the clips pause.
+    // ---- the old hero's move, as on the old home: the section stays pinned (band and copy), and the
+    // moment the visitor scrolls the copy fades and blurs away in place, while the next section rides
+    // up over the band. Off-screen, the hero hides and its clips pause until the visitor comes back.
     var spacer = qs('[data-band-spacer]');
     var fadeBehind = function () {
-      if (!spacer || !window.ScrollTrigger || !copy) return;
-      gsap.to(copy, { y: function () { return -spacer.offsetHeight; }, ease: 'none', scrollTrigger: {
-        trigger: spacer, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true,
+      if (!spacer || !window.ScrollTrigger) return;
+      var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
+      if (copy) gsap.to(copy, { opacity: 0, filter: 'blur(10px)', y: -18, ease: 'power1.out', scrollTrigger: { trigger: spacer, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+      if (scrollLine) gsap.to(scrollLine, { opacity: 0, ease: 'none', scrollTrigger: { trigger: spacer, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+      ScrollTrigger.create({
+        trigger: spacer, start: 'top top', end: 'bottom top',
         onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
         onEnterBack: function () { hidden = false; hero.style.visibility = ''; tune(); }
-      } });
-      if (scrollLine) gsap.to(scrollLine, { opacity: 0, ease: 'none', scrollTrigger: { trigger: spacer, start: 'top top', end: '25% top', scrub: true } });
+      });
     };
 
     // ---- the curve (experiment): with ?curve=N (or data-band-curve="N" on the section) the panels
