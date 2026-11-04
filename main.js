@@ -719,9 +719,12 @@
   // RESOURCES — /resources (was Slater 37087 RESOURCES.js)
   // =========================================================
   function rdResources() {
-    gsap.timeline()
-      .from(split('#HeroTitle').chars, { duration: 0.6, ease: 'expo.out', yPercent: 100, stagger: 0.03 })
-      .from(byId('First_content'), { opacity: 0, filter: 'blur(5px)', duration: 0.6 }, '<50%');
+    // the new header (.rs-title / .rs-tools) or the old one (#HeroTitle / #First_content)
+    var title = qs('.rs-title') || byId('HeroTitle');
+    var tools = qs('.rs-tools') || byId('First_content');
+    var tl = gsap.timeline();
+    if (title) tl.from(split(title).chars, { duration: 0.6, ease: 'expo.out', yPercent: 100, stagger: 0.03 });
+    if (tools) tl.from(tools, { opacity: 0, filter: 'blur(5px)', duration: 0.6 }, title ? '<50%' : 0);
     run('resources filter', rdMultiFilter);
     run('queued reveal', rdQueuedReveal);
   }
@@ -785,7 +788,10 @@
         if (!collectors.length) return;
         var seen = new Set(), tokens = [];
         collectors.forEach(function (c) {
+          // ours: an empty attribute takes the element's text as a slug ("UI/UX Design" → "ui-ux-design"),
+          // because Webflow can't bind an Option field to an attribute
           var v = (c.getAttribute('data-filter-name-collect') || '').trim().toLowerCase();
+          if (!v) v = (c.textContent || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
           if (v && !seen.has(v)) { seen.add(v); tokens.push(v); }
         });
         if (tokens.length) item.setAttribute('data-filter-name', tokens.join(' '));
