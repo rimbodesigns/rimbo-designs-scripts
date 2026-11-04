@@ -2515,6 +2515,7 @@
         });
         updateActiveUI(activeSlideIndex);
       };
+      container._radialSliderRender = render; // for rdBand: the wheel's roll-in, drift and scroll turn go through the proxy + this
 
       controls.forEach(btn => {
         btn.disabled = false;
@@ -2909,20 +2910,26 @@
       if (qs('[data-spatial-slider-init]', hero)) initSpatialCardsSlider();
     };
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // ---- the stepped auto-advance on the spatial slider (home-v4; Rimbo: "a 1, 2, 3, 4, 5 switch"): every few
-    // seconds the slider moves one card on, as if Next were pressed on a timer. It goes through the slider's own
-    // Next control: a hidden button added before Osmo's init, which wires it like any other control (and again
-    // after a width change), so each step is the slider's own click tween. ?step=N (or data-band-step="N" on the
-    // section) sets the seconds per step, 0 switches it off; off under prefers-reduced-motion. Clock: autoStep below.
-    var slider = band ? null : qs('[data-spatial-slider-init]', hero);
-    var stepEvery = parseFloat((/[?&]step=([\d.]+)/.exec(location.search) || [])[1]);
-    if (isNaN(stepEvery)) stepEvery = parseFloat(hero.getAttribute('data-band-step'));
-    if (isNaN(stepEvery)) stepEvery = 3.5;
+    // ---- the stepped auto-advance on an Osmo slider (home-v4's spatial arc; Rimbo: "a 1, 2, 3, 4, 5 switch"; the
+    // home-v3 wheel can run it too): every few seconds the slider moves one card on, as if Next were pressed on a
+    // timer. It goes through the slider's own Next control: a hidden button added before Osmo's init, which wires it
+    // like any other control (and again after a width change), so each step is the slider's own click tween. ?step=N
+    // (or data-band-step="N" on the section) sets the seconds per step, 0 switches it off (the wheel's default: it
+    // drifts instead, below); off under prefers-reduced-motion. Clock: autoStep below.
+    var slider = band ? null : (qs('[data-spatial-slider-init]', hero) || qs('[data-radial-slider-init]', hero));
+    var kind = slider && slider.hasAttribute('data-radial-slider-init') ? 'radial' : 'spatial'; // which Osmo slider: its data- attributes, and the handles its init leaves on the root
+    var wheel = kind === 'radial' ? slider : null;
+    var param = function (name, attr, fallback) { // ?name=N on the URL, else data-band-attr="N" on the section, else the default
+      var v = parseFloat((new RegExp('[?&]' + name + '=(-?[\\d.]+)').exec(location.search) || [])[1]);
+      if (isNaN(v)) v = parseFloat(hero.getAttribute('data-band-' + attr));
+      return isNaN(v) ? fallback : v;
+    };
+    var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
     var stepNext = null;
     if (slider && stepEvery > 0 && !reduced) {
       stepNext = document.createElement('button');
       stepNext.type = 'button'; stepNext.tabIndex = -1;
-      stepNext.setAttribute('data-spatial-slider-control', 'next'); stepNext.setAttribute('aria-hidden', 'true');
+      stepNext.setAttribute('data-' + kind + '-slider-control', 'next'); stepNext.setAttribute('aria-hidden', 'true');
       stepNext.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;overflow:hidden;pointer-events:none';
       slider.appendChild(stepNext);
     }
@@ -2940,18 +2947,64 @@
     // after a hand has let go or the pointer has left.
     var autoStep = function () {
       if (!stepNext) return;
-      var zone = qs('[data-spatial-slider-collection]', slider) || slider, over = false;
+      var zone = qs('[data-' + kind + '-slider-collection]', slider) || slider, over = false;
       zone.addEventListener('pointerenter', function () { over = true; });
       zone.addEventListener('pointerleave', function () { over = false; });
       var wait = stepEvery * 1000, due = performance.now() + wait;
       setInterval(function () {
-        var d = slider._spatialSliderDraggable, now = performance.now();
+        var d = slider['_' + kind + 'SliderDraggable'], now = performance.now();
         var held = over || hidden || document.hidden || (d && (d.isPressed || d.isDragging || d.isThrowing));
         if (held) { due = now + wait; return; }
         if (now < due) return;
         due = now + wait;
         stepNext.click();
       }, 200);
+    };
+
+    // ---- the wheel (home-v3, Osmo's radial slider): three turns on top of Osmo's drag, all through the slider's
+    // own proxy and render (turn below), so a hand on the wheel always wins and the layout maths stays Osmo's.
+    //   roll-in  the opening: the wheel waits turned back by N degrees and rolls to rest while the title rises
+    //            (?rollin=N / data-band-rollin, default 90; 0 = off)
+    //   drift    at rest the wheel keeps turning, N degrees a second, so the next card drifts into the middle every
+    //            few seconds; it holds while the pointer is over the cards, during a drag or its throw, during a
+    //            step or the roll-in, in a hidden tab or once the hero has scrolled away, and eases back up to speed
+    //            after (?drift=N / data-band-drift, default 3; 0 = off)
+    //   spin     scrolling the hero away turns the wheel N degrees over that first screen, so it rolls out under the
+    //            copy and rolls back on the way up (?spin=N / data-band-spin, default 24; 0 = off)
+    // All three are off under prefers-reduced-motion.
+    var rollIn = wheel ? param('rollin', 'rollin', 90) : 0, drift = wheel ? param('drift', 'drift', 3) : 0, spin = wheel ? param('spin', 'spin', 24) : 0;
+    if (reduced) rollIn = drift = spin = 0;
+    var wheelHeld = function () { var d = wheel && wheel._radialSliderDraggable; return !d || d.isPressed || d.isDragging || d.isThrowing; };
+    var turn = function (deg) { // turn the wheel by deg from outside a drag: the proxy moves, the Draggable syncs to it, the cards follow
+      var d = wheel && wheel._radialSliderDraggable, proxy = wheel && wheel._radialSliderProxy, render = wheel && wheel._radialSliderRender;
+      if (!d || !proxy || !render) return;
+      gsap.set(proxy, { rotation: (parseFloat(gsap.getProperty(proxy, 'rotation')) || 0) + deg });
+      d.update(); render();
+    };
+    var wheelOver = false;
+    if (wheel) {
+      var wzone = qs('[data-radial-slider-collection]', wheel) || wheel;
+      wzone.addEventListener('pointerenter', function () { wheelOver = true; });
+      wzone.addEventListener('pointerleave', function () { wheelOver = false; });
+      wzone.addEventListener('pointerdown', function () { if (wheel._radialSliderProxy) gsap.killTweensOf(wheel._radialSliderProxy); }, true); // a hand on the wheel ends the roll-in or a step where it is
+    }
+    var rollWheelIn = function () { // called by the opening: the wheel is already turned back; this rolls it to rest
+      var proxy = wheel && wheel._radialSliderProxy, d = wheel && wheel._radialSliderDraggable, render = wheel && wheel._radialSliderRender;
+      if (!rollIn || !proxy || !d || !render) return;
+      // a long, even slow-down: the stage itself fades in over its first 1.2 s, so a quick ease would be over before the wheel is seen
+      gsap.to(proxy, { rotation: 0, duration: 3.6, delay: 0.15, ease: 'power2.out', onUpdate: render, onComplete: function () { d.update(); render(); } });
+    };
+    var startDrift = function () {
+      if (!wheel || !drift) return;
+      var v = 0; // degrees a second right now, easing towards drift or 0
+      gsap.ticker.add(function (t, dt) {
+        var proxy = wheel._radialSliderProxy;
+        var want = (wheelOver || hidden || document.hidden || wheelHeld() || (proxy && gsap.isTweening(proxy))) ? 0 : drift;
+        v += (want - v) * Math.min(1, dt / 1000 * (want ? 1.5 : 6)); // up to speed in about a second and a half, off within a beat
+        if (Math.abs(v) < 0.01) { v = 0; return; }
+        if (wheelHeld()) return;
+        turn(-v * dt / 1000);
+      });
     };
 
     // ---- clips: play every video once (the marquee clones the row after this; re-touching a running video makes it hiccup)
@@ -3183,6 +3236,10 @@
     var fadeBehind = function () {
       if (!window.ScrollTrigger) return;
       var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
+      if (wheel && spin) { // the wheel turns with the scroll: spin degrees over the first screen, back again on the way up
+        var spun = 0;
+        ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
+      }
       if (copy) {
         gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
         // pinned while it blurs (Rimbo, 4 Nov): the copy rides the scroll back exactly as the hero moves up, so it
@@ -3261,12 +3318,14 @@
       // home-v4 (Rimbo): the copy first, then the cards. The stage keeps its own rise (the Designer's is-ready
       // transition) but starts it once the title is nearly in, with every frame empty; then each clip grows
       // from one pixel at the centre of its frame to fill it, the middle card first and the rest following outward.
-      var cardsAfter = !!slider && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      // The wheel (home-v3) does not wait: it rolls in with the reveal instead (rollWheelIn above).
+      var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      if (rollIn && wheel && wheel._radialSliderProxy) { turn(-rollIn); rollWheelIn(); }
       [cardsAfter ? null : stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
         if (scrollLine) scrollLine.classList.add('is-ready');
-        autoStep();
+        autoStep(); startDrift();
         nav.forEach(function (el) { gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out', clearProps: 'opacity' }); });
         // the reveal transitions have run; hand the elements to the scroll fade
         setTimeout(function () { if (copy) copy.style.transition = 'none'; fadeBehind(); }, 1900);
