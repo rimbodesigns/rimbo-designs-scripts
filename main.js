@@ -3390,17 +3390,19 @@
       } else {
         tl = gsap.timeline({ onComplete: function () {
           gsap.set(tile, { visibility: 'hidden' });
-          gsap.set(links, { yPercent: 110, rotate: 4 }); // ready to rise from below next time
+          gsap.set(links, { rotate: 4 }); // ready to rise from below next time
         } });
-        tl.to(links, { yPercent: -110, rotate: 0, duration: 0.55, ease: 'power3.in', stagger: { each: 0.05, from: 'end' } }, 0)
+        // the words sink back down into their masks (going up would pull the hover copy, the text-shadow under
+        // each word, through the mask); bottom word first, so the stack empties from below
+        tl.to(links, { yPercent: 110, rotate: 0, duration: 0.5, ease: 'power2.in', stagger: { each: 0.04, from: 'end' } }, 0)
           .to(bottom, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0);
         if (mode === 'blur') {
-          tl.to(tile, { opacity: 0, duration: 0.5, ease: 'power2.inOut' }, 0.3);
+          tl.to(tile, { opacity: 0, duration: 0.5, ease: 'power2.inOut' }, 0.35);
           tl.add(function () { edge.p = 0; });
         } else {
           edge.dir = -1;
-          tl.add(draw, 0.3)
-            .to(edge, { p: 0, duration: 0.85, ease: 'power3.inOut', onUpdate: draw }, 0.3);
+          tl.add(draw, 0.35) // the tile only lifts once the words are nearly gone, so its edge never cuts through them
+            .to(edge, { p: 0, duration: 0.85, ease: 'power3.inOut', onUpdate: draw }, 0.35);
         }
       }
     }
