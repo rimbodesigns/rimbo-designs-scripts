@@ -2,7 +2,6 @@
    button (Webflow class + main.js). Type and colours follow prototype/v2/prototype.css. */
 
 @font-face { font-family: "RM MONO"; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "GRIFTER BOLD"; src: url(https://webflow-files-prod.global.ssl.fastly.net/5b9ab5ab7d8a747bcc7b3216/fonts/6ac939cf87b6b0af62472c5a-grifter-bold.woff2) format("woff2"); font-weight: 700; font-display: swap; }
 
 :root {
   --color--black: #0c0c0c;
@@ -44,38 +43,23 @@ body { min-height: 100svh; display: flex; flex-direction: column; font-family: "
 /* a split label: one span per character; the space keeps its width */
 .lab-ch { display: inline-block; will-change: transform; }
 
-/* ---- 02 stop motion: the Osmo button from the old home, re-coloured for the dark site ---- */
+/* ---- 02 stop motion: the Osmo button from the old home, re-coloured for the dark site, mono label ---- */
 .lab-stack { display: inline-flex; flex-direction: column; align-items: flex-start; }
 [data-concept="stop"] .lab-stage { align-items: flex-start; align-content: center; }
-[data-concept="magnet"] .lab-stage { gap: 1.5rem; }
+[data-concept="magnet"] .lab-stage, [data-concept="magnetswap"] .lab-stage, [data-concept="all"] .lab-stage { gap: 1.5rem; }
 .lab-btn.is-hover { z-index: 1; }
-.lab-sm { padding: .8em 1em .72em; border: 0; border-radius: 0; font-family: "GRIFTER BOLD", sans-serif; font-size: 1rem; letter-spacing: 0; text-transform: none; color: #efeeec; gap: .2em; }
+.lab-sm { border: 0; border-radius: 0; padding: .95em 1.25em; gap: .5em; color: var(--color--rimbobage); }
 .lab-sm_back { position: absolute; inset: 0; overflow: hidden; }
 .lab-sm_back svg { position: absolute; left: 0; top: 0; width: 300%; height: 100%; }
 .lab-sm_back path { fill: #1f1f1f; stroke: rgba(248, 245, 238, .32); stroke-width: 1.25; }
 .lab-sm.is-secondary .lab-sm_back path { fill: transparent; stroke: rgba(248, 245, 238, .28); }
-.lab-sm.is-secondary { color: rgba(248, 245, 238, .78); }
-.lab-sm_icon { position: relative; flex: none; width: 1.3em; height: 1.3em; overflow: hidden; color: var(--color--rimbobage); margin: 0 -.05em; }
+.lab-sm.is-secondary { color: rgba(248, 245, 238, .8); }
+.lab-sm_icon { position: relative; flex: none; width: 1.5em; height: 1.5em; margin: -.25em -.1em; overflow: hidden; color: var(--color--rimbobage); }
 .lab-sm_icon svg { position: absolute; left: 0; top: 0; height: 100%; width: auto; fill: currentColor; }
-.lab-sm_p { position: relative; padding: .18em .15em 0; }
+.lab-sm_p { position: relative; }
 .lab-spots { margin: .7rem 0 0 .55rem; display: flex; align-items: center; gap: .6em; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; color: var(--color--text-on-black); white-space: nowrap; }
 .lab-spots i { width: .32rem; height: .32rem; border-radius: 50%; background: var(--color--brand); box-shadow: 0 0 .45rem rgba(255, 115, 115, .6); }
 
-/* ---- 04 frame wipe: the fill is clipped frame by frame; the label inverts over it (difference, isolated to the button) ---- */
-.lab-wipe { isolation: isolate; }
-.lab-wipe.is-solid, .lab-wipe.is-ghost { border-color: var(--color--rimbobage); }
-.lab-wipe.is-ghost { border-color: rgba(248, 245, 238, .5); }
-.lab-wipe .lab-t, .lab-wipe .lab-arrow { position: relative; z-index: 1; color: var(--color--rimbobage); mix-blend-mode: difference; }
-.lab-wipe_fill { position: absolute; inset: 0; background: var(--color--rimbobage); clip-path: inset(0 100% 0 0); }
-.lab-wipe_fill.is-dark { background: var(--color--black); }
-
-/* ---- 05 label swap: both lines share one mask so the button keeps its width ---- */
+/* ---- 04 label swap: both lines share one mask so the button keeps its width ---- */
 .lab-swap { display: inline-grid; justify-items: center; overflow: hidden; padding: .15em .5em .15em 0; margin: -.15em -.5em -.15em 0; } /* room on the right for the arrow nudge */
 .lab-swap_a, .lab-swap_b { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: .7em; white-space: nowrap; }
-
-/* ---- 06 underline ---- */
-.lab-btn.is-text { padding: .55em 0; border: 0; border-radius: 0; color: var(--color--text-on-black); transition: color .35s; }
-.lab-btn.is-text.is-primary, .lab-btn.is-text.is-hover { color: var(--color--rimbobage); }
-.lab-line, .lab-line_rest { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: currentColor; }
-.lab-line { transform: scaleX(0); transform-origin: left center; }
-.lab-line_rest { opacity: .22; }
