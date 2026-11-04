@@ -730,6 +730,53 @@
     run('resources filter', rdMultiFilter);
     run('queued reveal', rdQueuedReveal);
     run('language toggle', rdLangToggle);
+    run('chip boil', rdChipBoil);
+  }
+
+  // The filter chips borrow button 06's stop-motion boil (rdButtons): while the mouse is on a chip, every
+  // letter cycles through three hand-placed poses at 9 fps, set frame by frame like drawn frames; on leave
+  // they settle back. No label swap, no magnet. Mouse only (a tap would leave it boiling), off for reduced motion.
+  function rdChipBoil() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var rnd = gsap.utils.random;
+    var FPS = 9;
+    qsa('.rs-chip, .rs-reset, [data-boil]').forEach(function (btn) {
+      if (btn.hasAttribute('data-boil-ready')) return;
+      var label = qs('span', btn) || btn;
+      var chars = Array.from(label.textContent).map(function (ch) {
+        var c = document.createElement('span');
+        c.className = 'rs-ch';
+        c.style.display = 'inline-block';
+        c.textContent = ch === ' ' ? '\u00a0' : ch;
+        return c;
+      });
+      btn.setAttribute('aria-label', label.textContent.trim());
+      label.textContent = '';
+      chars.forEach(function (c) { c.setAttribute('aria-hidden', 'true'); label.appendChild(c); });
+      btn.setAttribute('data-boil-ready', '');
+      var poses = chars.map(function () {
+        return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; });
+      });
+      gsap.set(chars, { transformOrigin: '50% 55%' });
+      var running = false, last = -1, t0 = 0;
+      function tick() {
+        var f = Math.floor((gsap.ticker.time - t0) * FPS);
+        if (f === last) return;
+        last = f;
+        chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
+      }
+      btn.addEventListener('pointerenter', function (e) {
+        if (e.pointerType !== 'mouse' || running) return;
+        running = true; last = -1; t0 = gsap.ticker.time;
+        gsap.ticker.add(tick);
+      });
+      btn.addEventListener('pointerleave', function () {
+        if (!running) return;
+        running = false;
+        gsap.ticker.remove(tick);
+        gsap.to(chars, { x: 0, y: 0, rotation: 0, duration: 0.35, ease: 'power3.out', overwrite: 'auto' });
+      });
+    });
   }
 
   // Language toggle, after Osmo's Toggle Switch: a pill slides under the current language. Here the buttons
