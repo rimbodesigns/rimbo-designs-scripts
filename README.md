@@ -19,6 +19,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdGlobal` | every page | 35206 GLOBAL.js |
 | `rdFormValidation` | every page | 39499 FORM CODE.js |
 | `rdMenu` | every page | new: the burger menu's links rise in letter by letter |
+| `rdButtons` | every page | new: the global button (`.btn`, `.btn.is-secondary`) from the button lab's winner: magnetic, label swap from `data-btn-alt`, the boil |
 | `rdLenis` | every page | the inline Lenis block in the Webflow footer |
 | `rdHome` | `/`, `/home-copy` (redesign test page) | 35211 HOME.js |
 | `rdService` | `/service`, `/locations/…` | 35312 SERVICE.js |
