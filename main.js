@@ -4602,7 +4602,7 @@
     }
     var here = clean(location.pathname);
     var skip = [prefix || '/', here];
-    if (here === prefix + '/home-copy') skip.push(prefix || '/');
+    if (/^\/home-(copy|v\d+)$/.test(here.replace(prefix, ''))) skip.push(prefix || '/'); // a home exploration page is the home: no Home link
 
     var source = qsa('.pop-up_nav_menu .nav_link');
     var items = (source.length ? source.map(function (a) {
@@ -4835,7 +4835,7 @@
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
-  var navFull = path === '/home-copy' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go
+  var navFull = path === '/home-copy' || path === '/home-v4' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov)
   if (navFull) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
   if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
   run('band', rdBand);   // builds the home-opening rows before the marquees start
