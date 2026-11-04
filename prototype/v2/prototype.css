@@ -11,7 +11,7 @@
 .v2-hero { position: relative; height: 100svh; min-height: 36rem; overflow: hidden; background: var(--color--black); color: var(--color--rimbobage); }
 .v2-hero_stage { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 50% 45%; }
 /* the band falls to the right (like the Figma), which leaves the top-right corner for the copy and the bottom-left for the hint */
-.v2-band { position: absolute; left: 50%; top: 50%; width: 250vw; transform: translate(-50%, -50%) translateY(10vw) rotateX(56deg) rotateZ(27deg); transform-style: flat; backface-visibility: hidden; display: grid; gap: 1.5vw; }
+.v2-band { position: absolute; left: 50%; top: 50%; width: 250vw; --tilt-x: 0deg; --tilt-z: 0deg; transform: translate(-50%, -50%) translateY(10vw) rotateX(calc(56deg + var(--tilt-x))) rotateZ(calc(27deg + var(--tilt-z))); transform-style: flat; backface-visibility: hidden; display: grid; gap: 1.5vw; }
 .v2-band_edge { display: flex; overflow: visible; margin-bottom: .2vw; }
 .v2-band_edge .v2-row_list { gap: 0; }
 .v2-edge_name { flex: none; font-family: "RM MONO", monospace; font-size: .72vw; letter-spacing: .22em; text-transform: uppercase; color: var(--color--text-on-black); padding-right: 3vw; white-space: nowrap; }
@@ -19,10 +19,18 @@
 .v2-row { overflow: visible; }
 .v2-row_scroll { display: flex; }
 .v2-row_list { display: flex; flex-shrink: 0; gap: 1.5vw; padding-right: 1.5vw; will-change: transform; }
-.v2-panel { position: relative; display: block; flex: none; width: 20vw; aspect-ratio: 1.02; border-radius: .4vw; overflow: hidden; background: #161616; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); }
+.v2-panel { position: relative; display: block; flex: none; width: 20vw; aspect-ratio: 1.02; border-radius: .4vw; overflow: hidden; background: #161616; box-shadow: 0 2vw 4vw rgba(0, 0, 0, .55); transition: transform .6s cubic-bezier(.625, .05, 0, 1), box-shadow .6s cubic-bezier(.625, .05, 0, 1); }
+.v2-panel:hover { transform: translateY(-1.2vw) scale(1.035); box-shadow: 0 3vw 5vw rgba(0, 0, 0, .7); z-index: 2; }
+.v2-panel_media { transition: filter .6s; }
+.v2-panel:hover .v2-panel_media { filter: brightness(1.08); }
 .v2-panel_media { width: 100%; height: 100%; object-fit: cover; display: block; }
 .v2-panel_label { position: absolute; left: .9vw; bottom: .8vw; font-family: "RM MONO", monospace; font-size: .62vw; letter-spacing: .16em; text-transform: uppercase; color: var(--color--rimbobage); opacity: 0; transition: opacity .3s; }
 .v2-panel:hover .v2-panel_label { opacity: 1; }
+
+/* the left edge: the far end of the band goes out of focus and into the dark */
+.v2-edgeblur { position: absolute; left: 0; top: 0; bottom: 0; width: 34%; z-index: 1; pointer-events: none; -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px); -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, .85) 30%, rgba(0, 0, 0, .35) 65%, transparent 100%); mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, .85) 30%, rgba(0, 0, 0, .35) 65%, transparent 100%); }
+.v2-edgeblur::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to right, var(--color--black) 0%, rgba(12, 12, 12, .55) 40%, transparent 100%); }
+html.v2-noblur .v2-edgeblur { display: none; }
 
 /* a soft fall-off at the top and bottom so the band comes out of the dark */
 .v2-hero_stage::before, .v2-hero_stage::after { content: ""; position: absolute; left: 0; right: 0; height: 22%; pointer-events: none; z-index: 1; }
@@ -40,10 +48,10 @@
 .v2-btn_a { display: inline-block; transition: transform .5s cubic-bezier(.625, .05, 0, 1); }
 .v2-btn:hover .v2-btn_a { transform: translateX(.35em); }
 /* a: ghost pill, barely there, fills on hover */
-.v2-links.is-a .v2-btn { padding: .95em 1.4em; border-radius: 10em; border: 1px solid rgba(248, 245, 238, .18); }
+.v2-links.is-a .v2-btn { padding: .95em 1.4em; border-radius: .3em; border: 1px solid rgba(248, 245, 238, .18); }
 .v2-links.is-a .v2-btn:hover { background: var(--color--rimbobage); color: var(--color--black); border-color: var(--color--rimbobage); }
 /* b: one solid, one ghost */
-.v2-links.is-b .v2-btn { padding: .95em 1.4em; border-radius: 10em; border: 1px solid rgba(248, 245, 238, .18); }
+.v2-links.is-b .v2-btn { padding: .95em 1.4em; border-radius: .3em; border: 1px solid rgba(248, 245, 238, .18); }
 .v2-links.is-b .v2-btn:not(.is-second) { background: var(--color--rimbobage); color: var(--color--black); border-color: var(--color--rimbobage); box-shadow: 0 0 1.2rem rgba(248, 245, 238, .18); transition: background .35s, color .35s, border-color .35s, box-shadow .6s cubic-bezier(.625, .05, 0, 1), transform .6s cubic-bezier(.625, .05, 0, 1); }
 .v2-links.is-b .v2-btn:not(.is-second):hover { box-shadow: 0 0 2.2rem rgba(248, 245, 238, .4), 0 0 .6rem rgba(248, 245, 238, .3); transform: translateY(-1px); }
 .v2-links.is-b .v2-btn.is-second:hover { border-color: rgba(248, 245, 238, .6); }
@@ -70,7 +78,6 @@
   .v2-hero_copy::before { display: none; }
   .v2-title { font-size: clamp(2.2rem, 9vw, 4rem); }
 }
-}
 
-/* test switches: ?nograin hides the grain, ?noclips shows covers only (see prototype.js) */
+/* test switches: ?nograin hides the grain, ?noclips shows covers only, ?noblur drops the edge blur (see prototype.js) */
 html.v2-nograin .grain { display: none !important; }
