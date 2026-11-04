@@ -31,7 +31,7 @@ const slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/
   html = html.replace(/ fs-cmsfilter-field="BlogType"/g, '');
   html = html.replace(/ fs-cmsfilter-element="list" fs-countitems-element="list"/, '');
   html = html.replace('id="bloglist"', 'id="bloglist" data-queued-reveal-group=""'); // Osmo queued reveal, on each card's link
-  html = html.replace(/<a href="(\/post\/[^"]+)" class="blog_container/g, '<a data-queued-reveal-item="" href="$1" class="blog_container');
+  html = html.replace(/(role="listitem" data-filter-name="")/g, 'data-queued-reveal-item="" $1'); // on the shadowed card itself
   html = html.replace('<div class="main-wrapper">', '<div data-filter-group="" data-filter-target-match="multi" data-filter-name-match="multi" role="group" class="main-wrapper">');
 
   // the tags that exist, in the order of the old filter

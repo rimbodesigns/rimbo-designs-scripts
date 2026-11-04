@@ -745,7 +745,7 @@
       if (!items.length) return;
       items.forEach(function (item) {
         if (item.getBoundingClientRect().bottom <= 0) return;
-        gsap.set(item, { autoAlpha: 0, y: '4em' }); // hidden state on load
+        gsap.set(item, { autoAlpha: 0, y: '4em', transition: 'none' }); // hidden state on load (ours: no CSS transition fighting the tween)
         var entry = { item: item, st: null };
         waiting.push(entry);
         entry.st = ScrollTrigger.create({
@@ -772,16 +772,21 @@
       ScrollTrigger.refresh();
       waiting.slice().forEach(function (entry) {
         var r = entry.item.getBoundingClientRect();
-        if (r.width && r.top < window.innerHeight && r.bottom > 0) {
+        if (r.width && r.top < window.innerHeight && r.bottom > 0 && !filteredOut(entry.item)) {
           if (entry.st) entry.st.kill();
           enqueue(entry);
         }
       });
     });
 
+    // ours: a card the filter has hidden stays hidden; it just drops the reveal's inline styles
+    function filteredOut(item) {
+      return !!item.closest('[data-filter-status="not-active"], [data-filter-status="transition-out"]');
+    }
     function reveal(item) {
+      if (filteredOut(item)) { gsap.set(item, { clearProps: 'opacity,visibility,transform,transition' }); return; }
       gsap.to(item, { autoAlpha: 1, duration: 1.2, ease: 'power1.out', clearProps: 'opacity, visibility' });
-      gsap.to(item, { y: '0em', duration: 1.2, ease: 'expo.out', clearProps: 'transform' });
+      gsap.to(item, { y: '0em', duration: 1.2, ease: 'expo.out', clearProps: 'transform,transition' });
     }
     function revealNext() {
       var item = queue.shift();
