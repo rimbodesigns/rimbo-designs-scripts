@@ -2377,15 +2377,22 @@
     };
 
     // ---- the curve (experiment): with ?curve=N (or data-band-curve="N" on the section) the panels
-    // sit on an arc instead of a straight line: each recedes (translateZ) and turns (rotateY) by N
-    // degrees per panel of distance from the band's centre, with its own perspective(), so the band
-    // stays one flat layer. The ends always go back (coming forward puts a panel in the camera);
-    // negative N only flips which way the panels face.
+    // leave the straight line by N degrees per panel of distance from the band's centre, each with its own
+    // perspective(), so the band stays one flat layer. ?flat=F keeps the middle F panels either side of the
+    // centre straight, so only the ends bend. ?bend= picks the shape (or data-band-bend):
+    //   cyl   (default) the ends turn and go back, like a band over a drum
+    //   flare the ends turn and come forward, towards the camera (capped well short of it)
+    //   s     one end goes back and the other comes forward: an S in depth
+    //   plane the band bends within its own plane, like an S drawn on the table
+    // A negative N flips the direction of whichever shape.
     curve = parseFloat((/[?&]curve=(-?[\d.]+)/.exec(location.search) || [])[1]);
     if (isNaN(curve)) curve = parseFloat(hero.getAttribute('data-band-curve')) || 0;
+    var flat = parseFloat((/[?&]flat=([\d.]+)/.exec(location.search) || [])[1]);
+    if (isNaN(flat)) flat = parseFloat(hero.getAttribute('data-band-flat')) || 0;
+    var bendMode = (/[?&]bend=(\w+)/.exec(location.search) || [])[1] || hero.getAttribute('data-band-bend') || 'cyl';
     if (curve && !reduced) {
       var crow = qs('.band_row:not(.is-names)', hero), cscroll = crow && qs('[data-marquee-scroll-target]', crow);
-      var persp = 1400, sign = curve < 0 ? -1 : 1, step = Math.abs(curve);
+      var persp = 1400, sign = curve < 0 ? -1 : 1, step = Math.abs(curve), zCap = persp * 0.35;
       var bend = function () {
         if (cscroll && !hidden && !narrow()) {
           var center = band.offsetWidth / 2, sx = parseFloat(gsap.getProperty(cscroll, 'x')) || 0;
@@ -2393,11 +2400,16 @@
             var lx = list.offsetLeft + (parseFloat(gsap.getProperty(list, 'xPercent')) || 0) / 100 * list.offsetWidth + sx;
             qsa('.band_panel', list).forEach(function (pnl) {
               var pitch = pnl.offsetWidth * 1.0625;
-              var theta = Math.max(-70, Math.min(70, (lx + pnl.offsetLeft + pnl.offsetWidth / 2 - center) / pitch * step));
-              var R = pitch / Math.sin(step * Math.PI / 180);
-              var z = -R * (1 - Math.cos(theta * Math.PI / 180));
+              var d = (lx + pnl.offsetLeft + pnl.offsetWidth / 2 - center) / pitch, dir = d < 0 ? -1 : 1;
+              var u = dir * Math.max(0, Math.abs(d) - flat);
+              var theta = Math.max(-70, Math.min(70, u * step)), rad = theta * Math.PI / 180;
+              var R = pitch / Math.sin(step * Math.PI / 180), arc = R * (1 - Math.cos(rad)), tf;
+              if (bendMode === 'flare') tf = 'translateZ(' + Math.min(arc, zCap).toFixed(1) + 'px) rotateY(' + (sign * theta).toFixed(2) + 'deg)';
+              else if (bendMode === 's') tf = 'translateZ(' + (dir * sign * Math.min(arc, zCap)).toFixed(1) + 'px) rotateY(' + (-theta).toFixed(2) + 'deg)';
+              else if (bendMode === 'plane') tf = 'translateY(' + (-dir * sign * arc).toFixed(1) + 'px) rotateZ(' + (-sign * theta * 0.5).toFixed(2) + 'deg)';
+              else tf = 'translateZ(' + (-arc).toFixed(1) + 'px) rotateY(' + (-sign * theta).toFixed(2) + 'deg)';
               pnl.style.transition = 'box-shadow .6s';
-              pnl.style.transform = 'perspective(' + persp + 'px) translateZ(' + z.toFixed(1) + 'px) rotateY(' + (-sign * theta).toFixed(2) + 'deg)';
+              pnl.style.transform = 'perspective(' + persp + 'px) ' + tf;
             });
           });
         }
