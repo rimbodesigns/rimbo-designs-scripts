@@ -2330,6 +2330,14 @@
     }
     setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
 
+    // ---- a hidden tab costs nothing: every clip pauses the moment the page is hidden (a background tab,
+    // a minimised window) and the on-screen ones resume when it is shown again. Animation frames already
+    // sleep in a hidden tab, so the marquee, the clone canvases and the tilt stop by themselves.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) qsa('video', hero).forEach(function (v) { v.pause(); });
+      else if (!hidden) qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
+    });
+
     // ---- the name chip shows while the pointer rests on a panel; nothing lifts, nothing dims (Rimbo tried
     // both: the lift was not needed, the dimming flashed while switching panels and dragging).
     // Delegated, so the marquee's clones get it too.
