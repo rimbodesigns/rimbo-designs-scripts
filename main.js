@@ -3239,6 +3239,7 @@
       '.bold-nav-full__logo img { width: 100%; height: auto; display: block; }',
       '[data-navigation-status="active"] .bold-nav-full__logo { opacity: 0; pointer-events: none; }',
       '.bold-nav-full__hamburger { pointer-events: auto; color: #fff; cursor: pointer; background-color: #0000; justify-content: center; align-items: center; width: 3em; height: 3em; margin-right: -.5em; display: flex; position: relative; overflow: hidden; border: none; font: inherit; padding: 0; }',
+      '.bold-nav-full__hamburger:focus { outline: none; } .bold-nav-full__hamburger:focus-visible, .bold-nav-full__logo:focus-visible { outline: 1px solid #fff; outline-offset: 4px; border-radius: 2px; }',
       '.bold-nav-full__hamburger-bar { background-color: currentColor; width: 1.5em; height: .125em; position: absolute; transition: transform 0.5s ' + ease + '; }',
       '.bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(1, 1) rotate(0.001deg); }',
       '.bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(1, 1) rotate(0.001deg); }',
