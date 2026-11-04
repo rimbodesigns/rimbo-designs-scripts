@@ -1905,80 +1905,105 @@
   // =========================================================
 
   // =========================================================
-  // BAND — the new home opening on /home-copy: a band of work sliding by in perspective.
-  // The shell (section [data-band] with the stage, copy, scroll line and loader) is static in
-  // Webflow; this builds the three marquee rows into [data-band-rows] before initMarquees runs,
-  // then tilts the band with the pointer, lets it drag, plays the clips and runs the loader.
-  // Ported from prototype/v2/prototype.js (the local prototype keeps the switches and ranking tool).
+  // BAND — the home opening on /home-copy: a single band of work sliding by in perspective.
+  // Everything visible lives in the Designer: the fixed section [data-band] (the stage with the
+  // band [data-band-rows]: a names row and a panel row, both Osmo marquees with real <video>
+  // elements; the copy; the scroll line; the loader) and the spacer [data-band-spacer] that keeps
+  // the page's scroll room, like the old hero. Styles, breakpoints and hover states are Webflow
+  // styles. This adds the behaviour: clip tuning, one decoder per clip (the marquee clones every
+  // panel), the pointer tilt, dragging, the loader, the opening sequence, and the fade-behind on scroll.
   // =========================================================
-  var BAND_MEDIA = window.BAND_MEDIA_BASE || 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.1/media/'; // the local harness (prototype/band) sets BAND_MEDIA_BASE = '/media/'
-  var BAND_CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
-  var BAND_WORK = [ // the approved projects, in order (odd ranks on the upper row, even on the lower; Tinko between the two Echo panels)
-    { name: 'Echo Creative Agency', video: BAND_MEDIA + 'echo.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-a.jpg' },
-    { name: 'Digital Feng Shui', video: BAND_MEDIA + 'dfs-home-test.mp4', rate: 2, img: BAND_CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif' },
-    { name: 'Meet Tinko', video: BAND_MEDIA + 'tinko.mp4', rate: 1.5, img: BAND_MEDIA + 'tinko-cover.jpg' },
-    { name: 'Innergym', video: BAND_MEDIA + 'innergym.mp4', rate: 1.5, img: BAND_MEDIA + 'innergym-cover.jpg' },
-    { name: 'Echo Creative Agency · in use', video: BAND_MEDIA + 'echo-tour.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-hover.jpg' },
-    { name: "Charlie's Angels", video: BAND_MEDIA + 'charlies-angels.mp4', rate: 1.5, img: BAND_CDN + '6811f08989345b3409601f8b_Charlies_angels.avif' },
-    { name: 'Dieronesie', video: BAND_MEDIA + 'dieronesie.mp4', rate: 1.5, img: BAND_CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif' },
-    { name: 'Digital Feng Shui · course', video: BAND_MEDIA + 'dfs-home.mp4', rate: 1.5, img: BAND_MEDIA + 'dfs-course-cover.jpg' },
-    { name: 'Sandra Dreisbach', img: BAND_CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif' },
-    { name: 'Anapana', img: BAND_CDN + '6821a12565a36dfb5f0179c3_Anapana.avif' },
-    { name: 'Nathan Rajac', img: BAND_CDN + '67e3d914128c8952d1dd6523_Nathan4.avif' }
-  ];
-
-
   function rdBand() {
     var hero = qs('[data-band]');
-    var rowsHost = hero && qs('[data-band-rows]', hero);
-    if (!hero || !rowsHost) return;
+    var band = hero && qs('[data-band-rows]', hero);
+    var stage = hero && qs('.band_stage', hero);
+    if (!hero || !band) return;
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var narrow = function () { return window.innerWidth < 992; };
+    var copy = qs('.band_copy', hero), title = qs('.band_title', hero), eyebrow = qs('.band_eyebrow', hero);
+    var buttons = qsa('.btn', copy || hero), scrollLine = qs('.band_scroll', hero), loader = qs('.band_loader', hero);
+    var nav = [byId('FIXED_NAV'), qs('.burgermenu')].filter(Boolean);
+    var hidden = false;
 
-    // ---- rows: a project lives on ONE row (odd ranks up, even down; with an even count the last
-    // one goes up too, the far row shows more of itself). Along a row it repeats at a fixed distance.
-    var rowA = [], rowB = [];
-    BAND_WORK.forEach(function (w, i) { (i % 2 === 0 || (i === BAND_WORK.length - 1 && BAND_WORK.length % 2 === 0) ? rowA : rowB).push(w); });
-    function copies(len) { return len >= 6 ? 1 : (len >= 4 ? 2 : 3); } // the loop needs more content than the band is wide
-    function panel(w) {
-      var media = w.video
-        ? '<video class="band_panel-media" muted loop playsinline autoplay preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
-        : '<img class="band_panel-media" src="' + w.img + '" alt="" loading="eager" draggable="false">';
-      return '<div class="band_panel" aria-label="' + w.name + '">' + media + '<span class="band_panel-label">' + w.name + '</span></div>';
+    // ---- clips: play every video once (the marquee clones the row after this; re-touching a running video makes it hiccup)
+    function tune() {
+      qsa('video', hero).forEach(function (v) {
+        if (v.__tuned) return;
+        v.__tuned = true;
+        var rate = parseFloat(v.getAttribute('data-rate')) || 1.5;
+        v.muted = true; v.loop = true; v.playsInline = true;
+        var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
+        if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
+        if (v.paused && !hidden) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      });
     }
-    function row(items, direction, speed, cls, dup) {
-      return '<div class="band_row ' + (cls || '') + '" data-marquee-scroll-direction-target data-marquee-speed="' + speed + '" data-marquee-direction="' + direction + '" data-marquee-duplicate="' + (dup || 1) + '" data-marquee-scroll-speed="0">' +
-        '<div class="band_row-scroll" data-marquee-scroll-target><div class="band_row-list" data-marquee-collection-target>' + items.join('') + '</div></div></div>';
+    tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
+
+    // ---- one download and one decoder per clip: the clones' videos become canvases painted from the master video
+    function dedupeClips() {
+      var masters = {};
+      qsa('video', hero).forEach(function (v) {
+        var src = v.getAttribute('src');
+        if (!masters[src]) { masters[src] = v; return; }
+        var c = document.createElement('canvas');
+        c.className = v.className; c.setAttribute('aria-hidden', 'true');
+        c.width = 640; c.height = 627;
+        v.parentNode.replaceChild(c, v);
+        (masters[src].__canvases = masters[src].__canvases || []).push(c);
+      });
+      var painters = Object.keys(masters).map(function (k) { return masters[k]; }).filter(function (m) { return m.__canvases; });
+      if (!painters.length) return;
+      var paint = function () {
+        if (!hidden) painters.forEach(function (m) {
+          if (m.readyState < 2) return;
+          m.__canvases.forEach(function (c) {
+            if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
+            c.getContext('2d').drawImage(m, 0, 0);
+          });
+        });
+        requestAnimationFrame(paint);
+      };
+      requestAnimationFrame(paint);
     }
-    var names = BAND_WORK.map(function (w) { return '<span class="band_edge-name">' + w.name + '</span>'; });
-    rowsHost.innerHTML =
-      row(names, 'left', 55, 'band_edge') +
-      row(rowA.map(panel), 'left', 18 * rowA.length, '', copies(rowA.length)) +
-      row(rowB.map(panel), 'right', 19 * rowB.length, '', copies(rowB.length));
+    setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
 
-    var stage = qs('.band_stage', hero);
-    var band = rowsHost;
+    // ---- the name chip shows while the pointer rests on a panel (delegated: the clones get it too)
+    hero.addEventListener('mouseover', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p) { var l = qs('.band_panel-label', p); if (l) l.classList.add('is-on'); } });
+    hero.addEventListener('mouseout', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p && !p.contains(e.relatedTarget)) { var l = qs('.band_panel-label', p); if (l) l.classList.remove('is-on'); } });
 
-    // ---- the band tilts with the pointer (one flat layer, so this is one transform a frame)
+    // ---- the band tilts with the pointer: the Designer's transform is the resting pose; the script finds
+    // its two angles in the stylesheet and adds a few degrees (±5° around x, ±3.5° around z). Fine pointers, wide screens.
     if (!reduced && window.matchMedia('(pointer: fine)').matches) {
-      var tx = 0, tz = 0, gx = 0, gz = 0, raf = null;
+      var base = null, tx = 0, tz = 0, gx = 0, gz = 0, raf = null;
+      var rest = function () {
+        var rules = [].slice.call(document.styleSheets).reduce(function (acc, sh) { try { return acc.concat([].slice.call(sh.cssRules || [])); } catch (e) { return acc; } }, []);
+        var found = null;
+        rules.forEach(function (r) {
+          if (!r.selectorText || !/\.band_band(?![\w-])/.test(r.selectorText) || !r.style || !r.style.transform) return;
+          if (r.parentRule && r.parentRule.conditionText && !window.matchMedia(r.parentRule.conditionText).matches) return;
+          found = r.style.transform;
+        });
+        return found && /rotateX\(([-\d.]+)deg\)/.test(found) ? { str: found, x: +RegExp.$1, z: /rotateZ\(([-\d.]+)deg\)/.test(found) ? +RegExp.$1 : 0 } : null;
+      };
       var settle = function () {
         tx += (gx - tx) * 0.05; tz += (gz - tz) * 0.05;
-        band.style.setProperty('--tilt-x', tx.toFixed(3) + 'deg');
-        band.style.setProperty('--tilt-z', tz.toFixed(3) + 'deg');
+        if (base) band.style.transform = base.str.replace(/rotateX\([-\d.]+deg\)/, 'rotateX(' + (base.x + tx).toFixed(3) + 'deg)').replace(/rotateZ\([-\d.]+deg\)/, 'rotateZ(' + (base.z + tz).toFixed(3) + 'deg)');
         raf = (Math.abs(gx - tx) > 0.002 || Math.abs(gz - tz) > 0.002) ? requestAnimationFrame(settle) : null;
       };
       hero.addEventListener('mousemove', function (e) {
+        if (narrow()) return;
+        if (!base) base = rest();
         var r = hero.getBoundingClientRect();
         var nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-        gx = -ny * 10; gz = nx * 7; // ±5° around x, ±3.5° around z
+        gx = -ny * 10; gz = nx * 7;
         if (!raf) raf = requestAnimationFrame(settle);
       });
       hero.addEventListener('mouseleave', function () { gx = 0; gz = 0; if (!raf) raf = requestAnimationFrame(settle); });
+      window.addEventListener('resize', function () { base = null; band.style.transform = ''; });
     }
 
-    // ---- drag the band: a grab hand, all rows follow the pointer along the band, a flick keeps
-    // going and dies out; while held the rows' own motion eases to a stop and picks up after.
-    // The rows are the Osmo marquees from initMarquees: a looping xPercent tween per list.
+    // ---- drag the band: a grab hand, the rows follow the pointer along the band, a flick keeps going
+    // and dies out; while held the rows' own motion eases to a stop and picks up after.
     if (stage) {
       var dragRows = null, axis = null, lastX = 0, lastY = 0, lastT = 0, vel = 0, inertia = null, dragging = false;
       var rowsOf = function () {
@@ -1989,8 +2014,8 @@
           return { el: r, tween: tween, width: list ? list.offsetWidth : 0 };
         });
       };
-      var rowAxis = function (px, py) { // the band's x axis on screen near the pointer, and band px per screen px
-        var list = qs('.band_row:not(.band_edge) .band_row-list', hero);
+      var rowAxis = function (px, py) {
+        var list = qs('.band_row:not(.is-names) .band_row-list', hero);
         var ps = list ? list.children : [], best = -1, bd = Infinity;
         for (var i = 0; i < ps.length - 1; i++) {
           var c = ps[i].getBoundingClientRect(), d = Math.hypot(c.left + c.width / 2 - px, c.top + c.height / 2 - py);
@@ -2009,9 +2034,13 @@
           r.tween.progress(p - Math.floor(p));
         });
       };
+      var hold = function (on) { // no lift under a moving hand
+        qsa('.band_panel', hero).forEach(function (p) { p.style.transform = on ? 'none' : ''; });
+        hero.classList.toggle('is-dragging', on);
+      };
       var stop = function () {
         if (!dragging) return;
-        dragging = false; hero.classList.remove('is-dragging');
+        dragging = false; hold(false);
         var v = Math.max(-3, Math.min(3, vel)), prev = performance.now();
         var step = function (now) {
           var dt = Math.min(50, now - prev); prev = now;
@@ -2026,7 +2055,7 @@
         if (e.button !== 0) return;
         dragRows = rowsOf(); axis = rowAxis(e.clientX, e.clientY);
         if (!axis || !dragRows.some(function (r) { return r.tween; })) return;
-        dragging = true; hero.classList.add('is-dragging');
+        dragging = true; hold(true);
         try { stage.setPointerCapture(e.pointerId); } catch (err) {}
         lastX = e.clientX; lastY = e.clientY; lastT = e.timeStamp; vel = 0;
         if (inertia) { cancelAnimationFrame(inertia); inertia = null; }
@@ -2046,55 +2075,66 @@
       stage.addEventListener('lostpointercapture', stop);
     }
 
-    // ---- clips: the marquee clones the rows, so tune every video once (re-touching one makes it hiccup)
-    function tune() {
-      qsa('video', hero).forEach(function (v) {
-        if (v.__tuned) return;
-        v.__tuned = true;
-        var rate = parseFloat(v.getAttribute('data-rate')) || 1.5;
-        v.muted = true; v.loop = true; v.playsInline = true;
-        var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
-        if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
-        if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
-      });
-    }
-    tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
+    // ---- where the band opens: the first panel a third in from the left, the second beside it.
+    // The marquee is a looping tween on the row's list; its progress is scanned for that spot.
+    var startAt = function () {
+      var list = qs('.band_row:not(.is-names) [data-marquee-collection-target]', hero);
+      var tween = (window.gsap && list) ? gsap.getTweensOf(list).filter(function (t) { return t.duration() > 0; })[0] : null;
+      if (!tween) return false;
+      var first = qs('.band_panel', list), want = first && first.getAttribute('data-band-name');
+      if (!want) return true;
+      var tx = window.innerWidth * 0.38, ty = window.innerHeight * 0.55, best = null;
+      var panels = qsa('.band_panel', list.parentNode).filter(function (p) { return p.getAttribute('data-band-name') === want; });
+      for (var p = 0; p < 1; p += 0.02) {
+        tween.progress(p);
+        panels.forEach(function (el) { var r = el.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - tx, r.top + r.height / 2 - ty); if (!best || d < best.d) best = { d: d, p: p }; });
+      }
+      tween.progress(best ? best.p : 0.5);
+      return true;
+    };
 
-    // ---- one download and one decoder per clip: the marquee clones every panel, so the clones' videos
-    // become canvases painted from the first (master) video each frame. 8 clips, 8 decoders, not 19.
-    function dedupeClips() {
-      var masters = {};
-      qsa('video', hero).forEach(function (v) {
-        var src = v.getAttribute('src');
-        if (!masters[src]) { masters[src] = v; return; }
-        var c = document.createElement('canvas');
-        c.className = v.className; c.setAttribute('aria-hidden', 'true');
-        c.width = 640; c.height = 627;
-        v.parentNode.replaceChild(c, v);
-        (masters[src].__canvases = masters[src].__canvases || []).push(c);
-      });
-      var painters = Object.keys(masters).map(function (k) { return masters[k]; }).filter(function (m) { return m.__canvases; });
-      if (!painters.length) return;
-      var paint = function () {
-        painters.forEach(function (m) {
-          if (m.readyState < 2) return;
-          m.__canvases.forEach(function (c) {
-            if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
-            c.getContext('2d').drawImage(m, 0, 0);
-          });
-        });
-        requestAnimationFrame(paint);
-      };
-      requestAnimationFrame(paint);
-    }
-    setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
+    // ---- the fade-behind on scroll (the old hero's move): the section is fixed, the spacer scrolls;
+    // over the first screen the copy fades and blurs away and the band sinks back, then the hero
+    // hides and its clips pause until the visitor comes back up.
+    var spacer = qs('[data-band-spacer]');
+    var fadeBehind = function () {
+      if (!spacer || !window.ScrollTrigger) return;
+      gsap.timeline({
+        scrollTrigger: {
+          trigger: spacer, start: 'top top', end: 'bottom top', scrub: true,
+          onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
+          onEnterBack: function () { hidden = false; hero.style.visibility = ''; tune(); }
+        }
+      })
+        .to(copy, { opacity: 0, filter: 'blur(10px)', y: -24, ease: 'none', duration: 0.45 }, 0)
+        .to(scrollLine, { opacity: 0, ease: 'none', duration: 0.2 }, 0)
+        .to(stage, { opacity: 0.3, scale: 0.96, ease: 'none', duration: 1 }, 0);
+    };
 
-    // ---- loader: a dark cover while the covers and clips get ready, a counter and a line bottom-left,
-    // then html.band-ready brings the band up. Never under 1.3 s, never over 5 s.
-    var loader = qs('.band_loader', hero);
-    var ready = function () {
-      document.documentElement.classList.add('band-ready');
+    // ---- the opening, in order: the band rises, the title letters come up like the old hero,
+    // the eyebrow and the buttons follow, the scroll line, and last the logo and the burger.
+    nav.forEach(function (el) { gsap.set(el, { opacity: 0 }); });
+    var opened = false;
+    var open = function () {
+      if (opened) return; opened = true;
+      [stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
+      var done = function () {
+        if (scrollLine) scrollLine.classList.add('is-ready');
+        nav.forEach(function (el) { gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out', clearProps: 'opacity' }); });
+        // the reveal transitions have run; hand the elements to the scroll fade
+        setTimeout(function () { [stage, copy].forEach(function (el) { if (el) el.style.transition = 'none'; }); fadeBehind(); }, 1900);
+      };
+      if (reduced || !window.gsap || typeof SplitText === 'undefined') return done();
+      var chars = title ? split(title).chars : [];
+      gsap.timeline({ delay: 0.3, onComplete: done })
+        .from(chars, heroCharsIn(), 0)
+        .from(eyebrow, { opacity: 0, y: 8, duration: 0.8, ease: 'expo.out' }, 0.35)
+        .from(buttons, { opacity: 0, y: 14, duration: 0.9, ease: 'expo.out', stagger: 0.08, clearProps: 'opacity,transform' }, 0.55);
+    };
+    var ready = function () {
+      var tries = 0;
+      (function go() { if (!startAt() && tries++ < 90) return requestAnimationFrame(go); open(); })();
     };
     if (!loader) { ready(); return; }
     var num = qs('.band_loader-n', loader), bar = qs('.band_loader-fill', loader);
@@ -2102,7 +2142,7 @@
     var readiness = function () {
       var seen = {}, total = 0, done = 0;
       qsa('.band_panel-media', hero).forEach(function (m) {
-        if (m.tagName === 'CANVAS') return; // painted from a master video, counted there
+        if (m.tagName === 'CANVAS') return;
         var key = m.currentSrc || m.getAttribute('src');
         var ok = (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0);
         if (!seen[key]) seen[key] = { ok: ok }; else if (ok) seen[key].ok = true;
