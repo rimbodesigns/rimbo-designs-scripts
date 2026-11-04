@@ -2102,7 +2102,12 @@
       if (!spacer || !window.ScrollTrigger) return;
       var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
       if (copy) gsap.to(copy, { opacity: 0, filter: 'blur(10px)', y: -18, ease: 'power1.out', scrollTrigger: { trigger: spacer, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
-      if (scrollLine) gsap.to(scrollLine, { opacity: 0, ease: 'none', scrollTrigger: { trigger: spacer, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+      // the scroll line is still fading in (its CSS entrance runs 1.6-2.8 s after the opening), so its
+      // scrub waits for that to end, then takes over without the transition fighting every scroll step
+      if (scrollLine) setTimeout(function () {
+        scrollLine.style.transition = 'none';
+        gsap.fromTo(scrollLine, { opacity: 1 }, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: spacer, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+      }, 1100);
       ScrollTrigger.create({
         trigger: spacer, start: 'top top', end: 'bottom top',
         onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
