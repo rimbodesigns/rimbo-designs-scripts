@@ -2390,6 +2390,11 @@
     var flat = parseFloat((/[?&]flat=([\d.]+)/.exec(location.search) || [])[1]);
     if (isNaN(flat)) flat = parseFloat(hero.getAttribute('data-band-flat')) || 0;
     var bendMode = (/[?&]bend=(\w+)/.exec(location.search) || [])[1] || hero.getAttribute('data-band-bend') || 'cyl';
+    // ?p3d=1 (or data-band-3d): the band keeps its children in 3D (transform-style: preserve-3d on the band in
+    // the Designer), so the panels really leave the band's plane under the stage's own perspective; the
+    // per-panel perspective() is then left out
+    var p3d = /[?&]p3d=1/.test(location.search) || hero.hasAttribute('data-band-3d');
+    if (p3d && curve) band.style.transformStyle = 'preserve-3d';
     if (curve && !reduced) {
       var crow = qs('.band_row:not(.is-names)', hero), cscroll = crow && qs('[data-marquee-scroll-target]', crow);
       var persp = 1400, sign = curve < 0 ? -1 : 1, step = Math.abs(curve), zCap = persp * 0.35;
@@ -2409,7 +2414,7 @@
               else if (bendMode === 'plane') tf = 'translateY(' + (-dir * sign * arc).toFixed(1) + 'px) rotateZ(' + (-sign * theta * 0.5).toFixed(2) + 'deg)';
               else tf = 'translateZ(' + (-arc).toFixed(1) + 'px) rotateY(' + (-sign * theta).toFixed(2) + 'deg)';
               pnl.style.transition = 'box-shadow .6s';
-              pnl.style.transform = 'perspective(' + persp + 'px) ' + tf;
+              pnl.style.transform = (p3d ? '' : 'perspective(' + persp + 'px) ') + tf;
             });
           });
         }
