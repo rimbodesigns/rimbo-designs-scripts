@@ -3128,6 +3128,33 @@
   }
 
   // =========================================================
+  // COVER HUE DRIFT — blog posts whose CMS switch "Cover hue drift" is on
+  // The Blog posts template has an empty div [data-cover-hue-drift], shown only when the switch is set.
+  // Webflow keeps a hidden conditional element in the page (class w-condition-invisible, display none),
+  // so the drift is added here, and only when that div is really shown: a <style> inside a hidden embed
+  // would still apply to every post.
+  // =========================================================
+  function rdCoverHueDrift() {
+    // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
+    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
+    var on = qsa('[data-cover-hue-drift]').some(function (m) {
+      return !m.classList.contains('w-condition-invisible') && getComputedStyle(m).display !== 'none';
+    });
+    var cover = qs('.cover_image');
+    if (!on || !cover) return;
+    if (!qs('#rd-hue-drift-css')) {
+      var style = document.createElement('style');
+      style.id = 'rd-hue-drift-css';
+      style.textContent =
+        '@keyframes rdHueDrift { 0%, 100% { filter: hue-rotate(0deg); } 25% { filter: hue-rotate(45deg); } 75% { filter: hue-rotate(-45deg); } }\n' +
+        '.cover_image.is-hue-drift { animation: rdHueDrift 8s ease-in-out infinite; }\n' +
+        '@media (prefers-reduced-motion: reduce) { .cover_image.is-hue-drift { animation: none; } }';
+      document.head.appendChild(style);
+    }
+    cover.classList.add('is-hue-drift');
+  }
+
+  // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
   // runs on its own, so a missing element on one page can't stop the rest.
@@ -3157,7 +3184,10 @@
   else if (path === '/branding-brilliance-newsletter' || path === '/call-is-booked') run('newsletter', rdNewsletter);
   else if (path === '/resources') run('resources', rdResources);
   else if (path === '/rimbo-quiz') run('quiz', rdQuiz);
-  else if (path.indexOf('/post/') === 0) run('scroll ruler', rdScrollRuler);
+  else if (path.indexOf('/post/') === 0) {
+    run('scroll ruler', rdScrollRuler);
+    run('cover hue drift', rdCoverHueDrift);
+  }
 
   // These two replace code that still sits in Webflow for now, so they wait for
   // the whole page and check whether that old code has run first.
