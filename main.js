@@ -3183,7 +3183,12 @@
     var fadeBehind = function () {
       if (!window.ScrollTrigger) return;
       var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
-      if (copy) gsap.to(copy, { opacity: 0, filter: 'blur(10px)', y: -18, ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+      if (copy) {
+        gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+        // pinned while it blurs (Rimbo, 4 Nov): the copy rides the scroll back exactly as the hero moves up, so it
+        // stays put on screen and the band slides away underneath it. Only for the in-flow hero; a fixed one is pinned already.
+        if (!spacer) gsap.to(copy, { y: function () { return hero.offsetHeight; }, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } });
+      }
       // the scroll line is still fading in (its CSS entrance runs 1.6-2.8 s after the opening), so its
       // scrub waits for that to end, then takes over without the transition fighting every scroll step
       if (scrollLine) setTimeout(function () {
