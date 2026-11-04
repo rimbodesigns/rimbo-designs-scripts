@@ -738,6 +738,7 @@
     gsap.registerPlugin(ScrollTrigger);
     var queue = [];
     var isRunning = false;
+    var waiting = []; // ours: items not revealed yet, with their trigger
 
     document.querySelectorAll('[data-queued-reveal-group]').forEach(function (group) {
       var items = group.hasAttribute('data-queued-reveal-children') ? [].slice.call(group.children) : [].slice.call(group.querySelectorAll('[data-queued-reveal-item]'));
@@ -745,16 +746,36 @@
       items.forEach(function (item) {
         if (item.getBoundingClientRect().bottom <= 0) return;
         gsap.set(item, { autoAlpha: 0, y: '4em' }); // hidden state on load
-        ScrollTrigger.create({
+        var entry = { item: item, st: null };
+        waiting.push(entry);
+        entry.st = ScrollTrigger.create({
           trigger: item,
           start: 'top 100%', // reveal offset
           once: true,
-          onEnter: function () {
-            queue.push(item);
-            if (queue.length > 12) reveal(queue.shift()); // max queue length
-            if (!isRunning) { isRunning = true; gsap.delayedCall(0.1, revealNext); } // delay
-          }
+          onEnter: function () { enqueue(entry); }
         });
+      });
+    });
+
+    function enqueue(entry) {
+      var i = waiting.indexOf(entry);
+      if (i < 0) return; // already queued
+      waiting.splice(i, 1);
+      queue.push(entry.item);
+      if (queue.length > 12) reveal(queue.shift()); // max queue length
+      if (!isRunning) { isRunning = true; gsap.delayedCall(0.1, revealNext); } // delay
+    }
+
+    // Ours: the filter moved cards around (rdMultiFilter sends rd:filtered). ScrollTrigger re-measures, and any
+    // card that is now on screen joins the queue, since refresh() doesn't fire onEnter for those.
+    document.addEventListener('rd:filtered', function () {
+      ScrollTrigger.refresh();
+      waiting.slice().forEach(function (entry) {
+        var r = entry.item.getBoundingClientRect();
+        if (r.width && r.top < window.innerHeight && r.bottom > 0) {
+          if (entry.st) entry.st.kill();
+          enqueue(entry);
+        }
       });
     });
 
@@ -802,6 +823,15 @@
       items.forEach(function (el) {
         var raw = (el.getAttribute('data-filter-name') || '').trim().toLowerCase();
         itemTokens.set(el, new Set(raw ? raw.split(/\s+/).filter(Boolean) : []));
+      });
+
+      // Ours: a topic no card on this page has (Branding on the Dutch page) gets no button, instead of an empty grid
+      buttons = buttons.filter(function (btn) {
+        var t = (btn.getAttribute('data-filter-target') || '').trim().toLowerCase();
+        if (t === 'all' || t === 'reset') return true;
+        var used = items.some(function (el) { return itemTokens.get(el).has(t); });
+        if (!used) btn.hidden = true;
+        return used;
       });
 
       function setItemState(el, on) {
@@ -882,6 +912,15 @@
           setButtonState(btn, on);
         });
         showCount();
+
+        // Ours: Reset hides itself, so keyboard focus moves to All instead of getting lost
+        if (target === 'reset' && document.activeElement && document.activeElement.getAttribute('data-filter-target') === 'reset') {
+          var allBtn = group.querySelector('[data-filter-target="all"]');
+          if (allBtn) allBtn.focus();
+        }
+        // Ours: the cards moved, so the queued reveal (rdQueuedReveal) measures again and shows cards now in view
+        clearTimeout(group._st);
+        group._st = setTimeout(function () { document.dispatchEvent(new CustomEvent('rd:filtered')); }, transitionDelay + 50);
       }
 
       // Ours: "3 of 10", counted on what the filter has settled on, not on the fade-out in between
@@ -891,6 +930,7 @@
         var n = items.filter(function (el) { return itemMatches(el); }).length;
         shown.forEach(function (s) { s.textContent = n; });
         total.forEach(function (s) { s.textContent = items.length; });
+        shown.forEach(function (s) { if (s.parentNode) s.parentNode.setAttribute('data-filter-count-ready', ''); }); // the CSS shows the count once it's right
       }
 
       group.addEventListener('click', function (e) {
