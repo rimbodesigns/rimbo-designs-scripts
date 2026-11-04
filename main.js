@@ -3329,7 +3329,19 @@
       '.bold-nav__lang a:hover { color: rgba(19, 19, 19, .8); }',
       '.bold-nav__lang a[data-toggle-active] { color: #131313; }',
       '.bold-nav__lang a:focus-visible { outline: 1px solid #131313; outline-offset: 2px; }',
-      '@media (max-width: 767px) { .bold-nav-full__link { font-size: 12.5vw; } .bold-nav__bottom { grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; } .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; } .bold-nav__lang { order: 3; margin-top: .25em; } }'
+      '.bold-nav__mid { display: none; }',
+      '.bold-nav__mid > * { opacity: 0; }',
+      // phones: bigger words with more air between them; the language pill moves up into the middle of the gap
+      // between the last link and the time (the tile becomes a column: space / links / pill slot / time + email)
+      '@media (max-width: 767px) {' +
+        ' .bold-nav-full__tile { justify-content: flex-start; }' +
+        ' .bold-nav-full__tile::before { content: ""; flex: 1 1 0; }' +
+        ' .bold-nav-full__ul { flex: none; gap: 1.5vw; }' +
+        ' .bold-nav-full__link { font-size: min(14.5vw, 9vh); }' +
+        ' .bold-nav__mid { flex: 1 1 0; display: flex; align-items: center; justify-content: center; }' +
+        ' .bold-nav__bottom { position: relative; flex: none; grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; }' +
+        ' .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; }' +
+      ' }'
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
@@ -3347,7 +3359,7 @@
     nav.setAttribute('data-navigation-status', 'not-active');
     nav.setAttribute('aria-label', 'Main');
     nav.innerHTML =
-      '<div class="bold-nav-full__tile" aria-hidden="true"><ul class="bold-nav-full__ul">' + lis + '</ul>' +
+      '<div class="bold-nav-full__tile" aria-hidden="true"><ul class="bold-nav-full__ul">' + lis + '</ul><div class="bold-nav__mid"></div>' +
         '<div class="bold-nav__bottom">' + lang + '<p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></div></div>';
     var bar = document.createElement('div');
     bar.className = 'bold-nav-full__bar';
@@ -3357,11 +3369,19 @@
       '<button data-navigation-toggle="toggle" class="bold-nav-full__hamburger" aria-label="Menu" aria-expanded="false"><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div></button>';
     document.body.appendChild(nav);
     document.body.appendChild(bar);
-    if (lang) rdLangToggle();
+    if (lang) {
+      rdLangToggle();
+      // on phones the pill sits between the links and the time, on wider screens bottom-left in the row
+      var langEl = qs('.bold-nav__lang', nav), mid = qs('.bold-nav__mid', nav), row = qs('.bold-nav__bottom', nav);
+      var phone = window.matchMedia('(max-width: 767px)');
+      var placeLang = function () { if (phone.matches) mid.appendChild(langEl); else row.insertBefore(langEl, row.firstChild); };
+      placeLang();
+      if (phone.addEventListener) phone.addEventListener('change', placeLang); else phone.addListener(placeLang);
+    }
 
     var tile = qs('.bold-nav-full__tile', nav);
     var links = qsa('.bold-nav-full__link', nav);
-    var bottom = qsa('.bold-nav__bottom > *', nav);
+    var bottom = qsa('.bold-nav__mid > *, .bold-nav__bottom > *', nav); // the pill (in the middle slot on phones), time, email
     var btn = qs('[data-navigation-toggle="toggle"]', bar);
     gsap.set(links, { yPercent: 110, rotate: 4 });
 
