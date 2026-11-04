@@ -542,6 +542,16 @@
   // SERVICE — /service and every /locations/… page (was Slater 35312 SERVICE.js)
   // =========================================================
   function rdService() {
+    // the new /locations/… template: the whole hero card comes in (the text is not split letter by letter).
+    // The template head hides the card until html.loc-in is set, so it can't flash before this runs.
+    var card = qs('.loc_hero');
+    if (card && !byId('DARK_section')) {
+      document.documentElement.classList.add('loc-in');
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        gsap.from(card, { y: 40, opacity: 0, duration: 1.1, delay: 0.1, ease: 'expo.out', clearProps: 'transform,opacity' });
+      }
+      return;
+    }
     // each step only when its element is on the page: the new /locations/… template is one hero panel
     // (#HeroTitle + #text_local) without the dark section, so its text comes in right after the title
     var dark = byId('DARK_section'), first = byId('First_content'), special = byId('Special_text');
