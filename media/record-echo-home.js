@@ -9,7 +9,8 @@ const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const [out, introArg, toArg, scrollArg] = process.argv.slice(2);
+const WIDTH = +((process.argv.find(a => a.startsWith('--width=')) || '').slice(8)) || 1200;
+const [out, introArg, toArg, scrollArg] = process.argv.slice(2).filter(a => !a.startsWith('--width='));
 if (!out) { console.log('usage: node media/record-echo-home.js <out.mp4> [intro] [scrollTo] [scrollSeconds]'); process.exit(1); }
 const PROBE = !!process.env.PROBE;
 const URL = 'https://echocreativeagency.nl/';
@@ -24,7 +25,7 @@ fs.mkdirSync(frames, { recursive: true });
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
-  const context = await browser.newContext({ viewport: { width: 1200, height: 1176 }, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: WIDTH, height: Math.round(WIDTH * 0.98) }, deviceScaleFactor: 1 });
   await context.addInitScript(() => {
     const base = Date.now();
     const vt = { now: 0, q: [], id: 0, timers: [], tid: 0 };

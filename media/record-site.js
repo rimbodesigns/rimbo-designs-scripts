@@ -6,7 +6,8 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const args = process.argv.slice(2);
 const hideSel = (args.find(a => a.startsWith('--hide=')) || '').slice(7); // --hide=".popup,.cookie" keeps those elements out of the clip
-const [url, out, toArg, secArg, flag] = args.filter(a => !a.startsWith('--hide='));
+const WIDTH = +((args.find(a => a.startsWith('--width=')) || '').slice(8)) || 1200; // the window width the site lays out in
+const [url, out, toArg, secArg, flag] = args.filter(a => !a.startsWith('--hide=') && !a.startsWith('--width='));
 if (!url || !out) { console.log('usage: node media/record-site.js <url> <out.mp4> [scrollTo] [seconds] [--night] [--hide=<css selector>]'); process.exit(1); }
 const SCROLL_TO = +toArg || 4500, SECONDS = +secArg || 25, FPS = 30, STEP = 1000 / FPS;
 const LEAD = 1.0, TAIL = 1.5; // still at the top, still at the end
@@ -15,7 +16,7 @@ const frames = fs.mkdtempSync('/tmp/clip-');
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
-  const context = await browser.newContext({ viewport: { width: 1200, height: 1176 }, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: WIDTH, height: Math.round(WIDTH * 0.98) }, deviceScaleFactor: 1 });
   await context.addInitScript(() => {
     const base = Date.now(); const vt = { now: 0, q: [], id: 0 }; window.__vt = vt;
     performance.now = () => vt.now; Date.now = () => base + vt.now;

@@ -10,7 +10,8 @@ const path = require('path');
 const { execSync } = require('child_process');
 const args = process.argv.slice(2);
 const hideSel = (args.find(a => a.startsWith('--hide=')) || '').slice(7);
-const [URL, out, introArg, toArg, scrollArg] = args.filter(a => !a.startsWith('--hide='));
+const WIDTH = +((args.find(a => a.startsWith('--width=')) || '').slice(8)) || 1200;
+const [URL, out, introArg, toArg, scrollArg] = args.filter(a => !a.startsWith('--hide=') && !a.startsWith('--width='));
 if (!URL || !out) { console.log('usage: node media/record-intro.js <url> <out.mp4> [intro] [scrollTo] [scrollSeconds] [--hide=<selector>]'); process.exit(1); }
 const PROBE = !!process.env.PROBE;
 const FPS = 30, STEP = 1000 / FPS;
@@ -24,7 +25,7 @@ fs.mkdirSync(frames, { recursive: true });
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
-  const context = await browser.newContext({ viewport: { width: 1200, height: 1176 }, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: WIDTH, height: Math.round(WIDTH * 0.98) }, deviceScaleFactor: 1 });
   await context.addInitScript(() => {
     const base = Date.now();
     const vt = { now: 0, q: [], id: 0, timers: [], tid: 0 };
