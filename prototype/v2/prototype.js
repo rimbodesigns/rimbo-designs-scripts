@@ -37,9 +37,10 @@
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
-      ? '<video class="v2-panel_media" muted loop playsinline autoplay preload="auto" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
-      : '<img class="v2-panel_media" src="' + w.img + '" alt="" loading="eager">';
-    return '<a class="v2-panel" href="' + w.href + '" target="_blank" rel="noopener" aria-label="' + w.name + '">' + media + '<span class="v2-panel_label">' + w.name + '</span></a>';
+      ? '<video class="v2-panel_media" muted loop playsinline autoplay preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
+      : '<img class="v2-panel_media" src="' + w.img + '" alt="" loading="eager" draggable="false">';
+    // not a link: the band is there to look at, the page below is where people should go
+    return '<div class="v2-panel" aria-label="' + w.name + '">' + media + '<span class="v2-panel_label">' + w.name + '</span></div>';
   }
   function row(items, direction, speed, cls) {
     return '<div class="v2-row ' + (cls || '') + '" data-marquee-scroll-direction-target data-marquee-speed="' + speed + '" data-marquee-direction="' + direction + '" data-marquee-duplicate="1" data-marquee-scroll-speed="0">' +
