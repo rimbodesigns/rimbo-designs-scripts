@@ -31,12 +31,24 @@
     echo: { name: 'Echo Creative Agency', video: '/media/echo.mp4', rate: 1.5, img: '/media/echo/echo-preview-a.jpg', href: 'https://echocreativeagency.nl/' }
   };
   function cover(w) { return { name: w.name, img: w.img, href: w.href }; }
-  // Both rows slide the same way at the same pace, the lower one shifted by half a row: a project
-  // and its twin stay five panels apart for good (rows moving against each other put the same
-  // image above itself every so often). ?opposite brings the counter-moving rows back to compare.
-  var opposite = /[?&]opposite/.test(location.search);
-  var rowA = [W.innergym, W.nathan, W.charlies, W.anapana, W.course, W.sandra, cover(W.dieronesie), W.pooh, cover(W.dfs), W.echo];
-  var rowB = [W.sandra, W.dieronesie, W.pooh, W.dfs, cover(W.echo), cover(W.innergym), W.nathan, cover(W.charlies), W.anapana, cover(W.course)];
+  // ---- which projects, in which order: the ranking tool (/rank, prototype/v2/rank.html) saves
+  // { order, hidden } in localStorage; without it the default order applies. The rows move against
+  // each other (Rimbo missed that when it was gone), so a project lives on ONE row only: ranks
+  // 1, 3, 5 ... on the upper row, 2, 4, 6 ... on the lower one. Along a row it repeats at a fixed
+  // distance (the loop), so a project never sits next to its own copy.
+  var DEFAULT_ORDER = ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'pooh'];
+  var rank = null;
+  try { rank = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
+  var order = ((rank && rank.order) || DEFAULT_ORDER).filter(function (k) { return W[k]; });
+  DEFAULT_ORDER.forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); }); // new projects go last
+  var hidden = (rank && rank.hidden) || [];
+  var visible = order.filter(function (k) { return hidden.indexOf(k) < 0; });
+  if (visible.length < 2) visible = DEFAULT_ORDER.slice();
+  var keysA = visible.filter(function (k, i) { return i % 2 === 0; }), keysB = visible.filter(function (k, i) { return i % 2 === 1; });
+  var rowA = keysA.map(function (k) { return W[k]; }), rowB = keysB.map(function (k) { return W[k]; });
+  // the marquee needs more content than the band is wide (250vw, 340vw on phones): copies per row
+  function copies(len) { return len >= 6 ? 1 : (len >= 4 ? 2 : 3); }
+  window.v2Band = { order: visible, rowA: keysA, rowB: keysB }; // read-only peek for debugging
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
@@ -45,16 +57,16 @@
     // not a link: the band is there to look at, the page below is where people should go
     return '<div class="v2-panel" aria-label="' + w.name + '">' + media + '<span class="v2-panel_label">' + w.name + '</span></div>';
   }
-  function row(items, direction, speed, cls) {
-    return '<div class="v2-row ' + (cls || '') + '" data-marquee-scroll-direction-target data-marquee-speed="' + speed + '" data-marquee-direction="' + direction + '" data-marquee-duplicate="1" data-marquee-scroll-speed="0">' +
+  function row(items, direction, speed, cls, dup) {
+    return '<div class="v2-row ' + (cls || '') + '" data-marquee-scroll-direction-target data-marquee-speed="' + speed + '" data-marquee-direction="' + direction + '" data-marquee-duplicate="' + (dup || 1) + '" data-marquee-scroll-speed="0">' +
       '<div class="v2-row_scroll" data-marquee-scroll-target><div class="v2-row_list" data-marquee-collection-target>' + items.join('') + '</div></div></div>';
   }
   // the names, written along the top edge of the band ("text in the angle of the shape")
-  var names = rowA.concat(rowB).map(function (w) { return '<span class="v2-edge_name">' + w.name + '</span>'; });
+  var names = visible.map(function (k) { return '<span class="v2-edge_name">' + W[k].name + '</span>'; });
 
   // button styles to compare: ?buttons=a (ghost), b (solid + glow), c (text + line), d (coral outline)
   var buttonVariant = (/[?&]buttons=([a-d])/.exec(location.search) || [])[1] || 'b';
-  // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt, ?opposite (rows against each other)
+  // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt
   var noClips = /[?&]noclips/.test(location.search);
   if (/[?&]nograin/.test(location.search)) document.documentElement.classList.add('v2-nograin');
   if (/[?&]noblur/.test(location.search)) document.documentElement.classList.add('v2-noblur');
@@ -65,9 +77,10 @@
   hero.innerHTML =
     '<div class="v2-hero_stage" aria-hidden="true"><div class="v2-band">' +
       row(names, 'left', 55, 'v2-band_edge') +
-      row(rowA.map(function (w) { return panel(w, noClips); }), 'left', 90) +
-      row(rowB.map(function (w) { return panel(w, noClips); }), opposite ? 'right' : 'left', 90) +
+      row(rowA.map(function (w) { return panel(w, noClips); }), 'left', 18 * rowA.length, '', copies(rowA.length)) +
+      row(rowB.map(function (w) { return panel(w, noClips); }), 'right', 19 * rowB.length, '', copies(rowB.length)) +
     '</div><div class="v2-edgeblur"></div></div>' +
+    '<div class="v2-scroll" aria-hidden="true"><span class="v2-scroll_line"><i></i></span><span class="v2-scroll_t">Scroll</span></div>' +
     '<div class="v2-hero_copy">' +
       '<span class="v2-eyebrow">Branding <i>·</i> Design <i>·</i> Development</span>' +
       '<h1 class="v2-title">Unlock your<br>next level</h1>' +
@@ -93,7 +106,7 @@
     hero.addEventListener('mousemove', function (e) {
       var r = hero.getBoundingClientRect();
       var nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-      gx = -ny * 3; gz = nx * 2; // ±1.5° around x, ±1° around z
+      gx = -ny * 6; gz = nx * 4; // ±3° around x, ±2° around z
       if (!raf) raf = requestAnimationFrame(settle);
     });
     hero.addEventListener('mouseleave', function () { gx = 0; gz = 0; if (!raf) raf = requestAnimationFrame(settle); });

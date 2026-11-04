@@ -9,6 +9,7 @@ const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]);
     if (p === '/' || p === '/index.html') p = '/prototype/v2/index.html';   // the version being worked on
     if (/^\/v\d+\/?$/.test(p)) p = '/prototype' + p.replace(/\/$/, '') + '/index.html'; // /v1, /v2 ...
+    if (p === '/rank') p = '/prototype/v2/rank.html';                             // the ranking tool for the band
     const file = path.join(root, p);
     if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('not here'); }
     const stat = fs.statSync(file), type = types[path.extname(file)] || 'application/octet-stream';

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rank the band</title>
+<style>
+  :root { --bg: #0c0c0c; --card: #161616; --line: #262626; --text: #f8f5ee; --muted: #a4a4a4; --brand: #ff7373; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .wrap { max-width: 44rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .01em; margin: 0 0 .35rem; }
+  .lead { color: var(--muted); margin: 0 0 2rem; font-size: .9rem; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 1.6rem 1.5rem 3.5rem 1fr auto auto; align-items: center; gap: .9rem; padding: .55rem .8rem .55rem .5rem; margin-bottom: .4rem; background: var(--card); border: 1px solid var(--line); border-radius: .4rem; user-select: none; }
+  li.dragging { opacity: .45; }
+  li.hidden-item { opacity: .38; }
+  li.hidden-item img { filter: grayscale(1); }
+  .rank { font-family: ui-monospace, Menlo, monospace; font-size: .75rem; color: var(--muted); text-align: right; }
+  .handle { cursor: grab; color: #555; font-size: 1.1rem; line-height: 1; touch-action: none; text-align: center; }
+  .handle:active { cursor: grabbing; }
+  img { width: 3.5rem; height: 3.5rem; object-fit: cover; object-position: top; border-radius: .25rem; display: block; background: #222; }
+  .name { font-weight: 500; }
+  .tag { font-family: ui-monospace, Menlo, monospace; font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); border: 1px solid rgba(255, 115, 115, .4); border-radius: .2rem; padding: .2em .45em; }
+  .tag.off { visibility: hidden; }
+  .eye { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: .3rem; width: 2.1rem; height: 2.1rem; cursor: pointer; font-size: .9rem; }
+  .eye:hover { color: var(--text); border-color: #444; }
+  .controls { margin: 2rem 0 1rem; padding: 1.1rem 1rem; background: var(--card); border: 1px solid var(--line); border-radius: .4rem; }
+  .controls label { display: flex; align-items: center; gap: 1rem; }
+  input[type=range] { flex: 1; accent-color: var(--brand); }
+  .sum { color: var(--muted); font-size: .85rem; margin-top: .6rem; }
+  .rows { margin-top: 1.5rem; }
+  .row { display: flex; gap: .3rem; margin: .4rem 0 .9rem; }
+  .row img { width: 2.6rem; height: 2.6rem; border-radius: .2rem; }
+  .row .once { outline: 1px dashed #555; outline-offset: 1px; }
+  .actions { display: flex; gap: 1.5rem; align-items: center; margin-top: 2rem; }
+  .actions a, .actions button { font: inherit; font-size: .85rem; color: var(--text); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
+  .actions .quiet { color: var(--muted); margin-left: auto; }
+  .note { color: var(--muted); font-size: .8rem; margin-top: 2.2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Rank the band</h1>
+  <p class="lead">Drag to order. Odd ranks go on the upper row, even ranks on the lower one, so each project lives on one row and repeats there at a fixed distance, never next to its own copy. Hide what shouldn't be there. The band reads this the moment you reload it.</p>
+  <div class="mono">Projects</div>
+  <ol id="list"></ol>
+  <div class="controls">
+    <div class="sum" id="sum"></div>
+    <div class="rows">
+      <div class="mono">Upper row · moves left</div><div class="row" id="rowA"></div>
+      <div class="mono">Lower row · moves right</div><div class="row" id="rowB"></div>
+    </div>
+  </div>
+  <div class="actions">
+    <a href="/" target="band">Open the band ↗</a>
+    <button id="copy" type="button">Copy ranking</button>
+    <button id="reset" type="button" class="quiet">Reset</button>
+  </div>
+  <p class="note">A clip tag means that project has a scroll-through and plays on the band.</p>
+</div>
+<script>
+(function () {
+  // keep in step with W in prototype.js
+  var CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
+  var WORK = {
+    echo: { name: 'Echo Creative Agency', img: '/media/echo/echo-preview-a.jpg', clip: true },
+    dfs: { name: 'Digital Feng Shui', img: CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif', clip: true },
+    innergym: { name: 'Innergym', img: '/media/innergym-cover.jpg', clip: true },
+    charlies: { name: "Charlie's Angels", img: CDN + '6811f08989345b3409601f8b_Charlies_angels.avif', clip: true },
+    dieronesie: { name: 'Dieronesie', img: CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif', clip: true },
+    course: { name: 'Digital Feng Shui · course', img: '/media/dfs-course-cover.jpg', clip: true },
+    sandra: { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif' },
+    anapana: { name: 'Anapana', img: CDN + '6821a12565a36dfb5f0179c3_Anapana.avif' },
+    nathan: { name: 'Nathan Rajac', img: CDN + '67e3d914128c8952d1dd6523_Nathan4.avif' },
+    pooh: { name: 'Pooh Balance', img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif' }
+  };
+  var DEFAULT = { order: ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'pooh'], hidden: [] };
+  var state = load();
+
+  function load() {
+    var s = null;
+    try { s = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
+    if (!s || !s.order) return JSON.parse(JSON.stringify(DEFAULT));
+    s.order = s.order.filter(function (k) { return WORK[k]; });
+    DEFAULT.order.forEach(function (k) { if (s.order.indexOf(k) < 0) s.order.push(k); });
+    s.hidden = (s.hidden || []).filter(function (k) { return WORK[k]; });
+    return s;
+  }
+  function save() { try { localStorage.setItem('v2-rank', JSON.stringify(state)); } catch (e) {} }
+
+  // the same split the band makes (prototype.js): odd ranks up, even ranks down
+  function split() {
+    var visible = state.order.filter(function (k) { return state.hidden.indexOf(k) < 0; });
+    return { n: visible.length, A: visible.filter(function (k, i) { return i % 2 === 0; }), B: visible.filter(function (k, i) { return i % 2 === 1; }) };
+  }
+
+  var list = document.getElementById('list');
+  function render() {
+    list.innerHTML = '';
+    state.order.forEach(function (k, i) {
+      var w = WORK[k], hidden = state.hidden.indexOf(k) >= 0;
+      var li = document.createElement('li'); li.dataset.key = k; if (hidden) li.className = 'hidden-item';
+      li.innerHTML = '<span class="rank">' + (i + 1) + '</span><span class="handle" title="drag">⋮⋮</span><img src="' + w.img + '" alt=""><span class="name">' + w.name + '</span><span class="tag' + (w.clip ? '' : ' off') + '">clip</span><button class="eye" type="button" title="' + (hidden ? 'show' : 'hide') + '">' + (hidden ? '◌' : '●') + '</button>';
+      list.appendChild(li);
+    });
+    var r = split();
+    document.getElementById('sum').textContent = r.n + ' on the band (' + r.A.length + ' up, ' + r.B.length + ' down), ' + state.hidden.length + ' hidden.';
+    ['A', 'B'].forEach(function (x) {
+      var el = document.getElementById('row' + x); el.innerHTML = '';
+      r[x].forEach(function (k) { var im = document.createElement('img'); im.src = WORK[k].img; im.title = WORK[k].name; el.appendChild(im); });
+    });
+  }
+
+  // drag to reorder (pointer based, so it works with a mouse and a finger)
+  var drag = null;
+  list.addEventListener('pointerdown', function (e) {
+    var h = e.target.closest('.handle'); if (!h) return;
+    drag = h.closest('li'); drag.classList.add('dragging'); e.preventDefault();
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var over = document.elementFromPoint(e.clientX, e.clientY); over = over && over.closest('li');
+    if (!over || over === drag || over.parentNode !== list) return;
+    var r = over.getBoundingClientRect();
+    if (e.clientY < r.top + r.height / 2) list.insertBefore(drag, over); else list.insertBefore(drag, over.nextSibling);
+  });
+  document.addEventListener('pointerup', function () {
+    if (!drag) return;
+    drag.classList.remove('dragging'); drag = null;
+    state.order = [].map.call(list.children, function (li) { return li.dataset.key; });
+    save(); render();
+  });
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest('.eye'); if (!b) return;
+    var k = b.closest('li').dataset.key, i = state.hidden.indexOf(k);
+    if (i < 0) state.hidden.push(k); else state.hidden.splice(i, 1);
+    save(); render();
+  });
+  document.getElementById('copy').addEventListener('click', function (e) {
+    var r = split();
+    var text = 'order: ' + state.order.map(function (k) { return WORK[k].name + (state.hidden.indexOf(k) >= 0 ? ' (hidden)' : ''); }).join(', ') + '\n' + JSON.stringify(state);
+    navigator.clipboard.writeText(text).then(function () { e.target.textContent = 'Copied'; setTimeout(function () { e.target.textContent = 'Copy ranking'; }, 1500); });
+  });
+  document.getElementById('reset').addEventListener('click', function () {
+    if (!confirm('Back to the default order?')) return;
+    state = JSON.parse(JSON.stringify(DEFAULT)); save(); render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
