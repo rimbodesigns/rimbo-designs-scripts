@@ -2111,7 +2111,7 @@
       ScrollTrigger.create({
         trigger: spacer, start: 'top top', end: 'bottom top',
         onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
-        onEnterBack: function () { hidden = false; hero.style.visibility = ''; tune(); }
+        onEnterBack: function () { hidden = false; hero.style.visibility = ''; qsa('video', hero).forEach(function (v) { if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }); }
       });
     };
 
