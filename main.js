@@ -3125,7 +3125,13 @@
     // own proxy and render (turn below), so a hand on the wheel always wins and the layout maths stays Osmo's.
     //   roll-in  the opening: the wheel waits turned N degrees on and rolls back to rest while the title rises, the
     //            same way round as the drift, so the motion never turns about (Rimbo: the first cut rolled in to the
-    //            right and then drifted left) (?rollin=N / data-band-rollin, default 90; 0 = off)
+    //            right and then drifted left) (?rollin=N / data-band-rollin, default 90; 0 = the fly-in instead)
+    //   fly-in   the other opening (?rollin=0; Rimbo, 2026-11-05: "the first one has to come in, and after that it's
+    //            just always kind of circular"): title first, then the top card alone slides in fast from beyond the
+    //            right edge straight to its place, the others grow in at their places on the circle, the nearest pair
+    //            first, and only then the wheel turns (the drift, or the step clock). Knobs: ?fly=S the slide (s),
+    //            ?fill=S when the others start (s after the slide sets off), ?spread=S per ring outward, ?grow=S one
+    //            card's growth (data-band-fly/-fill/-spread/-grow on the section). Built in open() below (flyAfter).
     //   drift    at rest the wheel keeps turning, N degrees a second, so the next card drifts into the middle every
     //            few seconds; it holds during a drag or its throw, during a step or the roll-in, in a hidden tab or
     //            once the hero has scrolled away, and eases back up to speed after; it does not stop for a pointer
@@ -3135,6 +3141,7 @@
     // All three are off under prefers-reduced-motion.
     var rollIn = wheel ? param('rollin', 'rollin', 90) : 0, drift = wheel ? param('drift', 'drift', 3) : 0, spin = wheel ? param('spin', 'spin', 24) : 0;
     if (reduced) rollIn = drift = spin = 0;
+    var flyIn = Math.max(0, param('fly', 'fly', 0.9)), fillStart = Math.max(0, param('fill', 'fill', 0.5)), fillSpread = Math.max(0, param('spread', 'spread', 0.1)), fillGrow = Math.max(0, param('grow', 'grow', 0.8)); // the fly-in's timings (seconds)
     var wheelHeld = function () { var d = wheel && wheel._radialSliderDraggable; return !d || d.isPressed || d.isDragging || d.isThrowing; };
     var turn = function (deg) { // turn the wheel by deg from outside a drag: the proxy moves, the Draggable syncs to it, the cards follow
       var d = wheel && wheel._radialSliderDraggable, proxy = wheel && wheel._radialSliderProxy, render = wheel && wheel._radialSliderRender;
@@ -3515,14 +3522,17 @@
       // home-v4 (Rimbo): the copy first, then the cards. No rise and no fade for the stage (Rimbo: not needed);
       // once the title is nearly in, each whole card (frame, shadow and clip as one) grows from one pixel at its
       // centre to full size, the middle card first and the rest following outward.
-      // The wheel (home-v3) does not wait: it rolls in with the reveal instead (rollWheelIn above).
+      // The wheel (home-v3) does not wait: it rolls in with the reveal instead (rollWheelIn above) — unless ?rollin=0,
+      // when it opens title-first like V4: the top card alone slides in from the right, then the others grow in at
+      // their places (the flyAfter block below).
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      var flyAfter = !!wheel && !rollIn && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
       // The glass wheel (data-glass-carousel-arc) opens like V3 instead: the stage with the reveal, rolling in (Rimbo, 2026-11-05: the title-first fly-in was sent back).
       var glassAfter = !!qs('[data-glass-carousel]:not([data-glass-carousel-arc])', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
-      var stageNow = !(cardsAfter || glassAfter);
+      var stageNow = !(cardsAfter || glassAfter || flyAfter);
       [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
@@ -3548,6 +3558,27 @@
         if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the Designer's rise + fade are off: the cards are the entrance
         tl.call(function () { if (stage) stage.classList.add('is-ready'); }, null, 0.98)
           .to(panels, { scale: 1, duration: 1.1, ease: 'expo.out', stagger: 0.1, clearProps: 'transform' }, 1);
+      }
+      if (flyAfter) { // the wheel's fly-in (?rollin=0): the stage snaps in once the title is nearly in (no rise, no fade), the top
+        // card alone slides in from beyond the right edge straight to its place (the way the wheel turns), then every other
+        // card grows from one pixel at its place on the circle, the nearest pair first and the rest ring by ring outward.
+        // The cards are grown inside Osmo's items (each .band_panel about its own centre), so the items keep Osmo's rotation
+        // and a hand on the wheel still works during the opening. The timeline ends with the last ring on screen, so done()
+        // (the drift, the step clock) only runs once every card is in: from then on the wheel only ever turns.
+        // (Rimbo sent this opening back on V5 the same night; on V3 it waits behind the knob for his verdict on this wheel.)
+        var rotateStep = Math.abs(parseFloat(getComputedStyle(wheel).getPropertyValue('--slider-rotate'))) || 18;
+        var onScreen = Math.ceil(108 / rotateStep); // rings of cards either side that are on screen at all; the rest grow with the last of these
+        var top = null, others = [], rings = [];
+        qsa('[data-radial-slider-item]', wheel).forEach(function (item) {
+          var panel = qs('.band_panel', item) || item, ring = Math.round(Math.abs(parseFloat(gsap.getProperty(item, 'rotation')) || 0) / rotateStep);
+          if (!top && ring === 0) top = panel; else { others.push(panel); rings.push(Math.min(ring, onScreen)); }
+        });
+        if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the Designer's rise + fade are off: the cards are the entrance
+        if (others.length) gsap.set(others, { scale: 0.002, transformOrigin: '50% 50%' }); // one pixel, where each card's centre is
+        if (top) gsap.set(top, { x: window.innerWidth - top.getBoundingClientRect().left + 40 }); // its left edge just beyond the right edge of the screen
+        tl.call(function () { if (stage) stage.classList.add('is-ready'); }, null, 0.98);
+        if (top) tl.to(top, { x: 0, duration: flyIn, ease: 'expo.out', clearProps: 'transform' }, 1);
+        if (others.length) tl.to(others, { scale: 1, duration: fillGrow, ease: 'expo.out', clearProps: 'transform', stagger: function (i) { return Math.max(0, rings[i] - 1) * fillSpread; } }, 1 + fillStart);
       }
       if (glassAfter) {
         if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // no rise and no fade: the canvases expanding from the middle are the entrance
