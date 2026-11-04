@@ -465,6 +465,10 @@
     if (typeof Lenis === 'undefined') return;                            // library not loaded
     if (window.Webflow && Webflow.env('editor') !== undefined) return;   // never inside the Webflow editor
 
+    // The phone browser's bottom bar sliding away on the first scroll changes the viewport height;
+    // ScrollTrigger must not treat that as a resize (it recalculates and the page jumps)
+    if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.config({ ignoreMobileResize: true });
+
     // Until the old "LENIS SCROLL JS" block is deleted from the Webflow footer it
     // still creates `lenis` and wires the buttons below, so then we only reuse it.
     var instance = typeof lenis !== 'undefined' && lenis ? lenis : null;
@@ -892,6 +896,8 @@
 
     var panelHeight = 0.55; // 1 is the full height of the section (78svh on the test page, so this is about 43svh)
     var panelGap = 40; // px between images
+    var panelHeightNarrow = 0.86; // below 768px the centre panel takes most of the screen
+    var panelGapNarrow = 14;
     var wheel = 'horizontal'; // "horizontal" | "all" | "off"
 
     // Oval size
@@ -944,6 +950,7 @@
 
     var textureDetail = 1.5; // texture resolution over the size it is drawn at
     var panelWidthMax = 0.78; // the widest image never passes this share of the section width
+    var panelWidthMaxNarrow = 0.94;
     var narrowBreakpoint = 768;
 
     var repeats = 4;
@@ -1311,7 +1318,9 @@
       function measurePanel() {
         var widest = 1;
         for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
-        panelH = Math.min(H * panelShare, (W * panelWidthMax) / widest);
+        var phone = W < narrowBreakpoint;
+        panelGap = phone ? panelGapNarrow : 40;
+        panelH = Math.min(H * (phone ? Math.max(panelShare, panelHeightNarrow) : panelShare), (W * (phone ? panelWidthMaxNarrow : panelWidthMax)) / widest);
         wrapper.style.setProperty('--glass-carousel-panel', Math.round(panelH) + 'px'); // the CSS puts the caption under the row
       }
       measurePanel();
@@ -1880,6 +1889,215 @@
   }
 
   // =========================================================
+  // BUTTONS — every page: the global button (.btn), the button lab's winner (06 "All three")
+  // Webflow markup: a.btn[data-btn-alt="45 min · free"] > span.btn_in > span.btn_swap > span.btn_line > span.btn_t + span.btn_arrow
+  // (.btn.is-secondary for the ghost one). Editors type one label; the second line is built here
+  // from data-btn-alt. Hover is a class (.is-hover) set from pointer events, not CSS :hover, so it
+  // stays scriptable (the Webflow class carries the glow and the border change).
+  //   1. Magnetic: within 56px the button takes the pointer: scale 1.05, follows the pointer at .25
+  //      of the offset (never more than 9px), the label at .1; it springs back on leaving. Only the
+  //      nearest button on the page takes the pointer, so two never lean at once. Fine pointers only.
+  //   2. Label swap: the label rolls up out of its mask, letter by letter, while the alt line rolls
+  //      in from below; both roll back on release.
+  //   3. The boil, .4s after activation, on the alt line only: every letter has three hand-placed
+  //      poses and cycles through them at 9 fps, like a line traced three times. Off under
+  //      prefers-reduced-motion.
+  // =========================================================
+  function rdButtons() {
+    var buttons = qsa('.btn');
+    if (!buttons.length) return;
+
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var finePointer = window.matchMedia('(pointer: fine)').matches;
+    var rnd = gsap.utils.random;
+    var cap = gsap.utils.clamp(-9, 9); // never into the neighbour
+    var REACH = 56;
+    var FPS = 9; // the old stop-motion button ran 4 frames in .45 s
+
+    function em(el, n) { return n * parseFloat(getComputedStyle(el).fontSize); }
+
+    // One span per character, so each letter can move on its own. Returns the spans.
+    function splitChars(el) {
+      var frag = document.createDocumentFragment();
+      var chars = Array.from(el.textContent).map(function (ch) {
+        var s = document.createElement('span');
+        s.className = 'btn_ch';
+        s.style.display = 'inline-block';
+        s.textContent = ch === ' ' ? ' ' : ch; // a plain space in its own span would collapse to nothing
+        frag.appendChild(s);
+        return s;
+      });
+      el.textContent = '';
+      el.appendChild(frag);
+      return chars;
+    }
+
+    // Calls fn(frame) at a fixed frame rate off the GSAP ticker: the stop-motion clock
+    function stepper(fps, fn) {
+      var running = false, last = -1, t0 = 0;
+      function tick() {
+        var f = Math.floor((gsap.ticker.time - t0) * fps);
+        if (f !== last) { last = f; fn(f); }
+      }
+      return {
+        start: function () { if (running || reduce) return; running = true; last = -1; t0 = gsap.ticker.time; gsap.ticker.add(tick); },
+        stop: function () { if (!running) return false; running = false; gsap.ticker.remove(tick); return true; }
+      };
+    }
+
+    // The boil: every letter has three poses and cycles through them. Small moves, so it breathes
+    // instead of shaking. Nothing tweens between frames: each one is set, like a drawn frame.
+    function boil(chars) {
+      var poses = chars.map(function () {
+        return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; });
+      });
+      gsap.set(chars, { transformOrigin: '50% 55%' });
+      var step = stepper(FPS, function (f) {
+        chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
+      });
+      return {
+        start: step.start,
+        stop: function () {
+          if (step.stop()) gsap.to(chars, { x: 0, y: 0, rotation: 0, duration: 0.35, ease: 'power3.out', overwrite: 'auto' });
+        }
+      };
+    }
+
+    // The swap: line A rolls up out of the mask, line B rolls in from below (and back).
+    // Line B is a copy of line A with the alt label; both get one span per character.
+    function swap(lineA, alt) {
+      var lineB = lineA.cloneNode(true);
+      lineB.classList.add('is-alt');
+      lineB.setAttribute('aria-hidden', 'true');
+      qs('.btn_t', lineB).textContent = alt;
+      lineA.parentNode.appendChild(lineB);
+      var a = splitChars(qs('.btn_t', lineA)).concat(qsa('.btn_arrow', lineA));
+      var bChars = splitChars(qs('.btn_t', lineB));
+      var b = bChars.concat(qsa('.btn_arrow', lineB));
+      gsap.set(b, { yPercent: 120 });
+      return {
+        chars: bChars,
+        to: function (showAlt) {
+          gsap.to(a, { yPercent: showAlt ? -120 : 0, duration: 0.55, ease: 'expo.out', stagger: 0.012, overwrite: 'auto' });
+          gsap.to(b, { yPercent: showAlt ? 0 : 120, duration: 0.55, ease: 'expo.out', stagger: 0.012, overwrite: 'auto' });
+        }
+      };
+    }
+
+    // The magnet: within the reach the button follows the pointer, the label a little more.
+    // activate / release fire when the button takes and loses the pointer.
+    var magnets = [];
+
+    function magnet(btn, o) {
+      var inner = qs('.btn_in', btn);
+      var active = false;
+      var m = {
+        el: btn,
+        visible: true,
+        measure: function (e) {
+          var r = btn.getBoundingClientRect();
+          // the rect moves with the button: take the current offset out again
+          var cx = r.left + r.width / 2 - (gsap.getProperty(btn, 'x') || 0);
+          var cy = r.top + r.height / 2 - (gsap.getProperty(btn, 'y') || 0);
+          var dx = e.clientX - cx, dy = e.clientY - cy;
+          var w = btn.offsetWidth / 2 + REACH, h = btn.offsetHeight / 2 + REACH;
+          return { inside: Math.abs(dx) <= w && Math.abs(dy) <= h, dist: Math.max(Math.abs(dx) / w, Math.abs(dy) / h), dx: dx, dy: dy };
+        },
+        pull: function (d) {
+          if (!active) {
+            active = true;
+            btn.classList.add('is-hover');
+            gsap.to(btn, { scale: 1.05, duration: 0.6, ease: 'power3.out', overwrite: 'auto' });
+            o.activate();
+          }
+          gsap.to(btn, { x: cap(d.dx * 0.25), y: cap(d.dy * 0.25), duration: 0.6, ease: 'power3.out', overwrite: 'auto' });
+          if (inner) gsap.to(inner, { x: cap(d.dx * 0.1), y: cap(d.dy * 0.1), duration: 0.6, ease: 'power3.out', overwrite: 'auto' });
+        },
+        release: function () {
+          if (!active) return;
+          active = false;
+          btn.classList.remove('is-hover');
+          gsap.to(btn, { x: 0, y: 0, scale: 1, duration: 1, ease: 'elastic.out(1, 0.4)', overwrite: 'auto' });
+          if (inner) gsap.to(inner, { x: 0, y: 0, duration: 1, ease: 'elastic.out(1, 0.4)', overwrite: 'auto' });
+          o.release();
+        },
+        isActive: function () { return active; }
+      };
+      magnets.push(m);
+      return m;
+    }
+
+    // The press: down to 1 (from the hover 1.05), then a bounce back up
+    function press(btn, m) {
+      var down = false;
+      btn.addEventListener('pointerdown', function () {
+        down = true;
+        gsap.to(btn, { scale: m.isActive() ? 1 : 0.97, duration: 0.15, ease: 'power2.out', overwrite: 'auto' });
+      });
+      function up() {
+        if (!down) return;
+        down = false;
+        gsap.to(btn, { scale: m.isActive() ? 1.05 : 1, duration: 0.5, ease: 'back.out(3)', overwrite: 'auto' });
+      }
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointercancel', up);
+      btn.addEventListener('pointerleave', up);
+    }
+
+    buttons.forEach(function (btn) {
+      var lineA = qs('.btn_line', btn);
+      var alt = btn.getAttribute('data-btn-alt');
+      var s = lineA && alt && qs('.btn_t', lineA) ? swap(lineA, alt) : null;
+      var b = s ? boil(s.chars) : null;
+      var arrows = qsa('.btn_arrow', btn); // after the swap built line B, so both arrows nudge
+      var timer = null;
+      var m = magnet(btn, {
+        activate: function () {
+          if (arrows.length) gsap.to(arrows, { x: em(btn, 0.35), duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
+          if (s) s.to(true);
+          if (b) timer = gsap.delayedCall(0.4, b.start);
+        },
+        release: function () {
+          if (timer) timer.kill();
+          if (b) b.stop();
+          if (s) s.to(false);
+          if (arrows.length) gsap.to(arrows, { x: 0, duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
+        }
+      });
+      press(btn, m);
+    });
+
+    if (!finePointer) return; // touch: the press only; the magnet needs a pointer that hovers
+
+    // One listener for the page: the nearest button within reach takes the pointer, the rest let go
+    document.addEventListener('pointermove', function (e) {
+      var nearest = null, best = Infinity;
+      magnets.forEach(function (m) {
+        m.d = m.visible ? m.measure(e) : null;
+        if (m.d && m.d.inside && m.d.dist < best) { best = m.d.dist; nearest = m; }
+      });
+      magnets.forEach(function (m) { m === nearest ? m.pull(m.d) : m.release(); });
+    }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', function () {
+      magnets.forEach(function (m) { m.release(); });
+    });
+
+    // Buttons off screen are not measured on every move
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          magnets.forEach(function (m) {
+            if (m.el !== entry.target) return;
+            m.visible = entry.isIntersecting;
+            if (!m.visible) m.release();
+          });
+        });
+      }, { rootMargin: REACH + 'px' });
+      magnets.forEach(function (m) { io.observe(m.el); });
+    }
+  }
+
+  // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
   // runs on its own, so a missing element on one page can't stop the rest.
@@ -1896,6 +2114,7 @@
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
   run('global', rdGlobal);
+  run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
 
