@@ -2094,22 +2094,23 @@
       return true;
     };
 
-    // ---- the old hero's move, as on the old home: the section stays pinned (band and copy), and the
-    // moment the visitor scrolls the copy fades and blurs away in place, while the next section rides
-    // up over the band. Off-screen, the hero hides and its clips pause until the visitor comes back.
-    var spacer = qs('[data-band-spacer]');
+    // ---- the old home's move: the section scrolls away with the page (the Designer keeps it in flow, not fixed),
+    // and the moment the visitor scrolls the copy fades and blurs away in place, the scroll prompt even sooner.
+    // A page that still pairs a fixed hero with a [data-band-spacer] gets the same, measured on the spacer.
+    // Off-screen, the hero hides and its clips pause until the visitor comes back.
+    var spacer = qs('[data-band-spacer]'), scrollRef = spacer || hero;
     var fadeBehind = function () {
-      if (!spacer || !window.ScrollTrigger) return;
+      if (!window.ScrollTrigger) return;
       var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
-      if (copy) gsap.to(copy, { opacity: 0, filter: 'blur(10px)', y: -18, ease: 'power1.out', scrollTrigger: { trigger: spacer, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+      if (copy) gsap.to(copy, { opacity: 0, filter: 'blur(10px)', y: -18, ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
       // the scroll line is still fading in (its CSS entrance runs 1.6-2.8 s after the opening), so its
       // scrub waits for that to end, then takes over without the transition fighting every scroll step
       if (scrollLine) setTimeout(function () {
         scrollLine.style.transition = 'none';
-        gsap.fromTo(scrollLine, { opacity: 1 }, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: spacer, start: 'top top', end: function () { return '+=' + Math.round(window.innerHeight * 0.07); }, scrub: true, invalidateOnRefresh: true } }); // the scroll prompt is gone well before the copy
+        gsap.fromTo(scrollLine, { opacity: 1 }, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: scrollRef, start: 'top top', end: function () { return '+=' + Math.round(window.innerHeight * 0.07); }, scrub: true, invalidateOnRefresh: true } }); // the scroll prompt is gone well before the copy
       }, 1100);
       ScrollTrigger.create({
-        trigger: spacer, start: 'top top', end: 'bottom top',
+        trigger: scrollRef, start: 'top top', end: 'bottom top',
         onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
         onEnterBack: function () { hidden = false; hero.style.visibility = ''; qsa('video', hero).forEach(function (v) { if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }); }
       });
