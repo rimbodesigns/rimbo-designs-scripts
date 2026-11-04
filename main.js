@@ -792,7 +792,9 @@
   var leaving = false;
   var faded = []; // [element, its inline styles before the fade]
   function leaveTargets() {
-    return [qs('.main-wrapper') || document.body].concat(qsa('.nav').filter(function (n) { return getComputedStyle(n).opacity !== '0'; }));
+    return [qs('.main-wrapper') || document.body]
+      .concat(qsa('.nav').filter(function (n) { return getComputedStyle(n).opacity !== '0'; }))
+      .concat(qsa('.bold-nav-full[data-navigation-status="active"] .bold-nav-full__tile')); // the open full-screen menu fades with the page
   }
   function rdLeave(href, delay) {
     if (leaving) return;
@@ -3197,14 +3199,16 @@
 
 
   // =========================================================
-  // FULL SCREEN NAV — /home-copy and /resources: Osmo Supply "Bold Full Screen Navigation".
-  // Osmo's markup, CSS and toggle logic as Osmo wrote them (class names kept); ours is the rest:
-  // - the bar is the site's logo + burger, visible the whole time
-  // - the links are read from the existing burger menu (so Dutch follows along), in Integral
-  //   capitals, minus Home (the logo goes home), Contact (the email sits at the bottom) and the
-  //   page you are on; the last link is "Get started" (to /contact until the get-started page exists)
+  // FULL SCREEN NAV — /home-copy and /resources: after Osmo Supply's "Bold Full Screen Navigation"
+  // (markup, class names and toggle logic). Ours:
+  // - the bar is the site's logo + burger in their own fixed difference-blend layer, visible the whole time
+  // - the links are read from the existing burger menu (so Dutch follows along), in Integral capitals,
+  //   minus Home (the logo goes home) and the page you are on
   // - the tile is frosted glass: the site's cream, see-through and blurred, like the old menu
-  // - the bottom row is Amsterdam's local time in the middle and the email on the right
+  // - bottom row: the language toggle (the Resources pill) on the left, Amsterdam's time in the
+  //   middle, the email on the right
+  // - the motion is one GSAP timeline, so opening and closing can interrupt each other smoothly.
+  //   The tile comes in as a rounded swipe; ?menu=flat (straight edge) or ?menu=blur (a frost fade) to compare.
   // The old burger / fixed nav are hidden on these pages. Lenis stops while the menu is open.
   // =========================================================
   function rdNavFull() {
@@ -3215,7 +3219,7 @@
       return (href || '').replace(/^https?:\/\/[^/]+/, '').replace(/[?#].*$/, '').replace(/\/+$/, '') || '/';
     }
     var here = clean(location.pathname);
-    var skip = [prefix || '/', prefix + '/contact', here];
+    var skip = [prefix || '/', here];
     if (here === prefix + '/home-copy') skip.push(prefix || '/');
 
     var source = qsa('.pop-up_nav_menu .nav_link');
@@ -3223,24 +3227,25 @@
       return { href: clean(a.getAttribute('href')), text: a.textContent.trim() };
     }) : [
       { href: prefix + '/service', text: 'Service' }, { href: prefix + '/work', text: 'Work' },
-      { href: prefix + '/resources', text: 'Resources' }
+      { href: prefix + '/resources', text: 'Resources' }, { href: prefix + '/contact', text: 'Contact' }
     ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
-    items.push({ href: prefix + '/contact', text: nl ? 'Aan de slag' : 'Get started' }); // TODO: the get-started page once it exists
+    var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
+    var mode = (location.search.match(/[?&]menu=(flat|blur)/) || [])[1] || 'curve';
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    var ease = 'cubic-bezier(.7, 0, .3, 1)';
+    var ease = 'cubic-bezier(.65, 0, .35, 1)';
     var css = [
       // the old navigation steps aside on these pages
       '#FIXED_NAV, #Top_Nav, .burgermenu, .nav { display: none !important; }',
       '.bold-nav-full { --nf-bg: rgba(248, 245, 238, .8); --nf-ink: #131313; z-index: 1000; pointer-events: none; position: fixed; inset: 0; color: var(--nf-ink); }',
-      // the bar: same place and size as the old fixed nav (logo 72px, 5% in, 5rem high)
       // the bar is its own fixed layer (not inside the nav), so difference blends it with the page: dark on cream, light on dark
       '.bold-nav-full__bar { z-index: 1001; pointer-events: none; justify-content: space-between; align-items: center; width: 100%; height: 5rem; padding: 0 5%; display: flex; position: fixed; top: 0; left: 0; mix-blend-mode: difference; }',
-      '.bold-nav-full__logo { pointer-events: auto; display: block; width: 72px; line-height: 0; transition: opacity .5s ' + ease + '; }',
+      '.bold-nav-full__logo { pointer-events: auto; display: block; width: 72px; line-height: 0; }',
       '.bold-nav-full__logo img { width: 100%; height: auto; display: block; }',
       '.bold-nav-full__hamburger { pointer-events: auto; color: #fff; cursor: pointer; background-color: #0000; justify-content: center; align-items: center; width: 3em; height: 3em; margin-right: -.5em; display: flex; position: relative; overflow: hidden; border: none; font: inherit; padding: 0; }',
       '.bold-nav-full__hamburger:focus { outline: none; } .bold-nav-full__hamburger:focus-visible, .bold-nav-full__logo:focus-visible { outline: 1px solid #fff; outline-offset: 4px; border-radius: 2px; }',
-      '.bold-nav-full__hamburger-bar { background-color: currentColor; width: 1.5em; height: .125em; position: absolute; transition: transform 0.5s ' + ease + '; }',
+      '.bold-nav-full__hamburger-bar { background-color: currentColor; width: 1.5em; height: .125em; position: absolute; transition: transform .7s ' + ease + '; }',
       '.bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(1, 1) rotate(0.001deg); }',
       '.bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(1, 1) rotate(0.001deg); }',
       '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(.5, 1) rotate(0.001deg); }',
@@ -3250,28 +3255,32 @@
       '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(1, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(.7, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(.7, 1); }',
-      // the tile wipes down from the top (Osmo's straight clip-path)
-      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; transition: clip-path 1s cubic-bezier(.9, 0, .1, 1), visibility 0s 1s; clip-path: polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%); visibility: hidden; }',
-      '[data-navigation-status="active"] .bold-nav-full__tile { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); visibility: visible; transition: clip-path 1s cubic-bezier(.9, 0, .1, 1), visibility 0s; }',
+      // the tile: frosted glass; its edge (clip-path) and the letters are driven by the timeline below
+      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; visibility: hidden; will-change: clip-path; }',
       '.bold-nav-full__ul { flex-flow: column; align-items: center; margin: 0; padding: 0; display: flex; list-style: none; }',
-      '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity 0.5s ' + ease + '; }',
-      '.bold-nav-full__link { color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: calc(3.2vw + 3.2vh); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; transform: translateY(100%) rotate(5deg); transition: transform 0.75s ' + ease + '; }',
-      '.bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.15s; } .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.1s; } .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.05s; } .bold-nav-full__li:nth-child(4) .bold-nav-full__link { transition-delay: 0s; }',
-      '[data-navigation-status="active"] .bold-nav-full__link { transform: translateY(0%) rotate(0.001deg); }',
-      '[data-navigation-status="active"] .bold-nav-full__li:nth-child(1) .bold-nav-full__link { transition-delay: 0.3s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(2) .bold-nav-full__link { transition-delay: 0.35s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(3) .bold-nav-full__link { transition-delay: 0.4s; } [data-navigation-status="active"] .bold-nav-full__li:nth-child(4) .bold-nav-full__link { transition-delay: 0.45s; }',
-      '.bold-nav-full__link-text { text-shadow: 0 1.15em 0; display: block; position: relative; transition: transform 0.5s ' + ease + '; transform: translateY(0%) rotate(0.001deg); }',
-      '.bold-nav-full__link:hover .bold-nav-full__link-text { transform: translateY(-100%) rotate(0.001deg); }',
-      '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li { opacity: 0.15; }',
+      '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity .5s ' + ease + '; }',
+      '.bold-nav-full__link { display: block; color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: calc(3.2vw + 3.2vh); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; will-change: transform; }',
+      // hover (Osmo): the word rolls up to its copy, the other links step back
+      '.bold-nav-full__link-text { text-shadow: 0 1.15em 0; display: block; position: relative; transition: transform .6s ' + ease + '; transform: translateY(0%) rotate(0.001deg); }',
+      '.bold-nav-full__link:hover .bold-nav-full__link-text, .bold-nav-full__link:focus-visible .bold-nav-full__link-text { transform: translateY(-100%) rotate(0.001deg); }',
+      '.bold-nav-full__link:focus { outline: none; }',
+      '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li { opacity: .2; }',
       '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li:hover { opacity: 1; }',
-      // bottom row: time in the middle, email on the right
-      '.bold-nav__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; padding: 0 5% 2.25rem; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; opacity: 0; transition: opacity .3s ease; }',
-      '[data-navigation-status="active"] .bold-nav__bottom { opacity: 1; transition: opacity .6s ease .6s; }',
+      // bottom row: language left, time middle, email right
+      '.bold-nav__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; padding: 0 5% 2.25rem; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }',
+      '.bold-nav__bottom > * { opacity: 0; }',
       '.bold-nav__word { margin: 0; color: inherit; text-decoration: none; white-space: nowrap; }',
-      '.bold-nav__time { grid-column: 2; opacity: .5; font-variant-numeric: tabular-nums; }',
-      '.bold-nav__mail { grid-column: 3; justify-self: end; opacity: .5; transition: opacity .3s; }',
-      '.bold-nav__mail:hover { opacity: 1; }',
-      '@media (max-width: 767px) { .bold-nav-full__link { font-size: 11vw; } .bold-nav__bottom { grid-template-columns: 1fr; justify-items: center; gap: .6em; padding-bottom: 1.75rem; } .bold-nav__time, .bold-nav__mail { grid-column: 1; justify-self: center; } }',
-      '@media (prefers-reduced-motion: reduce) { .bold-nav-full__tile, .bold-nav-full__link, .bold-nav__bottom { transition-duration: 0s !important; transition-delay: 0s !important; } }'
+      '.bold-nav__time { grid-column: 2; font-variant-numeric: tabular-nums; color: rgba(19, 19, 19, .6); }',
+      '.bold-nav__mail { grid-column: 3; justify-self: end; color: rgba(19, 19, 19, .6); transition: color .3s; }',
+      '.bold-nav__mail:hover { color: #131313; }',
+      // the language toggle, the same pill as on Resources (rdLangToggle drives it)
+      '.bold-nav__lang { grid-column: 1; justify-self: start; position: relative; display: inline-grid; grid-template-columns: repeat(var(--toggle-count, 2), 1fr); padding: .1875rem; border-radius: .375rem; background-color: rgba(19, 19, 19, .06); }',
+      '.bold-nav__lang .rs-lang__pill { position: absolute; top: .1875rem; bottom: .1875rem; left: .1875rem; width: calc((100% - .375rem) / var(--toggle-count, 2)); transform: translateX(calc(var(--toggle-active, 0) * 100%)); border-radius: .25rem; background-color: #fff; box-shadow: 0 1px 2px rgba(19, 19, 19, .08); transition: transform .5s cubic-bezier(.625, .05, 0, 1); }',
+      '.bold-nav__lang a { position: relative; z-index: 1; display: block; padding: .35rem .7rem .3rem; border-radius: .25rem; color: rgba(19, 19, 19, .45); font-family: Akkuratllsub, sans-serif; font-size: .75rem; line-height: 1; letter-spacing: .04em; text-align: center; text-transform: uppercase; text-decoration: none; transition: color .3s; }',
+      '.bold-nav__lang a:hover { color: rgba(19, 19, 19, .8); }',
+      '.bold-nav__lang a[data-toggle-active] { color: #131313; }',
+      '.bold-nav__lang a:focus-visible { outline: 1px solid #131313; outline-offset: 2px; }',
+      '@media (max-width: 767px) { .bold-nav-full__link { font-size: 11vw; } .bold-nav__bottom { grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; } .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; } .bold-nav__lang { order: 3; margin-top: .25em; } }'
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
@@ -3280,36 +3289,99 @@
     var lis = items.map(function (it) {
       return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link"><span class="bold-nav-full__link-text">' + it.text + '</span></a></li>';
     }).join('');
+    var lang = locales.length > 1 ? '<div class="bold-nav__lang" data-lang-toggle>' + locales.map(function (a) {
+      return '<a hreflang="' + a.getAttribute('hreflang') + '" href="' + a.getAttribute('href') + '"' +
+        (a.classList.contains('w--current') ? ' class="w--current" aria-current="page"' : '') + '>' + a.textContent.trim() + '</a>';
+    }).join('') + '</div>' : '';
     var nav = document.createElement('nav');
     nav.className = 'bold-nav-full';
     nav.setAttribute('data-navigation-status', 'not-active');
     nav.setAttribute('aria-label', 'Main');
+    nav.innerHTML =
+      '<div class="bold-nav-full__tile" aria-hidden="true"><ul class="bold-nav-full__ul">' + lis + '</ul>' +
+        '<div class="bold-nav__bottom">' + lang + '<p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></div></div>';
     var bar = document.createElement('div');
     bar.className = 'bold-nav-full__bar';
     bar.setAttribute('data-navigation-status', 'not-active');
     bar.innerHTML =
       '<a href="' + (prefix || '/') + '" class="bold-nav-full__logo" aria-label="Rimbo Designs, home"><img src="' + logoSrc + '" alt="" width="72"></a>' +
       '<button data-navigation-toggle="toggle" class="bold-nav-full__hamburger" aria-label="Menu" aria-expanded="false"><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div></button>';
-    nav.innerHTML =
-      '<div class="bold-nav-full__tile"><ul class="bold-nav-full__ul">' + lis + '</ul>' +
-        '<div class="bold-nav__bottom"><p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></div></div>';
     document.body.appendChild(nav);
     document.body.appendChild(bar);
+    if (lang) rdLangToggle();
 
-    // Osmo's toggle logic (toggle, close, Esc), plus Lenis stop/start and aria
+    var tile = qs('.bold-nav-full__tile', nav);
+    var links = qsa('.bold-nav-full__link', nav);
+    var bottom = qsa('.bold-nav__bottom > *', nav);
     var btn = qs('[data-navigation-toggle="toggle"]', bar);
-    function set(active) {
-      nav.setAttribute('data-navigation-status', active ? 'active' : 'not-active');
-      bar.setAttribute('data-navigation-status', active ? 'active' : 'not-active');
-      btn.setAttribute('aria-expanded', active ? 'true' : 'false');
-      if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
+    gsap.set(links, { yPercent: 110, rotate: 4 });
+
+    // The tile's edge. p = how far down it has come (0 to 1). The rounded swipe bows its middle ahead of the
+    // sides while it moves (down when opening, up when closing) and is straight again when it settles.
+    var edge = { p: 0, dir: 1 };
+    function draw() {
+      var w = window.innerWidth, h = window.innerHeight, y = edge.p * h;
+      var bow = mode === 'curve' ? Math.sin(edge.p * Math.PI) * h * 0.22 * edge.dir : 0;
+      tile.style.clipPath = 'path("M0 0 H' + w + ' V' + y.toFixed(1) + ' Q' + (w / 2) + ' ' + (y + bow * 2).toFixed(1) + ' 0 ' + y.toFixed(1) + ' Z")';
     }
-    btn.addEventListener('click', function () { set(nav.getAttribute('data-navigation-status') === 'not-active'); });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && nav.getAttribute('data-navigation-status') === 'active') set(false);
-    });
+
+    var tl;
+    var isOpen = false;
+    function set(active) {
+      if (active === isOpen) return;
+      isOpen = active;
+      [nav, bar].forEach(function (el) { el.setAttribute('data-navigation-status', active ? 'active' : 'not-active'); });
+      btn.setAttribute('aria-expanded', active ? 'true' : 'false');
+      tile.setAttribute('aria-hidden', active ? 'false' : 'true');
+      if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
+      if (tl) tl.kill();
+
+      if (reduce) {
+        gsap.set(tile, { visibility: active ? 'visible' : 'hidden', clipPath: 'none', opacity: 1 });
+        gsap.set(links, { yPercent: active ? 0 : 110, rotate: 0 });
+        gsap.set(bottom, { opacity: active ? 1 : 0, y: 0 });
+        return;
+      }
+
+      if (active) {
+        tl = gsap.timeline({ onComplete: function () { tile.style.clipPath = 'none'; } }); // open: no clip, so a resize can't cut it
+        tl.set(tile, { visibility: 'visible' });
+        if (mode === 'blur') {
+          if (edge.p === 0) tl.set(tile, { opacity: 0 }, 0); // from fully closed: fade in from nothing
+          tl.set(tile, { clipPath: 'none' }, 0).to(tile, { opacity: 1, duration: 0.7, ease: 'power2.out' }, 0);
+          edge.p = 1;
+        } else {
+          edge.dir = 1;
+          tl.set(tile, { opacity: 1 })
+            .to(edge, { p: 1, duration: 1, ease: 'power3.inOut', onUpdate: draw }, 0);
+        }
+        tl.to(links, { yPercent: 0, rotate: 0, duration: 1.2, ease: 'expo.out', stagger: 0.07 }, mode === 'blur' ? 0.15 : 0.45)
+          .to(bottom, { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out', stagger: 0.06, startAt: { y: 8 } }, mode === 'blur' ? 0.35 : 0.7);
+      } else {
+        tl = gsap.timeline({ onComplete: function () {
+          gsap.set(tile, { visibility: 'hidden' });
+          gsap.set(links, { yPercent: 110, rotate: 4 }); // ready to rise from below next time
+        } });
+        tl.to(links, { yPercent: -110, rotate: 0, duration: 0.55, ease: 'power3.in', stagger: { each: 0.05, from: 'end' } }, 0)
+          .to(bottom, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0);
+        if (mode === 'blur') {
+          tl.to(tile, { opacity: 0, duration: 0.5, ease: 'power2.inOut' }, 0.3);
+          tl.add(function () { edge.p = 0; });
+        } else {
+          edge.dir = -1;
+          tl.add(draw, 0.3)
+            .to(edge, { p: 0, duration: 0.85, ease: 'power3.inOut', onUpdate: draw }, 0.3);
+        }
+      }
+    }
+
+    btn.addEventListener('click', function () { set(!isOpen); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) set(false); });
     // coming back with the browser's back button shows the page, not a menu left open
-    window.addEventListener('pageshow', function (e) { if (e.persisted) set(false); });
+    window.addEventListener('pageshow', function (e) {
+      if (!e.persisted || !isOpen) return;
+      reduce = true; set(false); reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    });
 
     var clock = qs('[data-nav-clock]', nav);
     function tick() { clock.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }); }
