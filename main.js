@@ -1911,21 +1911,22 @@
   // then tilts the band with the pointer, lets it drag, plays the clips and runs the loader.
   // Ported from prototype/v2/prototype.js (the local prototype keeps the switches and ranking tool).
   // =========================================================
-  var BAND_MEDIA = window.BAND_MEDIA_BASE || 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.0/media/'; // the local harness (prototype/band) sets BAND_MEDIA_BASE = '/media/'
+  var BAND_MEDIA = window.BAND_MEDIA_BASE || 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.1/media/'; // the local harness (prototype/band) sets BAND_MEDIA_BASE = '/media/'
   var BAND_CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
-  var BAND_WORK = [ // the approved projects, in order (odd ranks on the upper row, even on the lower)
+  var BAND_WORK = [ // the approved projects, in order (odd ranks on the upper row, even on the lower; Tinko between the two Echo panels)
     { name: 'Echo Creative Agency', video: BAND_MEDIA + 'echo.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-a.jpg' },
     { name: 'Digital Feng Shui', video: BAND_MEDIA + 'dfs-home-test.mp4', rate: 2, img: BAND_CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif' },
-    { name: 'Echo Creative Agency · in use', video: BAND_MEDIA + 'echo-tour.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-hover.jpg' },
+    { name: 'Meet Tinko', video: BAND_MEDIA + 'tinko.mp4', rate: 1.5, img: BAND_MEDIA + 'tinko-cover.jpg' },
     { name: 'Innergym', video: BAND_MEDIA + 'innergym.mp4', rate: 1.5, img: BAND_MEDIA + 'innergym-cover.jpg' },
+    { name: 'Echo Creative Agency · in use', video: BAND_MEDIA + 'echo-tour.mp4', rate: 1.5, img: BAND_MEDIA + 'echo/echo-preview-hover.jpg' },
     { name: "Charlie's Angels", video: BAND_MEDIA + 'charlies-angels.mp4', rate: 1.5, img: BAND_CDN + '6811f08989345b3409601f8b_Charlies_angels.avif' },
     { name: 'Dieronesie', video: BAND_MEDIA + 'dieronesie.mp4', rate: 1.5, img: BAND_CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif' },
     { name: 'Digital Feng Shui · course', video: BAND_MEDIA + 'dfs-home.mp4', rate: 1.5, img: BAND_MEDIA + 'dfs-course-cover.jpg' },
     { name: 'Sandra Dreisbach', img: BAND_CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif' },
     { name: 'Anapana', img: BAND_CDN + '6821a12565a36dfb5f0179c3_Anapana.avif' },
-    { name: 'Nathan Rajac', img: BAND_CDN + '67e3d914128c8952d1dd6523_Nathan4.avif' },
-    { name: 'Meet Tinko', video: BAND_MEDIA + 'tinko.mp4', rate: 1.5, img: BAND_MEDIA + 'tinko-cover.jpg' }
+    { name: 'Nathan Rajac', img: BAND_CDN + '67e3d914128c8952d1dd6523_Nathan4.avif' }
   ];
+
 
   function rdBand() {
     var hero = qs('[data-band]');
@@ -2059,6 +2060,35 @@
     }
     tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
 
+    // ---- one download and one decoder per clip: the marquee clones every panel, so the clones' videos
+    // become canvases painted from the first (master) video each frame. 8 clips, 8 decoders, not 19.
+    function dedupeClips() {
+      var masters = {};
+      qsa('video', hero).forEach(function (v) {
+        var src = v.getAttribute('src');
+        if (!masters[src]) { masters[src] = v; return; }
+        var c = document.createElement('canvas');
+        c.className = v.className; c.setAttribute('aria-hidden', 'true');
+        c.width = 640; c.height = 627;
+        v.parentNode.replaceChild(c, v);
+        (masters[src].__canvases = masters[src].__canvases || []).push(c);
+      });
+      var painters = Object.keys(masters).map(function (k) { return masters[k]; }).filter(function (m) { return m.__canvases; });
+      if (!painters.length) return;
+      var paint = function () {
+        painters.forEach(function (m) {
+          if (m.readyState < 2) return;
+          m.__canvases.forEach(function (c) {
+            if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
+            c.getContext('2d').drawImage(m, 0, 0);
+          });
+        });
+        requestAnimationFrame(paint);
+      };
+      requestAnimationFrame(paint);
+    }
+    setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
+
     // ---- loader: a dark cover while the covers and clips get ready, a counter and a line bottom-left,
     // then html.band-ready brings the band up. Never under 1.3 s, never over 5 s.
     var loader = qs('.band_loader', hero);
@@ -2072,6 +2102,7 @@
     var readiness = function () {
       var seen = {}, total = 0, done = 0;
       qsa('.band_panel-media', hero).forEach(function (m) {
+        if (m.tagName === 'CANVAS') return; // painted from a master video, counted there
         var key = m.currentSrc || m.getAttribute('src');
         var ok = (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0);
         if (!seen[key]) seen[key] = { ok: ok }; else if (ok) seen[key].ok = true;

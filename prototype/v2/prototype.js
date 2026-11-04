@@ -14,8 +14,7 @@
   });
 
   // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt,
-  // ?nodrag, ?noloader (band at once), ?playall (every copy of a clip decodes, not only the ones on
-  // screen), ?one or ?one=N (ONE band: a single row of bigger panels with
+  // ?nodrag, ?noloader (band at once), ?one or ?one=N (ONE band: a single row of bigger panels with
   // the top N of the ranking, 5 by default: about three and a half panels are on screen, so five is
   // the fewest that never show a project twice, six is comfortable)
   var noClips = /[?&]noclips/.test(location.search);
@@ -75,7 +74,7 @@
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
-      ? '<video class="v2-panel_media" muted loop playsinline preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
+      ? '<video class="v2-panel_media" muted loop playsinline autoplay preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
       : '<img class="v2-panel_media" src="' + w.img + '" alt="" loading="eager" draggable="false">';
     // not a link: the band is there to look at, the page below is where people should go
     return '<div class="v2-panel" aria-label="' + w.name + '">' + media + '<span class="v2-panel_label">' + w.name + '</span></div>';
@@ -210,18 +209,6 @@
 
   // clip speeds, also for the copies the marquee makes (it clones the row after this script ran).
   // Touch a video only once: re-setting the rate or calling play() on a running one makes it hiccup.
-  // Only the clips on screen play: the band holds three copies of every row, and fifteen to twenty
-  // decoders running at once is what made it heavy, while four or five panels are in view. A clip
-  // plays while its panel is inside the hero (with a margin, so it is running when it slides in)
-  // and pauses once it has left; a copy picks up where it paused. ?playall keeps them all running.
-  var playAll = /[?&]playall/.test(location.search);
-  var onScreen = (!playAll && 'IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
-    entries.forEach(function (en) {
-      var v = en.target;
-      if (en.isIntersecting) { if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }
-      else if (!v.paused) v.pause();
-    });
-  }, { root: hero, rootMargin: '15%', threshold: 0 }) : null;
   function tune() {
     hero.querySelectorAll('video').forEach(function (v) {
       if (v.__tuned) return;
@@ -230,11 +217,40 @@
       v.muted = true; v.loop = true; v.playsInline = true;
       var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
       if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
-      if (onScreen) onScreen.observe(v); // plays or pauses it on its first observation
-      else if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
     });
   }
   tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
+
+  // ---- one download and one decoder per clip (from the Webflow build): the marquee clones every
+  // panel, so the clones' videos become canvases painted from the first (master) video each frame.
+  // Five clips on the single band, five decoders, not fifteen. The masters therefore always play.
+  function dedupeClips() {
+    var masters = {};
+    Array.prototype.slice.call(hero.querySelectorAll('video')).forEach(function (v) {
+      var src = v.getAttribute('src');
+      if (!masters[src]) { masters[src] = v; return; }
+      var c = document.createElement('canvas');
+      c.className = v.className; c.setAttribute('aria-hidden', 'true');
+      c.width = 640; c.height = 627;
+      v.parentNode.replaceChild(c, v);
+      (masters[src].__canvases = masters[src].__canvases || []).push(c);
+    });
+    var painters = Object.keys(masters).map(function (k) { return masters[k]; }).filter(function (m) { return m.__canvases; });
+    if (!painters.length) return;
+    var paint = function () {
+      painters.forEach(function (m) {
+        if (m.readyState < 2) return;
+        m.__canvases.forEach(function (c) {
+          if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
+          c.getContext('2d').drawImage(m, 0, 0);
+        });
+      });
+      requestAnimationFrame(paint);
+    };
+    requestAnimationFrame(paint);
+  }
+  setTimeout(dedupeClips, 0); // after initMarquees (main.js, right after this script) has cloned the rows
 
   // ---- the loader: the clips start under a dark cover (that was the lag he saw), a counter and
   // a thin line fill up as the covers and clips get ready, then html.v2-ready brings the band up.
@@ -271,6 +287,7 @@
     var readiness = function () { // one unit per distinct cover and clip; a clip is ready once it can play on
       var seen = {}, total = 0, done = 0;
       hero.querySelectorAll('.v2-panel_media').forEach(function (m) {
+        if (m.tagName === 'CANVAS') return; // painted from a master video, counted there
         var key = m.currentSrc || m.getAttribute('src');
         if (seen[key]) { if (!seen[key].ok) seen[key].ok = (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0); return; }
         seen[key] = { ok: (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0) };
