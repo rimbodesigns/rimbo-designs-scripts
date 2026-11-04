@@ -13,33 +13,27 @@
     var el = document.querySelector(sel); if (el) el.remove();
   });
 
-  // ---- the work on the band. Two rows with different projects, so nothing shows twice; clips
-  // (scroll-throughs of the live sites) in both rows, covers for the rest. Every clip has its
-  // cover as poster, so a panel is never black while a clip loads.
+  // ---- the work on the band: only the nine projects Rimbo approved (older work stays out).
+  // The five clips are spread over both rows so both rows move; the rest show covers. A project
+  // appears once per row, with its clip in one row and its cover in the other where it has a clip.
   var CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
-  var SITE = 'https://www.rimbodesigns.com/work/';
   var DFS_COVER = CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif';
-  // upper row, moves left
-  var rowA = [
-    { name: 'Innergym', video: '/media/innergym.mp4', rate: 1.5, img: '/media/innergym-cover.jpg', href: 'https://relume-35142b-1c4210f53c5dee0536bbe334f.webflow.io/' },
-    { name: 'Nathan Rajac', video: '/media/nathan.mp4', rate: 1.5, img: CDN + '67e3d914128c8952d1dd6523_Nathan4.avif', href: 'https://www.nathanrajac.com/' },
-    { name: 'Anapana', img: CDN + '6821a12565a36dfb5f0179c3_Anapana.avif', href: SITE + 'anapana' },
-    { name: "Charlie's Angels", video: '/media/charlies-angels.mp4', rate: 1.5, img: CDN + '6811f08989345b3409601f8b_Charlies_angels.avif', href: 'https://www.charlies-angels-rescue.org/' },
-    { name: 'Henry Byrne', img: CDN + '68b6c1384718b6d16ab9b8ef_HenriTEST.avif', href: 'https://www.henrybyrne.com/' },
-    { name: 'Pooh Balance', video: '/media/pooh-balance.mp4', rate: 1.5, img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif', href: 'https://www.poohbalance.nl/' },
-    { name: 'Psychedelic Passage', img: CDN + '64e130a9e5ca48456f60ff2a_PP2.avif', href: SITE + 'psychedelic-passage' },
-    { name: 'Digital Feng Shui · course', img: DFS_COVER, href: 'https://www.digital-fengshui.com/' }
-  ];
-  // lower row, moves right
-  var rowB = [
-    { name: 'Digital Feng Shui', video: '/media/dfs-home-test.mp4', rate: 2, img: DFS_COVER, href: 'https://www.digital-fengshui.com/' },
-    { name: 'theFactor.e', img: CDN + '677ed78b8af70720ad69054f_TFE2.avif', href: SITE + 'case-study-thefactor-e' },
-    { name: 'Sandra Dreisbach', video: '/media/sandra.mp4', rate: 1.5, img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
-    { name: 'Tripsitters', img: CDN + '6637ae25ff58ba25de769e3d_Trip_new_overview.webp', href: SITE + 'grow-guide-tripsitters' },
-    { name: 'Dieronesie', video: '/media/dieronesie.mp4', rate: 1.5, img: CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif', href: SITE + 'dieronesie-retreat-festival-ceremony' },
-    { name: 'Catherine Hamilton', img: CDN + '677ed7268af70720ad6897be_Catherine_%40.avif', href: SITE + 'catherine-hamilton' },
-    { name: 'Zen met Madeleine', img: CDN + '6661ae69b5ed54891bf88a2e_test2.webp', href: 'https://www.zenmetmadeleine.nl/' }
-  ];
+  var W = {
+    innergym: { name: 'Innergym', video: '/media/innergym.mp4', rate: 1.5, img: '/media/innergym-cover.jpg', href: 'https://relume-35142b-1c4210f53c5dee0536bbe334f.webflow.io/' },
+    dfs: { name: 'Digital Feng Shui', video: '/media/dfs-home-test.mp4', rate: 2, img: DFS_COVER, href: 'https://www.digital-fengshui.com/' },
+    nathan: { name: 'Nathan Rajac', img: CDN + '67e3d914128c8952d1dd6523_Nathan4.avif', href: 'https://www.nathanrajac.com/' },
+    charlies: { name: "Charlie's Angels", video: '/media/charlies-angels.mp4', rate: 1.5, img: CDN + '6811f08989345b3409601f8b_Charlies_angels.avif', href: 'https://www.charlies-angels-rescue.org/' },
+    anapana: { name: 'Anapana', img: CDN + '6821a12565a36dfb5f0179c3_Anapana.avif', href: 'https://www.rimbodesigns.com/work/anapana' },
+    dieronesie: { name: 'Dieronesie', video: '/media/dieronesie.mp4', rate: 1.5, img: CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif', href: 'https://www.rimbodesigns.com/work/dieronesie-retreat-festival-ceremony' },
+    sandra: { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
+    course: { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: DFS_COVER, href: 'https://www.digital-fengshui.com/' },
+    pooh: { name: 'Pooh Balance', img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif', href: 'https://www.rimbodesigns.com/work/pooh-balance' }
+  };
+  function cover(w) { return { name: w.name, img: w.img, href: w.href }; }
+  // upper row, moves left: Innergym, Charlie's and the DFS course play
+  var rowA = [W.innergym, W.nathan, W.charlies, W.anapana, W.course, W.sandra, cover(W.dieronesie), W.pooh, cover(W.dfs)];
+  // lower row, moves right: DFS and Dieronesie play; the order keeps each project away from its twin above
+  var rowB = [W.dfs, W.pooh, cover(W.charlies), W.sandra, W.dieronesie, W.nathan, cover(W.course), W.anapana, cover(W.innergym)];
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
