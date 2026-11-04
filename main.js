@@ -3171,6 +3171,36 @@
   }
 
   // =========================================================
+  // POST CARDS — the three highlighted posts on the home page and under every post (.blog_highlight)
+  // The dark panel gets the same space above and below, and the title only the height it needs. The
+  // subtext no longer waits under the card's edge for the old hover slide (which needed a big gap under
+  // the title so it wouldn't peek out): on hover it fades in over the bottom of the image instead, so the
+  // card never changes size. Resources has its own cards (.is-resources) and is left alone.
+  // =========================================================
+  var POST_CARDS_CSS = [
+    '.blog_highlight .blog_list { align-items: stretch; }',
+    '.blog_highlight .post { height: auto; }',
+    '.blog_highlight .blog_container { height: 100%; }',
+    // the old hover slid this panel up (Webflow interaction): it stays put now
+    '.blog_highlight .blog_content { position: relative; top: auto; height: auto; flex: 1 1 auto; justify-content: center; padding: 1.25rem; transform: none !important; }', // centred, so a card next to a longer title keeps as much space above as below
+    '.blog_highlight .blog_title { height: auto; margin-bottom: 0; }',
+    '.blog_highlight .paragraph-46 { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0; padding: 3rem 1.25rem 1rem; color: #f8f5ee; background: linear-gradient(to top, rgba(12, 12, 12, .88), rgba(12, 12, 12, 0)); opacity: 0; transform: translateY(.5rem); transition: opacity .35s ease, transform .35s ease; pointer-events: none; }',
+    '.blog_highlight .post:hover .paragraph-46, .blog_highlight .blog_container:focus-visible .paragraph-46 { opacity: 1; transform: none; }',
+    '@media (hover: none) { .blog_highlight .post:hover .paragraph-46 { opacity: 0; } }',
+    '@media (prefers-reduced-motion: reduce) { .blog_highlight .paragraph-46 { transform: none; transition: opacity .2s linear; } }'
+  ].join('\n');
+
+  function rdPostCards() {
+    // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
+    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
+    if (!qs('.blog_highlight .post') || qs('#rd-post-cards-css')) return;
+    var style = document.createElement('style');
+    style.id = 'rd-post-cards-css';
+    style.textContent = POST_CARDS_CSS;
+    document.head.appendChild(style);
+  }
+
+  // =========================================================
   // COVER HUE DRIFT — blog posts whose CMS switch "Cover hue drift" is on
   // The Blog posts template has an empty div [data-cover-hue-drift], shown only when the switch is set.
   // Webflow keeps a hidden conditional element in the page (class w-condition-invisible, display none),
@@ -3411,6 +3441,7 @@
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
+  run('post cards', rdPostCards);
   run('page transition', rdPageTransition);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
