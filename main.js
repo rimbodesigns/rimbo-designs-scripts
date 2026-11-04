@@ -1331,9 +1331,18 @@
     var arcNarrow = 14; // below 768px: degrees per panel, hub distance and panel width (V3's phone wheel)
     var arcRadiusNarrow = 4.25;
     var panelWidthNarrowWheel = 0.62;
-    var arcRollIn = 90; // the opening: the wheel waits turned this many degrees on and rolls back to rest (0 = off)
+    // The wheel's opening (Rimbo, 2026-11-05: "the first one has to come in, and after that it's just always kind of
+    // circular"): once the title is in, the top card alone slides in fast from beyond the right edge straight to its
+    // place, then the others grow in at their places on the circle, nearest first, and from that moment the wheel
+    // only ever turns (the drift, or the stepped turn). ?rollin=90 brings back the earlier roll-in instead.
+    var flyDuration = 0.9; // s, the first card's slide
+    var fillStart = 0.5; // s after the first card sets off, the others begin to grow in
+    var fillStagger = 0.1; // s per card away from the top
+    var fillDuration = 0.8; // s for one card to grow
+    var arcRollIn = 0; // the earlier opening: the wheel waits turned this many degrees on and rolls back to rest (0 = off)
     var arcRollDuration = 3.6; // seconds, a long even slow-down while the stage fades in and the title rises
-    var arcDrift = 3; // degrees a second at rest, the same way round as the roll-in (0 = off; replaces autoDrift on the wheel)
+    var arcDrift = 3; // degrees a second at rest, the same way round as the opening (0 = off; replaces autoDrift on the wheel); it eases up to speed over about a second and a half
+    var arcStep = 0; // seconds between stepped turns of one card (V4's "1, 2, 3" clock) instead of the drift; 0 = drift (?step=3.5 to try)
     var arcSpin = 24; // degrees the wheel turns while the hero scrolls away, back again on the way up (0 = off)
     var panelCorner = 0.5; // rounded corners, vw (V3's cards: .5vw); 0 = square
     var panelBorder = 1; // hairline rim in px (V3: 1px rgba(248,245,238,.14)); 0 = none
@@ -1526,7 +1535,12 @@
       var radiusShare = attrNum('radius', arcRadius), radiusShareNarrow = attrNum('radius-narrow', arcRadiusNarrow);
       var widthShare = attrNum('width', 0), widthShareNarrow = attrNum('width-narrow', arc ? panelWidthNarrowWheel : 0);
       var rollInDeg = urlNum('rollin', attrNum('rollin', arcRollIn)), driftDeg = urlNum('drift', attrNum('drift', arcDrift)), spinDeg = urlNum('spin', attrNum('spin', arcSpin));
-      if (!arc) rollInDeg = driftDeg = spinDeg = 0;
+      var stepEvery = urlNum('step', attrNum('step', arcStep));
+      if (!arc) rollInDeg = driftDeg = spinDeg = stepEvery = 0;
+      if (stepEvery > 0) driftDeg = 0; // the stepped turn replaces the drift
+      var opening = false, introStart = 0; // the wheel's own opening (the fly-in and the fill), while it runs
+      var expoOut = gsap.parseEase('expo.out');
+      var driftV = 0, lastStep = 0;
       var hero = wrapper.closest('[data-band]') || wrapper.parentElement; // the spin follows this element scrolling away
       var arcDeg = function () { return narrow ? arcDegNarrow : arc; };
       var hubRadius = function () { return (narrow ? radiusShareNarrow : radiusShare) * panelH; };
@@ -1582,20 +1596,30 @@
       function startIntro() {
         if (introStarted) return;
         introStarted = true;
-        if (arc && rollInDeg) { // the wheel waits turned on by rollInDeg and rolls back to rest, the same way round as the drift
+        var finish = function () {
+          intro.value = 1;
+          introDone = true;
+          opening = false;
+          lastStep = performance.now(); // the first stepped turn comes stepEvery after the opening
+          lensStrength();
+          window.dispatchEvent(new CustomEvent('glass-carousel:intro-done', { detail: { wrapper: wrapper } }));
+        };
+        var wheelOpening = arc && !rollInDeg;
+        if (arc && rollInDeg) { // the earlier opening: the wheel waits turned on by rollInDeg and rolls back to rest, the same way round as the drift
           rolling = true;
           gsap.fromTo(roll, { v: -rollInDeg * pxPerDeg() }, { v: 0, duration: arcRollDuration, delay: 0.15, ease: 'power2.out', overwrite: true, onComplete: function () { roll.v = 0; rolling = false; } });
         }
-        gsap.to(intro, {
+        if (wheelOpening) { // the first card flies in, the rest fill in (drawn in layout from introStart); done once the farthest card is in
+          opening = true;
+          introStart = performance.now();
+          var rings = Math.ceil(108 / Math.max(1, arcDeg())); // cards each side that are on screen at all
+          gsap.delayedCall(fillStart + rings * fillStagger + fillDuration + 0.05, finish);
+        }
+        gsap.to(intro, { // the lens opens with the first card
           value: 1,
           duration: introDuration,
           ease: introEase,
-          onComplete: function () {
-            intro.value = 1;
-            introDone = true;
-            lensStrength();
-            window.dispatchEvent(new CustomEvent('glass-carousel:intro-done', { detail: { wrapper: wrapper } }));
-          }
+          onComplete: function () { if (!wheelOpening) finish(); }
         });
         gsap.to([captionEl, counterEl].filter(Boolean), {
           autoAlpha: 1, duration: 0.8, ease: 'power2.out', delay: introCaptionDelay, overwrite: true
@@ -1982,6 +2006,22 @@
             cx = Math.sin(tilt) * radius;
             cy = Math.cos(tilt) * radius - radius;
           }
+          if (arc && opening) { // the opening: the top card slides straight in from beyond the right edge, the others grow in at their places
+            var tOpen = (performance.now() - introStart) / 1000;
+            var ringO = Math.round(Math.abs(x) / Math.max(1, totalWidth / total));
+            if (ringO === 0) {
+              var e1 = expoOut(gsap.utils.clamp(0, 1, tOpen / flyDuration));
+              var fromX = half + w / 2 + 40;
+              cx = fromX + (cx - fromX) * e1;
+              cy *= e1;
+              tilt *= e1;
+            } else {
+              var e2 = expoOut(gsap.utils.clamp(0, 1, (tOpen - fillStart - (ringO - 1) * fillStagger) / fillDuration));
+              if (e2 <= 0) { p.mesh.visible = false; if (p.rim) p.rim.visible = false; return; }
+              w *= e2;
+              h *= e2;
+            }
+          }
           p.mesh.visible = true;
           p.mesh.position.set(cx, cy, depth);
           p.mesh.rotation.z = -tilt;
@@ -2225,10 +2265,19 @@
           velocity *= friction;
           if (Math.abs(velocity) < 0.05) velocity = 0;
 
-          drifting = driftPx > 0 && idle > driftResume * 1000 && now > holdUntil && !rolling; // also during the row's intro: it moves from the start; the wheel waits for its roll-in
+          drifting = driftPx > 0 && idle > driftResume * 1000 && now > holdUntil && !rolling && !opening; // also during the row's intro: it moves from the start; the wheel waits for its opening
+          var wantV = drifting ? driftPx : 0;
+          driftV += (wantV - driftV) * Math.min(1, dt * (arc ? (wantV ? 1.5 : 6) : 60)); // the wheel eases up to speed (V3), the row is at speed at once
           if (drifting) {
-            target += driftPx * dt; // the row rolls left on its own
+            target += driftV * dt; // the row rolls left on its own
             snapped = false;
+          } else if (stepEvery > 0 && !opening && !rolling && introDone && idle > driftResume * 1000 && now > holdUntil) {
+            // the stepped turn: one card on, every stepEvery seconds; any hold (a drag, a click, a wheel) restarts the wait
+            if (now - Math.max(lastStep, lastInput, holdUntil) > stepEvery * 1000) {
+              lastStep = now;
+              target = centerForIndex(nearestIndex(scroll) + 1);
+              snapped = true;
+            }
           } else if (!snapped && idle > snapIdle) {
             target = centerForIndex(nearestIndex(scroll));
             snapped = true;
@@ -3427,8 +3476,8 @@
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
-      // The glass wheel (data-glass-carousel-arc) opens like V3 instead: the stage with the reveal, rolling in.
-      var glassAfter = !!qs('[data-glass-carousel]:not([data-glass-carousel-arc])', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      // (The wheel version too: its first card flies in once the stage is shown, Rimbo 2026-11-05.)
+      var glassAfter = !!qs('[data-glass-carousel]', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
       var stageNow = !(cardsAfter || glassAfter);
       [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
