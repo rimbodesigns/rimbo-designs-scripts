@@ -2220,9 +2220,12 @@
     }
     setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
 
-    // ---- the name chip shows while the pointer rests on a panel (delegated: the clones get it too)
-    hero.addEventListener('mouseover', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p) { var l = qs('.band_panel-label', p); if (l) l.classList.add('is-on'); } });
-    hero.addEventListener('mouseout', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p && !p.contains(e.relatedTarget)) { var l = qs('.band_panel-label', p); if (l) l.classList.remove('is-on'); } });
+    // ---- focus: while the pointer rests on a panel its name chip shows and every other panel dims
+    // (.is-dim, a Designer combo class), so the eye lands on one project; nothing lifts or moves.
+    // Delegated, so the marquee's clones get it too.
+    var dimOthers = function (p) { qsa('.band_panel', hero).forEach(function (q) { q.classList.toggle('is-dim', !!p && q !== p); }); };
+    hero.addEventListener('mouseover', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p) { var l = qs('.band_panel-label', p); if (l) l.classList.add('is-on'); dimOthers(p); } });
+    hero.addEventListener('mouseout', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p && !p.contains(e.relatedTarget)) { var l = qs('.band_panel-label', p); if (l) l.classList.remove('is-on'); dimOthers(null); } });
 
     // ---- the band tilts with the pointer: the Designer's transform is the resting pose; the script finds
     // its two angles in the stylesheet and adds a few degrees (±5° around x, ±3.5° around z). Fine pointers, wide screens.
