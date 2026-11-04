@@ -22,14 +22,26 @@ share icons, summary), then the cover, the rich text (`.richtextbox > .richtexts
    `/post/wordpress-vs-webflow#what-is-webflow`.
 4. **Related posts.** Three cards from the same category, without the current post (the list now shows the post
    you're reading as the first card). Same card as the blog overview, so both pages share one component.
-5. **CTA.** One end-of-article block in place of two separate ones (newsletter + "Click to book a call"): a
-   short line from Rimbo, the global `.btn` "Book a call", and the newsletter as a secondary line. The page
-   then ends with a single clear next step.
+5. **CTA: one project call, no newsletter.** Branding Brilliance hasn't had an issue in a year and you don't plan
+   to restart it, so the newsletter sign-up comes off the post template. In its place goes one block at the end of
+   the article, about starting a project: a short line from you, your photo, and the global `.btn` "Start a
+   project" (it opens the Cal.com booking, like "Click to book a call" does now). The `/branding-brilliance-newsletter`
+   page and its form can be dealt with separately (keep the page for old links, or redirect it).
 6. **Small fixes seen while testing.** On phones the fixed logo sits on top of the text while you scroll. The
    old red progress bar along the top is now hidden by the ruler code, so it can be deleted from the template
    once the ruler goes live.
+7. **Grain.** The same `GRAIN_EFFECT` component as on the new home, but subtler on posts (about half the home's
+   opacity, around 0.03), so it adds texture without hurting the text. To check on the beige page and on the
+   dark CTA block before it goes in.
+8. **Related-post cards: the white bar.** Nothing broke recently; it's how the card is built. The dark text block
+   always starts 16rem (256px) from the top of the card, while the image's height follows the card width (3:2).
+   On screens of about 1440px and wider the image is taller than that, so they overlap and nothing shows.
+   Narrower than that, the image stops short and the card's light background shows through: about 12px at
+   1280px and about 64px at 1024px. Fix in Webflow: give `.image-318` a 16rem height, 100% width and
+   `object-fit: cover` (12.125rem from 767px down, where the text block starts there). Then the image always
+   meets the text block. Two style changes, no code.
 
 ## Open questions for Rimbo
 
-- Keep the dark newsletter card, or fold it into the single CTA block?
+- The project CTA: "Start a project" or keep "Book a call" as the button text?
 - Should the "On this page" list also show on desktop, or is the ruler enough there?

@@ -2462,34 +2462,54 @@
     // its labels (or a label has keyboard focus). A hidden label still answers the mouse, so moving from
     // the ticks to a label never drops the reveal on the way.
     '.scroll-ruler__label { opacity: 0; transition: opacity 0.35s ease, color 0.35s ease; }',
+    // a label on its way out waits a moment, so a diagonal move from the ticks to a label doesn't flicker
+    '.scroll-ruler__label:not([data-scroll-ruler-status="active"]) { transition-delay: 0.2s, 0s; }',
+    '.scroll-ruler:hover .scroll-ruler__label, .scroll-ruler:has(.scroll-ruler__label:focus-visible) .scroll-ruler__label { transition-delay: 0s; }',
     '.scroll-ruler:hover .scroll-ruler__label:not([data-scroll-ruler-status="active"]):not(:hover):not(:focus-visible),' +
     '.scroll-ruler:has(.scroll-ruler__label:focus-visible) .scroll-ruler__label:not([data-scroll-ruler-status="active"]):not(:hover):not(:focus-visible) { opacity: 0.45; }',
-    // a label Osmo left out because its section is short still shows while you're in that section
-    // (rdScrollRuler places it); a neighbour it would touch steps aside meanwhile
-    '.scroll-ruler__label[hidden][data-scroll-ruler-status="active"] { display: block; }',
-    '.scroll-ruler__label.is-yielding { visibility: hidden; }',
+    // a label Osmo left out because its section is short still shows (fading in) while you're in that
+    // section, and a neighbour it would touch fades aside. Not during a reveal: then Osmo's own tidy
+    // layout shows, so a label never vanishes from under the mouse or the keyboard focus.
+    '.scroll-ruler:not(:hover):not(:has(.scroll-ruler__label:focus)) .scroll-ruler__label[hidden][data-scroll-ruler-status="active"] { display: block; }',
+    '@starting-style { .scroll-ruler__label[hidden][data-scroll-ruler-status="active"] { opacity: 0; } }',
+    '.scroll-ruler:not(:hover):not(:has(.scroll-ruler__label:focus)) .scroll-ruler__label.is-yielding { opacity: 0 !important; pointer-events: none; }',
+    // the end mark's label: the mark only gives the last section its length on the ruler
+    '.scroll-ruler__label:last-child { display: none !important; }',
     // too narrow for the labels next to the text: ticks only (they stay in the layout, so Osmo can still measure them)
     '.scroll-ruler.is-compact .scroll-ruler__labels { visibility: hidden; }',
     // phones: the text starts 5vw (about 19px) from the edge, so the ticks get small enough to stay in
     // that gutter, also when the wave stretches them (Osmo sizes everything in em)
     '@media (max-width: 767px) { .scroll-ruler { font-size: 4.5px; padding-left: 4px; padding-right: 0; } }',
     // on touch screens and narrow windows the ruler sits over the text, so it only shows, it doesn't take taps
-    '@media (hover: none), (max-width: 991px) { .scroll-ruler { pointer-events: none; } }',
-    // before and after the article (the intro, the newsletter, the footer) it is gone
+    '@media (hover: none), (max-width: 991px) { .scroll-ruler, .scroll-ruler__label { pointer-events: none; } }',
+    // before and after the article (the intro, the newsletter, the footer) it is gone, also for the
+    // keyboard (rdScrollRuler makes it inert meanwhile)
     '.scroll-ruler.is-out { opacity: 0; pointer-events: none; }',
     '.scroll-ruler.is-out .scroll-ruler__label { pointer-events: none; }',
     // the ruler takes over from the old red progress bar along the top
     '.scroll_progress_indicatror { display: none; }'
   ].join('\n');
 
-  // "Webflow vs WordPress: the comparison" → "Webflow vs WordPress", "Which one should you choose?" → "Which one"
+  // Short labels from the H2s: "Webflow vs WordPress: the comparison" → "Webflow vs WordPress",
+  // "Which one should you choose?" → "Which one", "So, is Webflow good for SEO?" → "Is Webflow good for SEO"
+  var LABEL_MAX = 26; // characters, about what fits in the margin next to the text
   function scrollRulerLabel(text) {
     var STOP = /^(a|an|the|to|of|for|and|or|in|on|at|by|with|from|your|you|is|are|should|can|de|het|een|van|voor|en|op|met|je|jouw|zijn)$/i;
     var t = text.replace(/\s+/g, ' ').trim();
-    var head = t.split(/[:?!.—–(]/)[0].trim(); // only what comes before a colon or question mark
-    var words = (head || t).split(' ').slice(0, 3);
-    while (words.length > 1 && STOP.test(words[words.length - 1])) words.pop(); // no "Which one should"
-    return words.join(' ');
+    t = t.replace(/^\S+,\s+/, function (lead) { return /\s/.test(lead.trim()) ? lead : ''; }); // a lone "So," in front goes
+    // only what comes before a colon, question mark, comma, dash or bracket, or a full stop that ends
+    // a sentence (not the one in "vs." or "2.0")
+    var head = t.split(/[:?!,—–(]|(?<!\bvs)\.(?=\s|$)/i)[0].trim() || t;
+    var words = head.split(' '), out = [];
+    for (var i = 0; i < words.length; i++) {
+      if (out.length && (out.join(' ') + ' ' + words[i]).length > LABEL_MAX) break;
+      out.push(words[i]);
+    }
+    if (out.length < words.length) {
+      while (out.length > 1 && STOP.test(out[out.length - 1])) out.pop(); // no "Which one should you"
+    }
+    var label = out.join(' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   function rdScrollRuler() {
@@ -2503,8 +2523,14 @@
     // Same marker as Osmo's Table of Contents; such a heading also gets data-toc-ignore, so a TOC skips it too.
     var headings = article ? qsa('h2', article).filter(function (h) {
       if (h.textContent.indexOf('{skip}') !== -1) {
-        var walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), node;
-        while ((node = walker.nextNode())) node.textContent = node.textContent.replace('{skip}', '').replace(/\s+$/, '');
+        h.normalize();
+        var walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), node, found = false;
+        while ((node = walker.nextNode())) {
+          if (node.textContent.indexOf('{skip}') === -1) continue; // other words keep their spaces
+          node.textContent = node.textContent.replace(/\s*\{skip\}/, '');
+          found = true;
+        }
+        if (!found) h.textContent = h.textContent.replace(/\s*\{skip\}/, ''); // marker split over bold or a link
         h.setAttribute('data-toc-ignore', '');
         return false;
       }
@@ -2514,8 +2540,19 @@
 
     // Rich text can't get attributes in the Designer, so the H2s get their names here
     headings.forEach(function (h) {
-      if (!h.hasAttribute('data-scroll-ruler-name')) h.setAttribute('data-scroll-ruler-name', scrollRulerLabel(h.textContent));
+      if (!h.hasAttribute('data-scroll-ruler-name')) h.setAttribute('data-scroll-ruler-name', scrollRulerLabel(h.innerText || h.textContent));
     });
+
+    // Osmo's ruler ends where the last part starts, so the last section never got its turn. An empty
+    // end mark right after the article is one more part (its label is hidden), so the ruler runs to the
+    // end of the article
+    var box = article.closest('.richtextbox') || article;
+    var endMark = document.createElement('div');
+    endMark.setAttribute('data-scroll-ruler-name', '');
+    endMark.setAttribute('aria-hidden', 'true');
+    endMark.style.cssText = 'display: block; height: 0;';
+    box.parentNode.insertBefore(endMark, box.nextSibling);
+    var parts = headings.concat(endMark);
 
     if (!qs('#rd-scroll-ruler-css')) {
       var style = document.createElement('style');
@@ -2529,6 +2566,7 @@
       root = qs('[data-scroll-ruler-init]');
     }
     root.classList.add('is-out'); // fades in when the article comes on screen
+    root.inert = true;
 
     initScrollRuler();
 
@@ -2551,11 +2589,11 @@
     // Osmo leaves out a label that would touch the one above it and never places it. Those get
     // their place here (same sums as Osmo's measure()), so the section you're in always has its label.
     var ticks = qsa('[data-scroll-ruler-tick]', root);
-    var labels = qsa('[data-scroll-ruler-label]', labelWrap);
+    var labels = qsa('[data-scroll-ruler-label]', labelWrap).slice(0, headings.length); // without the end mark's
     function partStarts() { // where each part starts along the ruler, 0 to 1 (Osmo's measure() sums)
-      var sy = window.scrollY, last = headings.length - 1;
-      var tops = headings.map(function (h) { return h.getBoundingClientRect().top + sy; });
-      var end = headings[last].getBoundingClientRect().bottom + sy;
+      var sy = window.scrollY, last = parts.length - 1;
+      var tops = parts.map(function (h) { return h.getBoundingClientRect().top + sy; });
+      var end = parts[last].getBoundingClientRect().bottom + sy;
       var start = Math.max(tops[0], window.innerHeight / 2);
       var length = Math.max(Math.min(end, document.documentElement.scrollHeight - window.innerHeight / 2) - start, 1);
       return tops.map(function (top) { return gsap.utils.clamp(0, 1, (top - start) / length); });
@@ -2591,7 +2629,7 @@
       var label = e.target.closest ? e.target.closest('[data-scroll-ruler-label]') : null;
       if (label && e.detail) label.blur();
       var index = label ? labels.indexOf(label) : partAt((e.clientY - list.getBoundingClientRect().top) / list.getBoundingClientRect().height);
-      if (index >= 0) settleOn(headings[index], 2);
+      if (index >= 0 && parts[index]) settleOn(parts[index], 2);
     }, true);
     function partAt(position) { // the part Osmo's findPart() picks for a click on the ticks
       var starts = partStarts(), found = 0;
@@ -2616,23 +2654,32 @@
       });
     }
     new MutationObserver(makeRoom).observe(labelWrap, { subtree: true, attributes: true, attributeFilter: ['data-scroll-ruler-status'] });
-    // after Osmo re-measures (it waits 100 ms after a size change)
-    var placeTimer;
-    new ResizeObserver(function () { clearTimeout(placeTimer); placeTimer = setTimeout(placeLeftOut, 250); }).observe(document.body);
 
-    // On screen only while the article is: in once its top is in view, out once its end has
-    // passed the bottom of the ruler (80% down), so it never sits over the newsletter or footer
-    var box = article.closest('.richtextbox') || article;
+    // On screen only while the article is: in once its top is in view, out once its end has passed
+    // 60% down, as the ruler reaches its end, so it never stays over the newsletter or footer
+    var st = null;
+    function setOut(out) { root.classList.toggle('is-out', out); root.inert = out; }
     if (typeof ScrollTrigger !== 'undefined') {
-      ScrollTrigger.create({
+      st = ScrollTrigger.create({
         trigger: box,
         start: 'top bottom',
-        end: 'bottom 80%',
-        onToggle: function (self) { root.classList.toggle('is-out', !self.isActive); }
+        end: 'bottom 60%',
+        onToggle: function (self) { setOut(!self.isActive); }
       });
     } else {
-      root.classList.remove('is-out');
+      setOut(false);
     }
+
+    // After the layout changes (lazy images loading, a window resize, also one that only changes the
+    // height): re-place the left-out labels once Osmo has re-measured (it waits 100 ms) and move the
+    // fade-out to where the article now ends
+    var placeTimer;
+    var relayout = new ResizeObserver(function () {
+      clearTimeout(placeTimer);
+      placeTimer = setTimeout(function () { placeLeftOut(); if (st) st.refresh(); }, 250);
+    });
+    relayout.observe(document.body);
+    relayout.observe(root);
 
     // Osmo's code, as it came (only its DOMContentLoaded line is left out: rdScrollRuler calls it,
     // after the H2s have their names)
