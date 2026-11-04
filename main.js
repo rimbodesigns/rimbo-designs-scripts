@@ -785,8 +785,11 @@
     }
     function reveal(item) {
       if (filteredOut(item)) { gsap.set(item, { clearProps: 'opacity,visibility,transform,transition' }); return; }
-      gsap.to(item, { autoAlpha: 1, duration: 1.2, ease: 'power1.out', clearProps: 'opacity, visibility' });
-      gsap.to(item, { y: '0em', duration: 1.2, ease: 'expo.out', clearProps: 'transform,transition' });
+      gsap.to(item, { autoAlpha: 1, duration: 1.2, ease: 'power1.out' });
+      gsap.to(item, { y: '0em', duration: 1.2, ease: 'expo.out', onComplete: function () {
+        // one clear at the very end, so the card's own CSS transition never catches a half-done value
+        gsap.set(item, { clearProps: 'opacity,visibility,transform,transition' });
+      } });
     }
     function revealNext() {
       var item = queue.shift();
