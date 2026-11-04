@@ -1322,6 +1322,24 @@
     var panelWidthMaxNarrow = 0.94;
     var narrowBreakpoint = 768;
 
+    // The wheel (home-v5, Rimbo: "steal everything from V3, apply the liquid effect to that"): with
+    // data-glass-carousel-arc="29.5" (degrees per panel) on the wrapper the row becomes Osmo's radial wheel inside
+    // the canvas — the panels sit on a circle whose hub is arcRadius panel heights below the middle panel, each
+    // turned to face out — and the lens refracts the whole wheel. The scroll model is unchanged (px along the rim
+    // map to degrees), so drag, mouse wheel, snap and click work as on the row. V3's numbers are the defaults:
+    var arcRadius = 2.5; // hub distance in panel heights (V3: 300% of the card height from its top = 2.5 from its centre)
+    var arcNarrow = 14; // below 768px: degrees per panel, hub distance and panel width (V3's phone wheel)
+    var arcRadiusNarrow = 4.25;
+    var panelWidthNarrowWheel = 0.62;
+    var arcRollIn = 90; // the opening: the wheel waits turned this many degrees on and rolls back to rest (0 = off)
+    var arcRollDuration = 3.6; // seconds, a long even slow-down while the stage fades in and the title rises
+    var arcDrift = 3; // degrees a second at rest, the same way round as the roll-in (0 = off; replaces autoDrift on the wheel)
+    var arcSpin = 24; // degrees the wheel turns while the hero scrolls away, back again on the way up (0 = off)
+    var panelCorner = 0.5; // rounded corners, vw (V3's cards: .5vw); 0 = square
+    var panelBorder = 1; // hairline rim in px (V3: 1px rgba(248,245,238,.14)); 0 = none
+    var panelBorderColor = '#f8f5ee';
+    var panelBorderAlpha = 0.14;
+
     var repeats = 4;
     var ease = 0.09;
     var wheelSpeed = 1.4;
@@ -1499,6 +1517,22 @@
       // data-glass-carousel-start="right": the first item begins at the right edge instead of the
       // middle, so with the row rolling left it crosses the whole screen before it leaves
       var startEdge = wrapper.getAttribute('data-glass-carousel-start') || 'center';
+      // The wheel: data-glass-carousel-arc (degrees per panel) switches it on; -radius, -width (panel width as a share
+      // of the canvas width), -arc-narrow, -radius-narrow, -width-narrow, -rollin, -drift and -spin override the
+      // settings above, and ?rollin= ?drift= ?spin= on the URL win while tuning (0 switches one off)
+      var attrNum = function (name, fallback) { var v = parseFloat(wrapper.getAttribute('data-glass-carousel-' + name)); return isNaN(v) ? fallback : v; };
+      var urlNum = function (name, fallback) { var m = new RegExp('[?&]' + name + '=(-?[\\d.]+)').exec(location.search); return m ? parseFloat(m[1]) : fallback; };
+      var arc = attrNum('arc', 0), arcDegNarrow = attrNum('arc-narrow', arcNarrow);
+      var radiusShare = attrNum('radius', arcRadius), radiusShareNarrow = attrNum('radius-narrow', arcRadiusNarrow);
+      var widthShare = attrNum('width', 0), widthShareNarrow = attrNum('width-narrow', arc ? panelWidthNarrowWheel : 0);
+      var rollInDeg = urlNum('rollin', attrNum('rollin', arcRollIn)), driftDeg = urlNum('drift', attrNum('drift', arcDrift)), spinDeg = urlNum('spin', attrNum('spin', arcSpin));
+      if (!arc) rollInDeg = driftDeg = spinDeg = 0;
+      var hero = wrapper.closest('[data-band]') || wrapper.parentElement; // the spin follows this element scrolling away
+      var arcDeg = function () { return narrow ? arcDegNarrow : arc; };
+      var hubRadius = function () { return (narrow ? radiusShareNarrow : radiusShare) * panelH; };
+      var pxPerDeg = function () { return (totalWidth / Math.max(1, total)) / Math.max(1, arcDeg()); }; // one slot along the rim is one arc
+      var roll = { v: 0 }, rolling = false; // the roll-in: an offset on the view, so the scroll model underneath is untouched
+      var spinOffset = 0;
       var introEvent = wrapper.getAttribute('data-glass-carousel-intro-event');
       var introEventFired = !introEvent;
       if (introEvent) {
@@ -1548,6 +1582,10 @@
       function startIntro() {
         if (introStarted) return;
         introStarted = true;
+        if (arc && rollInDeg) { // the wheel waits turned on by rollInDeg and rolls back to rest, the same way round as the drift
+          rolling = true;
+          gsap.fromTo(roll, { v: -rollInDeg * pxPerDeg() }, { v: 0, duration: arcRollDuration, delay: 0.15, ease: 'power2.out', overwrite: true, onComplete: function () { roll.v = 0; rolling = false; } });
+        }
         gsap.to(intro, {
           value: 1,
           duration: introDuration,
@@ -1689,8 +1727,12 @@
         for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
         var phone = W < narrowBreakpoint;
         panelGap = phone ? panelGapNarrow : 40;
-        panelH = Math.min(H * (phone ? Math.max(panelShare, panelHeightNarrow) : panelShare), (W * (phone ? panelWidthMaxNarrow : panelWidthMax)) / widest);
+        var widthNow = phone ? (widthShareNarrow || widthShare) : widthShare;
+        panelH = widthNow
+          ? (W * widthNow) / widest // the widest panel is exactly that share of the canvas width (V3's 30vw cards)
+          : Math.min(H * (phone ? Math.max(panelShare, panelHeightNarrow) : panelShare), (W * (phone ? panelWidthMaxNarrow : panelWidthMax)) / widest);
         wrapper.style.setProperty('--glass-carousel-panel', Math.round(panelH) + 'px'); // the CSS puts the caption under the row
+        if (panelCorner) makeMask();
       }
       measurePanel();
 
@@ -1750,14 +1792,38 @@
       }
 
       var panelGeometry = new THREE.PlaneGeometry(1, 1);
+      // V3's cards have rounded corners and a hairline rim: every panel gets a rounded-rectangle alpha mask (redrawn
+      // whenever the panel size changes, so the corner stays panelCorner vw) and a slightly larger plane behind it
+      // in the rim colour, which shows only along the edge
+      var maskTex = null;
+      function makeMask() {
+        var aspect = sources[0] ? sources[0].aspect : 1;
+        var w = Math.max(2, panelH * aspect), tw = 256, th = Math.max(2, Math.round(tw / aspect));
+        var c = document.createElement('canvas'); c.width = tw; c.height = th;
+        var g = c.getContext('2d');
+        g.fillStyle = '#000'; g.fillRect(0, 0, tw, th);
+        var r = Math.min(tw / 2, th / 2, (panelCorner * window.innerWidth / 100) * (tw / w));
+        g.fillStyle = '#fff'; g.beginPath();
+        g.moveTo(r, 0); g.lineTo(tw - r, 0); g.arcTo(tw, 0, tw, r, r); g.lineTo(tw, th - r); g.arcTo(tw, th, tw - r, th, r);
+        g.lineTo(r, th); g.arcTo(0, th, 0, th - r, r); g.lineTo(0, r); g.arcTo(0, 0, r, 0, r); g.closePath(); g.fill();
+        if (!maskTex) { maskTex = new THREE.CanvasTexture(c); maskTex.colorSpace = THREE.NoColorSpace; }
+        else { maskTex.image = c; maskTex.needsUpdate = true; }
+      }
+      if (panelCorner) makeMask();
       var pool = [];
       for (var r = 0; r < repeats; r++) {
         for (var i = 0; i < total; i++) {
-          var mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true });
+          var rim = null;
+          if (panelBorder) {
+            rim = new THREE.Mesh(panelGeometry, new THREE.MeshBasicMaterial({ color: screenColor(panelBorderColor), transparent: true, opacity: panelBorderAlpha, alphaMap: maskTex, depthWrite: false }));
+            rim.visible = false;
+            scene.add(rim);
+          }
+          var mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, alphaMap: maskTex });
           var mesh = new THREE.Mesh(panelGeometry, mat);
           mesh.visible = false;
           scene.add(mesh);
-          pool.push({ mesh: mesh, mat: mat, srcIndex: i, bound: false });
+          pool.push({ mesh: mesh, mat: mat, rim: rim, srcIndex: i, bound: false });
         }
       }
 
@@ -1865,28 +1931,33 @@
         var centeredDist = Infinity;
         var half = W / 2;
         var buffer = panelH;
+        var view = scroll + roll.v + spinOffset; // what is seen: the scroll model plus the roll-in and the scroll turn
+        var degPx = arc ? pxPerDeg() : 0, radius = arc ? hubRadius() : 0;
+        var reach = arc ? Math.PI * 0.6 * degPx * 180 / Math.PI : 0; // beyond ~108° a panel is under the hub
 
         pool.forEach(function (p, poolIdx) {
           var rep = Math.floor(poolIdx / total);
           var i = p.srcIndex;
           var src = sources[i];
 
-          var x = slotCenter(i) - scroll;
+          var x = slotCenter(i) - view;
           x = ((x % totalWidth) + totalWidth) % totalWidth;
           x += (rep - Math.floor(repeats / 2)) * totalWidth;
           if (x > half + totalWidth) x -= totalWidth * repeats;
 
           var centerX = x;
-          if (centerX < -half - buffer || centerX > half + buffer) {
+          if (arc ? Math.abs(centerX) > reach : (centerX < -half - buffer || centerX > half + buffer)) {
             p.mesh.visible = false;
+            if (p.rim) p.rim.visible = false;
             return;
           }
 
           // Intro: the row expands from the middle — every image starts as a point at the centre and slides
           // out to its own place while it grows, the middle one first and its neighbours following (like the
           // cards on home-v4). While they still overlap, the ones nearer the middle draw in front.
+          // (The wheel rolls in instead: full-size panels, the roll-in offset above.)
           var grow = 1, depth = 0;
-          if (!introDone) {
+          if (!introDone && !arc) {
             var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
             grow = gsap.utils.clamp(0, 1, (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread));
             centerX *= grow;
@@ -1904,17 +1975,33 @@
             p.bound = true;
           }
 
+          // on the wheel the rim position becomes an angle from the top: the panel sits on the circle and faces out
+          var cx = centerX, cy = 0, tilt = 0;
+          if (arc) {
+            tilt = (centerX / degPx) * Math.PI / 180;
+            cx = Math.sin(tilt) * radius;
+            cy = Math.cos(tilt) * radius - radius;
+          }
           p.mesh.visible = true;
-          p.mesh.position.set(centerX, 0, depth);
+          p.mesh.position.set(cx, cy, depth);
+          p.mesh.rotation.z = -tilt;
           p.mesh.scale.set(w, h, 1);
+          if (p.rim) {
+            p.rim.visible = true;
+            p.rim.position.set(cx, cy, depth - 0.002);
+            p.rim.rotation.z = -tilt;
+            p.rim.scale.set(w + 2 * panelBorder, h + 2 * panelBorder, 1);
+          }
 
-          var sx = centerX + W / 2;
-          var sy = H / 2;
+          var sx = cx + W / 2;
+          var sy = H / 2 - cy;
+          var ex = Math.abs(w / 2 * Math.cos(tilt)) + Math.abs(h / 2 * Math.sin(tilt)); // the turned panel's box
+          var ey = Math.abs(w / 2 * Math.sin(tilt)) + Math.abs(h / 2 * Math.cos(tilt));
           panelRects.push({
-            left: sx - w / 2,
-            right: sx + w / 2,
-            top: sy - h / 2,
-            bottom: sy + h / 2,
+            left: sx - ex,
+            right: sx + ex,
+            top: sy - ey,
+            bottom: sy + ey,
             poolIdx: poolIdx,
             srcIndex: i,
             centerX: x
@@ -2001,6 +2088,7 @@
         suppressClick = false;
         if (dragging) return;
         if (e.button !== 0 && e.pointerType === 'mouse') return;
+        if (rolling) { gsap.killTweensOf(roll); scroll += roll.v; target += roll.v; roll.v = 0; rolling = false; } // a hand on the wheel ends the roll-in where it is
         dragging = true;
         dragPointerId = e.pointerId;
         dragPointerType = e.pointerType || 'mouse';
@@ -2127,15 +2215,19 @@
         var dt = Math.min(0.05, (now - lastFrame) / 1000);
         lastFrame = now;
         var idle = now - lastInput;
+        var box = el.getBoundingClientRect();
+        if (box.bottom <= 0 || box.top >= window.innerHeight) { raf = requestAnimationFrame(tick); return; } // scrolled away: nothing moves, nothing is drawn
+        var driftPx = arc ? driftDeg * pxPerDeg() : autoDrift; // the wheel drifts in degrees a second (V3), the row in px
+        spinOffset = spinDeg ? gsap.utils.clamp(0, 1, (window.pageYOffset || 0) / Math.max(1, hero.offsetHeight)) * spinDeg * pxPerDeg() : 0;
 
         if (!dragging) {
           target += velocity;
           velocity *= friction;
           if (Math.abs(velocity) < 0.05) velocity = 0;
 
-          drifting = autoDrift > 0 && idle > driftResume * 1000 && now > holdUntil; // also during the intro: it moves from the start
+          drifting = driftPx > 0 && idle > driftResume * 1000 && now > holdUntil && !rolling; // also during the row's intro: it moves from the start; the wheel waits for its roll-in
           if (drifting) {
-            target += autoDrift * dt; // the row rolls left on its own
+            target += driftPx * dt; // the row rolls left on its own
             snapped = false;
           } else if (!snapped && idle > snapIdle) {
             target = centerForIndex(nearestIndex(scroll));
@@ -2237,7 +2329,8 @@
         lensQuad.geometry.dispose();
         lensMat.dispose();
         panelGeometry.dispose();
-        pool.forEach(function (p) { p.mat.dispose(); });
+        pool.forEach(function (p) { p.mat.dispose(); if (p.rim) p.rim.material.dispose(); });
+        if (maskTex) maskTex.dispose();
         sources.forEach(function (s) { if (s.tex) s.tex.dispose(); });
         wrapper.setAttribute('data-glass-carousel', '');
       }
@@ -3334,9 +3427,12 @@
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
-      var glassAfter = !!qs('[data-glass-carousel]', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      // The glass wheel (data-glass-carousel-arc) opens like V3 instead: the stage with the reveal, rolling in.
+      var glassAfter = !!qs('[data-glass-carousel]:not([data-glass-carousel-arc])', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
-      [(cardsAfter || glassAfter) ? null : stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
+      var stageNow = !(cardsAfter || glassAfter);
+      [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
+      if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
         if (scrollLine) scrollLine.classList.add('is-ready');
