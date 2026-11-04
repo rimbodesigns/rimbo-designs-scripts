@@ -14,7 +14,8 @@
   });
 
   // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt,
-  // ?nodrag, ?noloader (band at once), ?one or ?one=N (ONE band: a single row of bigger panels with
+  // ?nodrag, ?noloader (band at once), ?playall (every copy of a clip decodes, not only the ones on
+  // screen), ?one or ?one=N (ONE band: a single row of bigger panels with
   // the top N of the ranking, 5 by default: about three and a half panels are on screen, so five is
   // the fewest that never show a project twice, six is comfortable)
   var noClips = /[?&]noclips/.test(location.search);
@@ -74,7 +75,7 @@
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
-      ? '<video class="v2-panel_media" muted loop playsinline autoplay preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
+      ? '<video class="v2-panel_media" muted loop playsinline preload="auto" draggable="false" src="' + w.video + '" poster="' + w.img + '" data-rate="' + (w.rate || 1.5) + '"></video>'
       : '<img class="v2-panel_media" src="' + w.img + '" alt="" loading="eager" draggable="false">';
     // not a link: the band is there to look at, the page below is where people should go
     return '<div class="v2-panel" aria-label="' + w.name + '">' + media + '<span class="v2-panel_label">' + w.name + '</span></div>';
@@ -209,6 +210,18 @@
 
   // clip speeds, also for the copies the marquee makes (it clones the row after this script ran).
   // Touch a video only once: re-setting the rate or calling play() on a running one makes it hiccup.
+  // Only the clips on screen play: the band holds three copies of every row, and fifteen to twenty
+  // decoders running at once is what made it heavy, while four or five panels are in view. A clip
+  // plays while its panel is inside the hero (with a margin, so it is running when it slides in)
+  // and pauses once it has left; a copy picks up where it paused. ?playall keeps them all running.
+  var playAll = /[?&]playall/.test(location.search);
+  var onScreen = (!playAll && 'IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      var v = en.target;
+      if (en.isIntersecting) { if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }
+      else if (!v.paused) v.pause();
+    });
+  }, { root: hero, rootMargin: '15%', threshold: 0 }) : null;
   function tune() {
     hero.querySelectorAll('video').forEach(function (v) {
       if (v.__tuned) return;
@@ -217,7 +230,8 @@
       v.muted = true; v.loop = true; v.playsInline = true;
       var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
       if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
-      if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      if (onScreen) onScreen.observe(v); // plays or pauses it on its first observation
+      else if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
     });
   }
   tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
