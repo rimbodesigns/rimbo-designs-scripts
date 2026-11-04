@@ -10,7 +10,9 @@ const server = http.createServer((req, res) => {
     if (p === '/' || p === '/index.html') p = '/prototype/v2/index.html';   // the version being worked on
     if (/^\/v\d+\/?$/.test(p)) p = '/prototype' + p.replace(/\/$/, '') + '/index.html'; // /v1, /v2 ...
     if (p === '/rank') p = '/prototype/v2/rank.html';                             // the ranking tool for the band
-    const file = path.join(root, p);
+    if (p === '/buttons') p = '/prototype/buttons/index.html';                   // the button lab
+    let file = path.join(root, p);
+    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html'); // /prototype/buttons/ → its index
     if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('not here'); }
     const stat = fs.statSync(file), type = types[path.extname(file)] || 'application/octet-stream';
     const range = req.headers.range;
