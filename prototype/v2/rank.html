@@ -43,7 +43,7 @@
 <body>
 <div class="wrap">
   <h1>Rank the band</h1>
-  <p class="lead">Drag to order. Odd ranks go on the upper row, even ranks on the lower one, and with an even count the last one goes up too: the upper row is the far one, more of it is on screen, so it needs the longer loop. Each project lives on one row and repeats there at a fixed distance, never next to its own copy. Hide what shouldn't be there. The band reads this the moment you reload it.</p>
+  <p class="lead">Drag to order. Odd ranks go on the upper row, even ranks on the lower one, and with an even count the last one goes up too: the upper row is the far one, more of it is on screen, so it needs the longer loop. Each project lives on one row and repeats there at a fixed distance, never next to its own copy. The one band (?one) takes the first five that are not hidden, ?one=6 the first six. Hide what shouldn't be there. The band reads this the moment you reload it.</p>
   <div class="mono">Projects</div>
   <ol id="list"></ol>
   <div class="controls">
@@ -55,6 +55,7 @@
   </div>
   <div class="actions">
     <a href="/" target="band">Open the band ↗</a>
+    <a href="/?one" target="band">Open the one band ↗</a>
     <button id="copy" type="button">Copy ranking</button>
     <button id="reset" type="button" class="quiet">Reset</button>
   </div>
@@ -76,7 +77,7 @@
     nathan: { name: 'Nathan Rajac', img: CDN + '67e3d914128c8952d1dd6523_Nathan4.avif' },
     tinko: { name: 'Meet Tinko', img: '/media/tinko-cover.jpg', clip: true }
   };
-  var DEFAULT = { order: ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko'], hidden: [] };
+  var DEFAULT = { order: ['dfs', 'echo', 'charlies', 'dieronesie', 'course', 'innergym', 'sandra', 'anapana', 'nathan', 'tinko'], hidden: [] };
   var state = load();
 
   function load() {

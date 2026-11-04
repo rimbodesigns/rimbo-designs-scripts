@@ -15,7 +15,8 @@
 
   // test switches: ?noclips (covers only), ?nograin (no grain overlay), ?noblur (no edge blur), ?notilt,
   // ?nodrag, ?noloader (band at once), ?one or ?one=N (ONE band: a single row of bigger panels with
-  // the top N of the ranking, 6 by default, to see how a trimmed best-of-the-best feels)
+  // the top N of the ranking, 5 by default: about three and a half panels are on screen, so five is
+  // the fewest that never show a project twice, six is comfortable)
   var noClips = /[?&]noclips/.test(location.search);
   if (/[?&]nograin/.test(location.search)) document.documentElement.classList.add('v2-nograin');
   if (/[?&]noblur/.test(location.search)) document.documentElement.classList.add('v2-noblur');
@@ -23,7 +24,7 @@
   var noDrag = /[?&]nodrag/.test(location.search);
   var noLoader = /[?&]noloader/.test(location.search);
   var oneMatch = /[?&]one(?:=(\d+))?(?:&|$)/.exec(location.search);
-  var oneN = oneMatch ? Math.max(2, parseInt(oneMatch[1], 10) || 6) : 0;
+  var oneN = oneMatch ? Math.max(2, parseInt(oneMatch[1], 10) || 5) : 0;
   if (oneN) document.documentElement.classList.add('v2-one');
 
   // ---- the work on the band: only the projects Rimbo approved (older work stays out; Pooh Balance
@@ -50,7 +51,8 @@
   // goes up as well: the upper row is the far one, more of it is on screen, so that is where a short
   // loop shows the same project twice (Rimbo saw it there). Along a row a project repeats at a fixed
   // distance (the loop), never next to its own copy.
-  var DEFAULT_ORDER = ['echo', 'dfs', 'innergym', 'charlies', 'dieronesie', 'course', 'sandra', 'anapana', 'nathan', 'tinko'];
+  // Rimbo's order of 2026-11-04: open on Digital Feng Shui and Echo; Innergym further down ("not that proud")
+  var DEFAULT_ORDER = ['dfs', 'echo', 'charlies', 'dieronesie', 'course', 'innergym', 'sandra', 'anapana', 'nathan', 'tinko'];
   var rank = null;
   try { rank = JSON.parse(localStorage.getItem('v2-rank') || 'null'); } catch (e) {}
   var order = ((rank && rank.order) || DEFAULT_ORDER).filter(function (k) { return W[k]; });
@@ -88,7 +90,7 @@
   hero.className = 'v2-hero';
   hero.innerHTML =
     '<div class="v2-hero_stage" aria-hidden="true"><div class="v2-band">' +
-      row(names, 'left', 55, 'v2-band_edge') +
+      row(names, 'left', 55, 'v2-band_edge', Math.max(2, Math.ceil(300 / (names.length * 14)))) + // enough copies of the names to cover the band
       row(rowA.map(function (w) { return panel(w, noClips); }), 'left', 18 * rowA.length, '', copies(rowA.length)) +
       (rowB.length ? row(rowB.map(function (w) { return panel(w, noClips); }), 'right', 19 * rowB.length, '', copies(rowB.length)) : '') +
     '</div><div class="v2-edgeblur"></div></div>' +
@@ -220,10 +222,30 @@
   // ---- the loader: the clips start under a dark cover (that was the lag he saw), a counter and
   // a thin line fill up as the covers and clips get ready, then html.v2-ready brings the band up.
   // Never shorter than 1.3 s (so it reads), never longer than 5 s (a slow clip must not hold the page).
+  // ---- where the band opens: rank 1 a third in from the left, rank 2 beside it (the row moves left,
+  // so rank 2 is the next to arrive). The marquee is a looping tween on the row's lists (built by
+  // main.js after this script); its progress is scanned for the spot that puts rank 1 nearest the mark.
+  var startAt = function () {
+    var list = hero.querySelector('.v2-row:not(.v2-band_edge) [data-marquee-collection-target]');
+    var tween = (window.gsap && list) ? gsap.getTweensOf(list).filter(function (t) { return t.duration() > 0; })[0] : null;
+    if (!tween) return false;
+    var want = W[visible[0]].name, tx = window.innerWidth * 0.38, ty = window.innerHeight * 0.55, best = null;
+    var panels = Array.prototype.filter.call(list.parentNode.querySelectorAll('.v2-panel'), function (p) { return p.getAttribute('aria-label') === want; });
+    for (var p = 0; p < 1; p += 0.02) {
+      tween.progress(p);
+      panels.forEach(function (el) { var r = el.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - tx, r.top + r.height / 2 - ty); if (!best || d < best.d) best = { d: d, p: p }; });
+    }
+    tween.progress(best ? best.p : 0.5);
+    return true;
+  };
   var ready = function () {
-    var el = hero.querySelector('.v2-loader');
-    document.documentElement.classList.add('v2-ready');
-    if (el) setTimeout(function () { el.remove(); }, 1200);
+    var tries = 0;
+    (function go() {
+      if (!startAt() && tries++ < 90) return requestAnimationFrame(go);
+      var el = hero.querySelector('.v2-loader');
+      document.documentElement.classList.add('v2-ready');
+      if (el) setTimeout(function () { el.remove(); }, 1200);
+    })();
   };
   if (noLoader) { ready(); }
   else {
