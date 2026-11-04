@@ -3083,7 +3083,7 @@
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
-    var exitTilt = kind === 'spatial' ? param('exit', 'exit', 40) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
+    var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
     var exitDepth = param('exitdepth', 'exit-depth', 2400); // home-v4: the perspective of that tip in px; lower = the near half swells more
     var scrolled = false; // the hero has started to scroll away: the auto-step clock holds, the drum belongs to the scroll
     var stepNext = null;
@@ -3409,6 +3409,30 @@
     // A page that still pairs a fixed hero with a [data-band-spacer] gets the same, measured on the spacer.
     // Off-screen, the hero hides and its clips pause until the visitor comes back.
     var spacer = qs('[data-band-spacer]'), scrollRef = spacer || hero;
+    // ---- home-v4, the scroll pieces that must exist before anyone scrolls. Not in fadeBehind, which waits for the
+    // opening: a trigger made mid-scroll snaps the drum to the current progress, the "straight, then clips to 3D"
+    // Rimbo saw. The 3D exit: as the hero leaves, the whole drum tips over about its centre (no recede, it keeps its
+    // size), on a 3D layer from the first frame so nothing re-rasterizes when the tip starts. And the scroll turn:
+    // drumTurn cards over the first screen, back on the way up, settling on a card at the top.
+    if (window.ScrollTrigger && !reduced && slider && kind === 'spatial') {
+      if (exitTilt) {
+        gsap.set(slider, { rotationX: 0, transformPerspective: exitDepth, transformOrigin: '50% 50%', force3D: true });
+        gsap.to(slider, { rotationX: exitTilt, transformPerspective: exitDepth, transformOrigin: '50% 50%', force3D: true, ease: 'none', scrollTrigger: { trigger: scrollRef, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } });
+      }
+      if (drumTurn) {
+        var turned = 0;
+        ScrollTrigger.create({
+          trigger: scrollRef, start: 'top top', end: 'bottom top',
+          onUpdate: function (st) {
+            scrolled = st.progress > 0.02;
+            var d = slider._spatialSliderDraggable, want = drumTurn * st.progress;
+            if (d && (d.isPressed || d.isDragging || d.isThrowing)) { turned = want; return; } // a hand on the drum wins; the scroll picks up from wherever it lands
+            turnDrum(want - turned); turned = want;
+            if (st.progress <= 0) settleDrum();
+          }
+        });
+      }
+    }
     // "See the work" points at #work: the section after the hero answers to it, and the hero's in-page
     // links scroll with Lenis (the Webflow jQuery scroller would fight it)
     var next = qs('[data-band-next]');
@@ -3428,22 +3452,6 @@
       if (wheel && spin) { // the wheel turns with the scroll: spin degrees over the first screen, back again on the way up
         var spun = 0;
         ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
-      }
-      if (!reduced && slider && kind === 'spatial' && exitTilt) { // home-v4, the 3D exit: as the hero leaves, the whole drum tips over about its centre, in step with the scroll (no recede: it keeps its size, Rimbo)
-        gsap.to(slider, { rotationX: exitTilt, transformPerspective: exitDepth, transformOrigin: '50% 50%', ease: 'none', scrollTrigger: { trigger: scrollRef, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } });
-      }
-      if (drumTurn && !reduced && slider && kind === 'spatial') { // home-v4: the drum turns with the scroll, drumTurn cards over the first screen, and settles on a card back at the top
-        var turned = 0;
-        ScrollTrigger.create({
-          trigger: scrollRef, start: 'top top', end: 'bottom top',
-          onUpdate: function (st) {
-            scrolled = st.progress > 0.02;
-            var d = slider._spatialSliderDraggable, want = drumTurn * st.progress;
-            if (d && (d.isPressed || d.isDragging || d.isThrowing)) { turned = want; return; } // a hand on the drum wins; the scroll picks up from wherever it lands
-            turnDrum(want - turned); turned = want;
-            if (st.progress <= 0) settleDrum();
-          }
-        });
       }
       if (copy) {
         gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
