@@ -2963,12 +2963,13 @@
 
     // ---- the wheel (home-v3, Osmo's radial slider): three turns on top of Osmo's drag, all through the slider's
     // own proxy and render (turn below), so a hand on the wheel always wins and the layout maths stays Osmo's.
-    //   roll-in  the opening: the wheel waits turned back by N degrees and rolls to rest while the title rises
-    //            (?rollin=N / data-band-rollin, default 90; 0 = off)
+    //   roll-in  the opening: the wheel waits turned N degrees on and rolls back to rest while the title rises, the
+    //            same way round as the drift, so the motion never turns about (Rimbo: the first cut rolled in to the
+    //            right and then drifted left) (?rollin=N / data-band-rollin, default 90; 0 = off)
     //   drift    at rest the wheel keeps turning, N degrees a second, so the next card drifts into the middle every
-    //            few seconds; it holds while the pointer is over the cards, during a drag or its throw, during a
-    //            step or the roll-in, in a hidden tab or once the hero has scrolled away, and eases back up to speed
-    //            after (?drift=N / data-band-drift, default 3; 0 = off)
+    //            few seconds; it holds during a drag or its throw, during a step or the roll-in, in a hidden tab or
+    //            once the hero has scrolled away, and eases back up to speed after; it does not stop for a pointer
+    //            over the cards (Rimbo: not needed) (?drift=N / data-band-drift, default 3; 0 = off)
     //   spin     scrolling the hero away turns the wheel N degrees over that first screen, so it rolls out under the
     //            copy and rolls back on the way up (?spin=N / data-band-spin, default 24; 0 = off)
     // All three are off under prefers-reduced-motion.
@@ -2981,14 +2982,11 @@
       gsap.set(proxy, { rotation: (parseFloat(gsap.getProperty(proxy, 'rotation')) || 0) + deg });
       d.update(); render();
     };
-    var wheelOver = false;
     if (wheel) {
       var wzone = qs('[data-radial-slider-collection]', wheel) || wheel;
-      wzone.addEventListener('pointerenter', function () { wheelOver = true; });
-      wzone.addEventListener('pointerleave', function () { wheelOver = false; });
       wzone.addEventListener('pointerdown', function () { if (wheel._radialSliderProxy) gsap.killTweensOf(wheel._radialSliderProxy); }, true); // a hand on the wheel ends the roll-in or a step where it is
     }
-    var rollWheelIn = function () { // called by the opening: the wheel is already turned back; this rolls it to rest
+    var rollWheelIn = function () { // called by the opening: the wheel is already turned on by rollIn; this rolls it back to rest
       var proxy = wheel && wheel._radialSliderProxy, d = wheel && wheel._radialSliderDraggable, render = wheel && wheel._radialSliderRender;
       if (!rollIn || !proxy || !d || !render) return;
       // a long, even slow-down: the stage itself fades in over its first 1.2 s, so a quick ease would be over before the wheel is seen
@@ -2999,7 +2997,7 @@
       var v = 0; // degrees a second right now, easing towards drift or 0
       gsap.ticker.add(function (t, dt) {
         var proxy = wheel._radialSliderProxy;
-        var want = (wheelOver || hidden || document.hidden || wheelHeld() || (proxy && gsap.isTweening(proxy))) ? 0 : drift;
+        var want = (hidden || document.hidden || wheelHeld() || (proxy && gsap.isTweening(proxy))) ? 0 : drift;
         v += (want - v) * Math.min(1, dt / 1000 * (want ? 1.5 : 6)); // up to speed in about a second and a half, off within a beat
         if (Math.abs(v) < 0.01) { v = 0; return; }
         if (wheelHeld()) return;
@@ -3320,7 +3318,7 @@
       // centre to full size, the middle card first and the rest following outward.
       // The wheel (home-v3) does not wait: it rolls in with the reveal instead (rollWheelIn above).
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
-      if (rollIn && wheel && wheel._radialSliderProxy) { turn(-rollIn); rollWheelIn(); }
+      if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
       [cardsAfter ? null : stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
