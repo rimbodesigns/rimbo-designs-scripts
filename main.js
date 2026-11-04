@@ -3289,6 +3289,9 @@
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
     var mode = (location.search.match(/[?&]menu=(flat|blur)/) || [])[1] || 'curve';
+    // hover extras to try, alone or combined: ?hover=magnet,blur,stretch,lean (default: only the fade)
+    var hover = ((location.search.match(/[?&]hover=([a-z,]+)/) || [])[1] || '').split(',');
+    function hoverHas(name) { return hover.indexOf(name) > -1; }
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     var ease = 'cubic-bezier(.65, 0, .35, 1)';
@@ -3318,7 +3321,12 @@
       '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity .5s ' + ease + '; }',
       '.bold-nav-full__link { display: block; color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: min(calc(4.4vw + 4.4vh), 9.5rem); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; will-change: transform; }',
       // hover: the other links fade back, the hovered one stays as it is (no colour change, no roll)
-      '.bold-nav-full__link-text { display: block; }',
+      '.bold-nav-full__link-text { display: block; will-change: transform; transition: letter-spacing .7s ' + ease + (hoverHas('lean') ? ', transform .6s ' + ease : '') + '; }', // GSAP moves it for the magnet, so no CSS transform transition then
+      // once the menu has settled the masks open up, so a hover that moves or leans a word is never clipped
+      '.bold-nav-full.is-settled .bold-nav-full__li { overflow: visible; }',
+      hoverHas('blur') ? '.bold-nav-full__li { transition: opacity .5s ' + ease + ', filter .5s ' + ease + '; } .bold-nav-full__ul:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) .bold-nav-full__li { filter: blur(4px); } .bold-nav-full__ul .bold-nav-full__li:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) { filter: none; }' : '',
+      hoverHas('stretch') ? '.bold-nav-full__link:hover .bold-nav-full__link-text, .bold-nav-full__link:focus-visible .bold-nav-full__link-text { letter-spacing: .06em; }' : '',
+      hoverHas('lean') ? '.bold-nav-full__link:hover .bold-nav-full__link-text, .bold-nav-full__link:focus-visible .bold-nav-full__link-text { transform: skewX(-9deg); }' : '',
       '.bold-nav-full__link:hover, .bold-nav-full__link:focus, .bold-nav-full__link:focus-visible { color: var(--nf-ink); outline: none; }', // the site's global link hover would turn it coral
       '.bold-nav-full__ul:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) .bold-nav-full__li { opacity: .25; }',
       '.bold-nav-full__ul .bold-nav-full__li:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) { opacity: 1; }',
@@ -3400,7 +3408,7 @@
       }
 
       if (active) {
-        tl = gsap.timeline({ onComplete: function () { tile.style.clipPath = 'none'; } }); // open: no clip, so a resize can't cut it
+        tl = gsap.timeline({ onComplete: function () { tile.style.clipPath = 'none'; nav.classList.add('is-settled'); } }); // open: no clip, so a resize can't cut it
         tl.set(tile, { visibility: 'visible' });
         if (mode === 'blur') {
           if (edge.p === 0) tl.set(tile, { opacity: 0 }, 0); // from fully closed: fade in from nothing
@@ -3414,9 +3422,11 @@
         tl.to(links, { yPercent: 0, rotate: 0, duration: 1.2, ease: 'expo.out', stagger: 0.07 }, mode === 'blur' ? 0.15 : 0.45)
           .to(bottom, { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out', stagger: 0.06, startAt: { y: 8 } }, mode === 'blur' ? 0.35 : 0.7);
       } else {
+        nav.classList.remove('is-settled');
         tl = gsap.timeline({ onComplete: function () {
           gsap.set(tile, { visibility: 'hidden' });
           gsap.set(links, { rotate: 4 }); // ready to rise from below next time
+          gsap.set(qsa('.bold-nav-full__link-text', nav), { x: 0, y: 0 }); // a magnet hover never stays behind
         } });
         // the words sink back down into their masks (going up would pull the hover copy, the text-shadow under
         // each word, through the mask); bottom word first, so the stack empties from below
@@ -3434,6 +3444,24 @@
     }
 
     btn.addEventListener('click', function () { set(!isOpen); });
+
+    // ?hover=magnet: the word under the pointer leans a little towards it and springs back when the pointer leaves
+    if (hoverHas('magnet') && !reduce && window.matchMedia('(pointer: fine)').matches) {
+      links.forEach(function (a) {
+        var text = qs('.bold-nav-full__link-text', a);
+        a.addEventListener('pointermove', function (e) {
+          var r = a.getBoundingClientRect();
+          gsap.to(text, {
+            x: (e.clientX - (r.left + r.width / 2)) * 0.12,
+            y: (e.clientY - (r.top + r.height / 2)) * 0.25,
+            duration: 0.6, ease: 'power3.out', overwrite: 'auto'
+          });
+        });
+        a.addEventListener('pointerleave', function () {
+          gsap.to(text, { x: 0, y: 0, duration: 1.1, ease: 'elastic.out(1, 0.45)', overwrite: 'auto' });
+        });
+      });
+    }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) set(false); });
     // coming back with the browser's back button shows the page, not a menu left open
     window.addEventListener('pageshow', function (e) {
