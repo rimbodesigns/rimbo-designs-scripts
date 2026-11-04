@@ -2099,6 +2099,19 @@
     // A page that still pairs a fixed hero with a [data-band-spacer] gets the same, measured on the spacer.
     // Off-screen, the hero hides and its clips pause until the visitor comes back.
     var spacer = qs('[data-band-spacer]'), scrollRef = spacer || hero;
+    // "See the work" points at #work: the section after the hero answers to it, and the hero's in-page
+    // links scroll with Lenis (the Webflow jQuery scroller would fight it)
+    var next = qs('[data-band-next]');
+    if (next && !next.id && !byId('work')) next.id = 'work';
+    hero.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (!a || a.getAttribute('href').length < 2) return;
+      var target = byId(a.getAttribute('href').slice(1));
+      if (!target) return;
+      e.preventDefault(); e.stopPropagation();
+      if (window.lenis && window.lenis.scrollTo) window.lenis.scrollTo(target, { duration: 1.4 });
+      else target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+    });
     var fadeBehind = function () {
       if (!window.ScrollTrigger) return;
       var quick = function () { return '+=' + Math.round(window.innerHeight * 0.18); }; // gone within the first fifth of a screen
@@ -2346,10 +2359,13 @@
       var s = lineA && alt && qs('.btn_t', lineA) ? swap(lineA, alt) : null;
       var b = s ? boil(s.chars) : null;
       var arrows = qsa('.btn_arrow', btn); // after the swap built line B, so both arrows nudge
+      var downs = arrows.filter(function (a) { return /\u2193/.test(a.textContent); }); // a down arrow nudges down, not right
+      var sides = arrows.filter(function (a) { return downs.indexOf(a) < 0; });
       var timer = null;
       var m = magnet(btn, {
         activate: function () {
-          if (arrows.length) gsap.to(arrows, { x: em(btn, 0.35), duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
+          if (sides.length) gsap.to(sides, { x: em(btn, 0.35), duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
+          if (downs.length) gsap.to(downs, { y: em(btn, 0.3), duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
           if (s) s.to(true);
           if (b) timer = gsap.delayedCall(0.4, b.start);
         },
@@ -2357,7 +2373,7 @@
           if (timer) timer.kill();
           if (b) b.stop();
           if (s) s.to(false);
-          if (arrows.length) gsap.to(arrows, { x: 0, duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
+          if (arrows.length) gsap.to(arrows, { x: 0, y: 0, duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
         }
       });
       press(btn, m);
