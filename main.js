@@ -4128,7 +4128,7 @@
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
-  var navFull = path === '/home-copy' || path === '/resources' || path === '/locations'; // the new menu, page by page until Rimbo's go
+  var navFull = path === '/home-copy' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go
   if (navFull) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
