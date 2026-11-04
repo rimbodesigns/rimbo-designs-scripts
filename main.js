@@ -3316,13 +3316,12 @@
       '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; visibility: hidden; will-change: clip-path; }',
       '.bold-nav-full__ul { flex-flow: column; align-items: center; margin: 0; padding: 0; display: flex; list-style: none; }',
       '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity .5s ' + ease + '; }',
-      '.bold-nav-full__link { display: block; color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: calc(3.2vw + 3.2vh); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; will-change: transform; }',
-      // hover (Osmo): the word rolls up to its copy, the other links step back
-      '.bold-nav-full__link-text { text-shadow: 0 1.15em 0; display: block; position: relative; transition: transform .6s ' + ease + '; transform: translateY(0%) rotate(0.001deg); }',
-      '.bold-nav-full__link:hover .bold-nav-full__link-text, .bold-nav-full__link:focus-visible .bold-nav-full__link-text { transform: translateY(-100%) rotate(0.001deg); }',
-      '.bold-nav-full__link:focus { outline: none; }',
-      '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li { opacity: .2; }',
-      '.bold-nav-full__ul:has(.bold-nav-full__li:hover) .bold-nav-full__li:hover { opacity: 1; }',
+      '.bold-nav-full__link { display: block; color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: min(calc(4.4vw + 4.4vh), 9.5rem); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; will-change: transform; }',
+      // hover: the other links fade back, the hovered one stays as it is (no colour change, no roll)
+      '.bold-nav-full__link-text { display: block; }',
+      '.bold-nav-full__link:hover, .bold-nav-full__link:focus, .bold-nav-full__link:focus-visible { color: var(--nf-ink); outline: none; }', // the site's global link hover would turn it coral
+      '.bold-nav-full__ul:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) .bold-nav-full__li { opacity: .25; }',
+      '.bold-nav-full__ul .bold-nav-full__li:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) { opacity: 1; }',
       // bottom row: language left, time middle, email right
       '.bold-nav__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; padding: 0 5% 2.25rem; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }',
       '.bold-nav__bottom > * { opacity: 0; }',
@@ -3337,7 +3336,7 @@
       '.bold-nav__lang a:hover { color: rgba(19, 19, 19, .8); }',
       '.bold-nav__lang a[data-toggle-active] { color: #131313; }',
       '.bold-nav__lang a:focus-visible { outline: 1px solid #131313; outline-offset: 2px; }',
-      '@media (max-width: 767px) { .bold-nav-full__link { font-size: 11vw; } .bold-nav__bottom { grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; } .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; } .bold-nav__lang { order: 3; margin-top: .25em; } }'
+      '@media (max-width: 767px) { .bold-nav-full__link { font-size: 12.5vw; } .bold-nav__bottom { grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; } .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; } .bold-nav__lang { order: 3; margin-top: .25em; } }'
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
