@@ -2256,7 +2256,7 @@
     var copy = qs('.band_copy', hero), title = qs('.band_title', hero), eyebrow = qs('.band_eyebrow', hero);
     var curve = 0; // set below (the curve experiment)
     var buttons = qsa('.btn', copy || hero), scrollLine = qs('.band_scroll', hero), loader = qs('.band_loader', hero);
-    var nav = [byId('FIXED_NAV'), qs('.burgermenu')].filter(Boolean);
+    var nav = [byId('FIXED_NAV'), qs('.burgermenu'), qs('.bold-nav-full__bar')].filter(Boolean); // the old or the new (rdNavFull) logo + burger
     var hidden = false;
 
     // ---- clips: play every video once (the marquee clones the row after this; re-touching a running video makes it hiccup)
@@ -3462,10 +3462,10 @@
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
+  var navFull = path === '/home-copy' || path === '/resources'; // the new menu, page by page until Rimbo's go
+  if (navFull) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
-  var navFull = path === '/home-copy' || path === '/resources'; // the new menu, page by page until Rimbo's go
-  if (navFull) run('full screen nav', rdNavFull);
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
