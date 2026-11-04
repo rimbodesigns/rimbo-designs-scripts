@@ -2165,6 +2165,9 @@
     var opened = false;
     var open = function () {
       if (opened) return; opened = true;
+      // every clip starts from its first frame as the band reveals, so the visitor sees each opening
+      // (Echo's own loader, say) instead of whatever was playing behind the black
+      qsa('video', hero).forEach(function (v) { try { v.currentTime = 0; } catch (e) {} if (v.paused && !hidden) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
       [stage, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
@@ -2455,6 +2458,16 @@
     // Osmo hides a label that would touch the one above it
     '.scroll-ruler { top: 15svh; bottom: 15svh; }',
     '.scroll-ruler__label { padding-top: 0.25em; padding-bottom: 0.25em; }',
+    // labels: only the section you're in shows; the others appear while the mouse is on the ruler or
+    // its labels (or a label has keyboard focus). A hidden label still answers the mouse, so moving from
+    // the ticks to a label never drops the reveal on the way.
+    '.scroll-ruler__label { opacity: 0; transition: opacity 0.35s ease, color 0.35s ease; }',
+    '.scroll-ruler:hover .scroll-ruler__label:not([data-scroll-ruler-status="active"]):not(:hover):not(:focus-visible),' +
+    '.scroll-ruler:has(.scroll-ruler__label:focus-visible) .scroll-ruler__label:not([data-scroll-ruler-status="active"]):not(:hover):not(:focus-visible) { opacity: 0.45; }',
+    // a label Osmo left out because its section is short still shows while you're in that section
+    // (rdScrollRuler places it); a neighbour it would touch steps aside meanwhile
+    '.scroll-ruler__label[hidden][data-scroll-ruler-status="active"] { display: block; }',
+    '.scroll-ruler__label.is-yielding { visibility: hidden; }',
     // too narrow for the labels next to the text: ticks only (they stay in the layout, so Osmo can still measure them)
     '.scroll-ruler.is-compact .scroll-ruler__labels { visibility: hidden; }',
     // phones: the text starts 5vw (about 19px) from the edge, so the ticks get small enough to stay in
@@ -2534,6 +2547,78 @@
     fitLabels();
     var fitTimer;
     window.addEventListener('resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(fitLabels, 150); });
+
+    // Osmo leaves out a label that would touch the one above it and never places it. Those get
+    // their place here (same sums as Osmo's measure()), so the section you're in always has its label.
+    var ticks = qsa('[data-scroll-ruler-tick]', root);
+    var labels = qsa('[data-scroll-ruler-label]', labelWrap);
+    function partStarts() { // where each part starts along the ruler, 0 to 1 (Osmo's measure() sums)
+      var sy = window.scrollY, last = headings.length - 1;
+      var tops = headings.map(function (h) { return h.getBoundingClientRect().top + sy; });
+      var end = headings[last].getBoundingClientRect().bottom + sy;
+      var start = Math.max(tops[0], window.innerHeight / 2);
+      var length = Math.max(Math.min(end, document.documentElement.scrollHeight - window.innerHeight / 2) - start, 1);
+      return tops.map(function (top) { return gsap.utils.clamp(0, 1, (top - start) / length); });
+    }
+    function placeLeftOut() {
+      var starts = partStarts();
+      labels.forEach(function (l, i) {
+        if (!l.hidden) return;
+        var tick = ticks[Math.round(starts[i] * (ticks.length - 1))];
+        if (tick) gsap.set(l, { y: tick.offsetTop + tick.offsetHeight / 2, yPercent: -50 });
+      });
+      makeRoom();
+    }
+    // while a left-out label is the active one, the labels it would touch are hidden
+    function makeRoom() {
+      var active = labels.filter(function (l) { return l.getAttribute('data-scroll-ruler-status') === 'active'; })[0];
+      var shown = labels.filter(function (l) { return !l.hidden; })[0];
+      var reach = (shown ? shown.offsetHeight : 16) * 1.1;
+      var y = active && active.hidden ? gsap.getProperty(active, 'y') : null;
+      labels.forEach(function (l) {
+        l.classList.toggle('is-yielding', y !== null && l !== active && !l.hidden && Math.abs(gsap.getProperty(l, 'y') - y) < reach);
+      });
+    }
+    placeLeftOut();
+    // Clicks on the ruler, seen before Osmo's own handlers (its labels stop the click from bubbling):
+    // - a mouse click leaves the label focused, which keeps the ruler awake (Osmo counts focus as
+    //   activity), so a clicked label lets go of focus; keyboard users keep theirs
+    // - lazy images above the target can still load while the page glides there and push the heading
+    //   down, so once the scroll has settled, a jump that came up short goes the rest of the way
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var list = qs('[data-scroll-ruler-list]', root);
+    root.addEventListener('click', function (e) {
+      var label = e.target.closest ? e.target.closest('[data-scroll-ruler-label]') : null;
+      if (label && e.detail) label.blur();
+      var index = label ? labels.indexOf(label) : partAt((e.clientY - list.getBoundingClientRect().top) / list.getBoundingClientRect().height);
+      if (index >= 0) settleOn(headings[index], 2);
+    }, true);
+    function partAt(position) { // the part Osmo's findPart() picks for a click on the ticks
+      var starts = partStarts(), found = 0;
+      starts.forEach(function (start, i) { if (start <= gsap.utils.clamp(0, 1, position)) found = i; });
+      return found;
+    }
+    function settleOn(heading, corrections) {
+      var last = -1, still = 0, frames = 0, cancelled = false;
+      function cancel() { cancelled = true; }
+      ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (t) { window.addEventListener(t, cancel, { once: true, passive: true }); });
+      requestAnimationFrame(function check() {
+        if (cancelled) return;
+        var y = window.scrollY;
+        still = y === last ? still + 1 : 0; last = y;
+        if (still < 8 && ++frames < 600) return requestAnimationFrame(check); // until it has stood still for ~8 frames
+        ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (t) { window.removeEventListener(t, cancel); });
+        var off = heading.getBoundingClientRect().top;
+        if (Math.abs(off) > 2 && corrections > 0) {
+          window.scrollTo({ top: y + off, behavior: reduce.matches ? 'auto' : 'smooth' });
+          settleOn(heading, corrections - 1);
+        }
+      });
+    }
+    new MutationObserver(makeRoom).observe(labelWrap, { subtree: true, attributes: true, attributeFilter: ['data-scroll-ruler-status'] });
+    // after Osmo re-measures (it waits 100 ms after a size change)
+    var placeTimer;
+    new ResizeObserver(function () { clearTimeout(placeTimer); placeTimer = setTimeout(placeLeftOut, 250); }).observe(document.body);
 
     // On screen only while the article is: in once its top is in view, out once its end has
     // passed the bottom of the ruler (80% down), so it never sits over the newsletter or footer
