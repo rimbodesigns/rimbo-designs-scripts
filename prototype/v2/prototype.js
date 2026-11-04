@@ -13,8 +13,8 @@
     var el = document.querySelector(sel); if (el) el.remove();
   });
 
-  // ---- the work on the band: only the nine projects Rimbo approved (older work stays out).
-  // The five clips are spread over both rows so both rows move; the rest show covers. A project
+  // ---- the work on the band: only the ten projects Rimbo approved (older work stays out).
+  // The six clips are spread over both rows so both rows move; the rest show covers. A project
   // appears once per row, with its clip in one row and its cover in the other where it has a clip.
   var CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
   var DFS_COVER = CDN + '6aa42d7d36f358a8814102d0_PNG%20to%20AVIF%20Cover%20v2.avif';
@@ -27,13 +27,14 @@
     dieronesie: { name: 'Dieronesie', video: '/media/dieronesie.mp4', rate: 1.5, img: CDN + '68f63e4c1c1c36bdbb3f83d2_V1_dieronesie.avif', href: 'https://www.rimbodesigns.com/work/dieronesie-retreat-festival-ceremony' },
     sandra: { name: 'Sandra Dreisbach', img: CDN + '67e3dbbfbf16c85454d3ebf2_Sandra%205.avif', href: 'https://www.sandradreisbach.com/' },
     course: { name: 'Digital Feng Shui · course', video: '/media/dfs-home.mp4', rate: 1.5, img: DFS_COVER, href: 'https://www.digital-fengshui.com/' },
-    pooh: { name: 'Pooh Balance', img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif', href: 'https://www.rimbodesigns.com/work/pooh-balance' }
+    pooh: { name: 'Pooh Balance', img: CDN + '6821a15537f8a86203c318b7_PoohV2.avif', href: 'https://www.rimbodesigns.com/work/pooh-balance' },
+    echo: { name: 'Echo Creative Agency', video: '/media/echo.mp4', rate: 1.5, img: '/media/echo/echo-preview-a.jpg', href: 'https://echocreativeagency.nl/' }
   };
   function cover(w) { return { name: w.name, img: w.img, href: w.href }; }
-  // upper row, moves left: Innergym, Charlie's and the DFS course play
-  var rowA = [W.innergym, W.nathan, W.charlies, W.anapana, W.course, W.sandra, cover(W.dieronesie), W.pooh, cover(W.dfs)];
+  // upper row, moves left: Innergym, Charlie's, the DFS course and Echo play
+  var rowA = [W.innergym, W.nathan, W.charlies, W.anapana, W.course, W.sandra, cover(W.dieronesie), W.pooh, cover(W.dfs), W.echo];
   // lower row, moves right: DFS and Dieronesie play; the order keeps each project away from its twin above
-  var rowB = [W.dfs, W.pooh, cover(W.charlies), W.sandra, W.dieronesie, W.nathan, cover(W.course), W.anapana, cover(W.innergym)];
+  var rowB = [W.dfs, W.pooh, cover(W.charlies), cover(W.echo), W.sandra, W.dieronesie, W.nathan, cover(W.course), W.anapana, cover(W.innergym)];
 
   function panel(w, coverOnly) {
     var media = (w.video && !coverOnly)
