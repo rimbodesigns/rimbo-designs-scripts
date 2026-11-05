@@ -11,6 +11,7 @@ const server = http.createServer((req, res) => {
     if (/^\/v\d+\/?$/.test(p)) p = '/prototype' + p.replace(/\/$/, '') + '/index.html'; // /v1, /v2 ...
     if (p === '/rank') p = '/prototype/v2/rank.html';                             // the ranking tool for the band
     if (p === '/buttons') p = '/prototype/buttons';                              // the button lab
+    if (/^\/drum\/?$/.test(p)) p = '/prototype/drum/';                               // the drum lab (home V4 exits and extras, side by side)
     if (/^\/post\/[\w-]+\/?$/.test(p)) p = '/prototype/post/' + p.split('/')[2] + '.html'; // blog post copies (prototype/post/sync.js)
     if (/^\/resources\/?$/.test(p)) p = '/prototype/resources/index.html';          // the blog overview prototype (prototype/resources/sync.js)
     let file = path.join(root, p);

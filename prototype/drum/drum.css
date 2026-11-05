@@ -1,0 +1,56 @@
+/* Drum lab: the home V4 drum, ten ideas side by side. Dark like the site, RM Mono like the labs before it. */
+@font-face { font-family: "RM MONO"; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+
+:root {
+  --bg: #0c0c0c; --ink: #f8f5ee; --dim: #a4a4a4; --line: rgba(248, 245, 238, .14); --card: #161616; --accent: #f3562e;
+  --bar-h: 64px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { min-height: 100svh; font-family: "RM MONO", monospace; font-size: 12px; letter-spacing: .08em; -webkit-font-smoothing: antialiased; padding-bottom: calc(var(--bar-h) + 24px); }
+
+.lab-head { display: flex; justify-content: space-between; gap: 24px; padding: 22px 32px; text-transform: uppercase; color: var(--dim); font-size: 11px; }
+.lab-head i { font-style: normal; margin: 0 .5em; opacity: .5; }
+
+.lab-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 24px; padding: 0 32px; }
+@media (max-width: 900px) { .lab-grid { grid-template-columns: 1fr; } }
+.lab-grid.is-focus .lab-cell:not(.is-on) { display: none; }
+.lab-grid.is-focus .lab-cell.is-on { grid-column: 1 / -1; }
+
+.lab-cell { min-width: 0; }
+.lab-meta { display: flex; align-items: baseline; gap: 14px; text-transform: uppercase; margin: 0 0 6px; }
+.lab-num { color: var(--dim); }
+.lab-name { font-size: 13px; }
+.lab-cost { margin-left: auto; color: var(--dim); font-size: 10px; }
+.lab-cost.is-staging { color: var(--accent); }
+.lab-note { margin: 0 0 12px; color: var(--dim); letter-spacing: .04em; line-height: 1.5; text-transform: none; max-width: 70ch; }
+
+/* the stage: a 16:10 window on the site's black, the scene inside leaves upward like the hero does */
+.lab-stage { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: zoom-in; user-select: none; -webkit-user-select: none; }
+.lab-cell.is-on .lab-stage { cursor: zoom-out; }
+.scene { position: absolute; inset: 0; }
+.scene-copy { position: absolute; left: 0; right: 0; top: 11%; text-align: center; text-transform: uppercase; font-size: 11px; letter-spacing: .22em; color: var(--ink); pointer-events: none; }
+.scene-next { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; text-transform: uppercase; letter-spacing: .3em; font-size: 22px; color: var(--ink); opacity: 0; pointer-events: none; }
+.scene-next small { display: block; margin-top: 10px; font-size: 10px; color: var(--dim); letter-spacing: .18em; }
+.counter { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; font-size: 11px; letter-spacing: .3em; color: var(--dim); }
+.counter b { font-weight: 400; color: var(--ink); }
+
+/* the drum: a cylinder of cards, its axis R behind the front card (the same geometry as the Osmo slider on the site) */
+.view { position: absolute; left: 0; right: 0; top: 50%; height: 0; transform-style: preserve-3d; }
+.pivot { position: absolute; left: 50%; top: 0; width: 0; height: 0; transform-style: preserve-3d; }
+.drum { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; }
+.card { position: absolute; left: 0; top: 0; width: var(--card-w); height: calc(var(--card-w) / 1.02); margin-left: calc(var(--card-w) / -2); margin-top: calc(var(--card-w) / -2.04); background: var(--card); border: 1px solid var(--line); border-radius: 4%; overflow: hidden; box-shadow: 0 .7em 1.4em rgba(0, 0, 0, .55); backface-visibility: hidden; transform-style: preserve-3d; }
+.card img, .card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.card-gloss { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .55) 50%, rgba(255, 255, 255, 0) 70%); opacity: 0; mix-blend-mode: screen; pointer-events: none; }
+
+/* the reflection: a second drum upside down, fading out */
+/* a box under the drum, its contents flipped: the local bottom lands against the drum, the local top fades out below */
+.reflect { position: absolute; left: 0; right: 0; top: 69%; height: 38%; transform: scaleY(-1); opacity: .4; -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.7) 0%, rgba(0,0,0,0) 60%); mask-image: linear-gradient(to top, rgba(0,0,0,.7) 0%, rgba(0,0,0,0) 60%); pointer-events: none; }
+
+/* the bar */
+.lab-bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--bar-h); display: flex; align-items: center; gap: 20px; padding: 0 32px; background: rgba(12, 12, 12, .92); border-top: 1px solid var(--line); backdrop-filter: blur(8px); }
+.lab-play { font: inherit; text-transform: uppercase; letter-spacing: .14em; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 9px 16px; cursor: pointer; min-width: 84px; }
+.lab-play.is-on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.lab-scrub { flex: 1; display: flex; align-items: center; gap: 16px; text-transform: uppercase; color: var(--dim); }
+.lab-scrub input { flex: 1; accent-color: var(--ink); height: 2px; cursor: ew-resize; }
+.lab-scrub-v { min-width: 4ch; text-align: right; color: var(--ink); }
