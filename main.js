@@ -5265,11 +5265,11 @@
       if (window.lenis && window.lenis.scrollTo) window.lenis.scrollTo(0, { duration: 1.8 }); else window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    // ---- Osmo's Text Scramble for the small text; the plugin comes from Webflow's GSAP CDN when it isn't there ----
+    // ---- Osmo's Text Scramble for the ruler's width label; the plugin comes from Webflow's GSAP CDN when it isn't there ----
     var scrambleOK = false;
     function scrambleReady() {
-      if (!window.gsap || !window.ScrambleTextPlugin || !window.SplitText || reduce) return;
-      gsap.registerPlugin(ScrambleTextPlugin, SplitText); scrambleOK = true;
+      if (!window.gsap || !window.ScrambleTextPlugin || reduce) return;
+      gsap.registerPlugin(ScrambleTextPlugin); scrambleOK = true;
     }
     scrambleReady();
     if (!scrambleOK && window.gsap && !reduce) {
@@ -5278,24 +5278,64 @@
       sc.onload = scrambleReady;
       document.head.appendChild(sc);
     }
-    var scState = new Map();
-    function scrambleSet(kid, on) {
-      var s = scState.get(kid) || { on: null, splits: [], tws: [] };
+    // ---- the small text writes itself in from an empty cell, left to right, a few loose glyphs running ahead of it
+    // (Rimbo, 5 Nov: it popped in whole and only then scrambled). Scrolling back it fades out. ?ftext=fade: a plain fade ----
+    var fadeOnly = /[?&]ftext=fade/.test(location.search);
+    var GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', AHEAD = 4;
+    var writeState = new Map();
+    function splitChars(s, kid) {
+      if (s.units) return;
+      s.root = kid.classList.contains('rdf-swap') ? kid.firstElementChild : kid; // the swap's second line stays out of sight anyway
+      s.units = [];
+      var walk = document.createTreeWalker(s.root, NodeFilter.SHOW_TEXT), nodes = [], n;
+      while ((n = walk.nextNode())) if (n.nodeValue.trim()) nodes.push(n);
+      nodes.forEach(function (node) {
+        if (node.parentNode.hasAttribute('data-rdf-clock')) { s.units.push({ el: node.parentNode }); return; } // the clock rewrites itself, so it comes in whole
+        var frag = document.createDocumentFragment();
+        Array.from(node.nodeValue).forEach(function (ch) {
+          if (!ch.trim()) { frag.appendChild(document.createTextNode(ch)); return; }
+          var el = document.createElement('span'); el.className = 'rdf-ch'; el.textContent = ch;
+          frag.appendChild(el); s.units.push({ el: el, ch: ch, loose: /[a-z0-9]/i.test(ch) });
+        });
+        node.parentNode.replaceChild(frag, node);
+      });
+    }
+    function joinChars(s) {
+      if (!s.units) return;
+      s.units.forEach(function (u) { if (u.ch) u.el.replaceWith(u.ch); else u.el.style.visibility = ''; });
+      s.root.normalize(); s.units = null;
+    }
+    function paintChars(s) {
+      var n = s.k * (s.units.length + AHEAD), now = performance.now(), roll = now - (s.rolled || 0) > 60;
+      if (roll) s.rolled = now;
+      s.units.forEach(function (u, i) {
+        u.el.style.visibility = i < n ? '' : 'hidden';
+        if (!u.ch) return;
+        var ahead = u.loose && i >= n - AHEAD && i < n;
+        if (ahead && (roll || !u.ahead)) u.el.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        else if (!ahead && u.ahead) u.el.textContent = u.ch;
+        if (ahead !== !!u.ahead) { u.ahead = ahead; u.el.style.opacity = ahead ? 0.55 : ''; }
+      });
+    }
+    function writeSet(kid, on) {
+      var s = writeState.get(kid) || { on: null, k: 0 };
       if (s.on === on) return;
-      s.on = on; scState.set(kid, s);
-      s.tws.forEach(function (t) { t.kill(); }); s.tws = [];
-      s.splits.forEach(function (sp) { sp.revert(); }); s.splits = [];
-      kid.style.clipPath = 'none'; kid.style.opacity = on ? 1 : 0;
-      if (!on || !scrambleOK) return;
-      var targets = !kid.children.length ? [kid] : kid.classList.contains('rdf-swap') ? [kid.firstElementChild]
-        : qsa('span, a', kid).filter(function (el) { return !el.children.length && el.textContent.trim(); });
-      targets.forEach(function (el) {
-        var sp = new SplitText(el, { type: 'words, chars', wordsClass: 'rdf-w', charsClass: 'rdf-c' });
-        s.splits.push(sp);
-        s.tws.push(gsap.to(sp.words, {
-          duration: 1.4, stagger: 0.015, scrambleText: { text: '{original}', chars: 'upperCase', speed: 0.95 },
-          onComplete: function () { sp.revert(); s.splits = s.splits.filter(function (x) { return x !== sp; }); }
-        }));
+      var first = s.on === null;
+      s.on = on; writeState.set(kid, s);
+      kid.style.clipPath = 'none';
+      if (s.fade) s.fade.kill();
+      if (s.write) s.write.kill();
+      if (first || !window.gsap) { s.k = on ? 1 : 0; kid.style.opacity = s.k; return; }
+      if (!on) {
+        s.fade = gsap.to(kid, { opacity: 0, duration: 0.5, ease: 'power1.out', onComplete: function () { s.k = 0; joinChars(s); } });
+        return;
+      }
+      s.fade = gsap.to(kid, { opacity: 1, duration: fadeOnly ? 1 : 0.3, ease: 'power1.out' });
+      if (fadeOnly || s.k >= 1) { s.k = 1; return; }
+      splitChars(s, kid); paintChars(s);
+      s.write = gsap.to(s, {
+        k: 1, duration: Math.min(1.5, 0.5 + s.units.length * 0.022), ease: 'sine.inOut',
+        onUpdate: function () { paintChars(s); }, onComplete: function () { joinChars(s); }
       });
     }
 
@@ -5333,9 +5373,9 @@
       var cv = qs('canvas', logoCell), ctx = cv.getContext('2d');
       var VB = { w: 72, h: 25.1 }, M = 30, T = { guide: 0.3, outline: 0.44, fill: 0.6 };
       var letters = [], rows = [], dpr = 1, S = 1, W = 0, H = 0, ready = false, pNow = 0;
-      // the size label (Rimbo, 5 Nov: "it flashes in and is gone"): once the dimension line has completed, the
-      // guides and the label stay for HOLD ms whatever the scroll does, then fade over half a second
-      var HOLD = 1600, labelAt = 0, holdRaf = 0;
+      // the size label (Rimbo, 5 Nov: "it flashes in"): once the dimension line has completed it fades in, stays whatever
+      // the scroll does and fades out again, the guides with it; scrolled back before that, it fades out from where it is
+      var LABEL_IN = 700, LABEL_HOLD = 1500, LABEL_OUT = 1000, labelAt = 0, labelK = 0, labelT = 0, holdRaf = 0;
       fetch(logoSrc).then(function (r) { return r.text(); }).then(function (txt) {
         var doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
         var NS = 'http://www.w3.org/2000/svg';
@@ -5377,16 +5417,19 @@
         var settle = smooth(0.74, 0.88, p), lw = 72 * S, lh = 25.1 * S;
         // the dimension line completes at p = .58 (it was .7, which left the label four scroll-percent before the fade)
         var kdNow = smooth(T.guide + 0.12, T.guide + 0.28, p), now = performance.now();
-        if (kdNow > 0.98) { if (!labelAt) labelAt = now; } else labelAt = 0;
-        var timeFade = labelAt ? smooth(HOLD, HOLD + 500, now - labelAt) : 1;
-        var settleG = Math.min(settle, timeFade); // the guide layer settles on scroll, but never before the hold is over
+        if (kdNow > 0.98) { if (!labelAt) labelAt = now; } else if (kdNow < 0.6) labelAt = 0;
+        var labelOn = !!labelAt && now - labelAt < LABEL_IN + LABEL_HOLD, dt = Math.min(now - labelT, 50);
+        labelT = now;
+        labelK = labelOn ? Math.min(1, labelK + dt / LABEL_IN) : Math.max(0, labelK - dt / LABEL_OUT);
+        var labelA = labelK * labelK * (3 - 2 * labelK);
+        var guideA = Math.max(1 - settle, labelA); // the guide layer settles on scroll, but never before the label has gone
         cancelAnimationFrame(holdRaf);
-        if (labelAt && timeFade < 1) holdRaf = requestAnimationFrame(function () { paint(pNow); });
+        if (labelOn || labelK > 0) holdRaf = requestAnimationFrame(function () { paint(pNow); });
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.lineWidth = 1;
-        if (settleG < 1) {
+        if (guideA > 0) {
           ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = rgba(ACCENT, 0.9 * (1 - settleG));
+          ctx.strokeStyle = rgba(ACCENT, 0.9 * guideA);
           ctx.beginPath();
           rows.forEach(function (y, i) {
             var yy = Math.round(M + y * S) + 0.5, k = smooth(T.guide + i * 0.03, T.guide + 0.26 + i * 0.03, p);
@@ -5400,12 +5443,13 @@
           var kd = kdNow;
           if (kd > 0) {
             var dy = Math.round(M + lh + M * 0.55) + 0.5, x1 = M + lw * kd;
-            ctx.globalAlpha = 1 - settleG;
+            ctx.globalAlpha = guideA;
             ctx.strokeStyle = rgba(ACCENT, 0.9); ctx.fillStyle = rgba(ACCENT, 1);
             ctx.beginPath(); ctx.moveTo(M, dy); ctx.lineTo(x1, dy); ctx.moveTo(M, dy - 4); ctx.lineTo(M, dy + 4);
-            if (kd > 0.98) { ctx.moveTo(x1, dy - 4); ctx.lineTo(x1, dy + 4); }
+            ctx.moveTo(x1, dy - 4); ctx.lineTo(x1, dy + 4);
             ctx.stroke();
-            if (kd > 0.98) {
+            if (labelA > 0) {
+              ctx.globalAlpha = labelA;
               var label = Math.round(lw) + ' × ' + Math.round(lh);
               ctx.font = '9px "Rm Mono", "RM MONO", monospace'; ctx.textBaseline = 'middle';
               var tw = ctx.measureText(label).width, lx = M + lw / 2 - tw / 2 - 6;
@@ -5572,7 +5616,10 @@
             var kr = smooth(t0, t0 + 0.14, p);
             reveal(k, kr);
             if (kr > 0 && kr < 1 && !typed) typed = { a: b.at[j], k: kr };
-          } else scrambleSet(k, p > t0 + 0.1); // the small text scrambles in a little after the big text
+          } else { // the small text starts as the typed HTML has gone, so the cell never sits empty; it leaves a little lower, so a resting scroll can't flicker it
+            var w = writeState.get(k);
+            writeSet(k, p > t0 + (w && w.on ? -0.02 : 0.04));
+          }
         });
         if (typed && typed.a) {
           b.caret.style.opacity = 1;
