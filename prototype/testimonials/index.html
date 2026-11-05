@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testimonial lab</title>
+<!-- Round 6: Wall of love. Locked: ball, dark, Integral, Akkurat, underline. wall.js: the balls move by themselves (calculator shader), faces swoon, each card's corners and fade follow where the card actually is. ?corners=off hides the card corners. slider.js: Osmo's, only the card ease changed. -->
+<style>
+  @font-face { font-family: IntegralNEW; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68b025db738fc57555d5e08f_Integral-Heavy.woff2) format("woff2"); font-weight: 900; font-display: swap; }
+  @font-face { font-family: "RM MONO"; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: Akkuratllsub; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6603db04efccc89ef43b319b_AkkuratLLSub-Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+
+  :root {
+    --ground: #0c0c0c;
+    --panel: #131313;
+    --fg: #f8f5ee;
+    --muted: #a4a4a4;
+    --brand: #E4441C;
+    --hair: rgba(248, 245, 238, .12);
+    --dash: rgba(248, 245, 238, .22);
+    --corner: .25em;                      /* a little round on photos and cards */
+    --ease: cubic-bezier(.625, .05, 0, 1);
+    --mono: "RM MONO", ui-monospace, monospace;
+    --display: IntegralNEW, "Arial Black", sans-serif;
+    --body: Akkuratllsub, Arial, sans-serif;
+    --ball: 7;                            /* ball radius in em, read by wall.js */
+    --ink: #131313;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ground); color: var(--fg); }
+  body { font-family: var(--body); font-size: 16px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+
+  /* grain over everything, like the site */
+  body::after {
+    content: ""; position: fixed; inset: -50%; z-index: 50; pointer-events: none; opacity: .07;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ---------- section ---------- */
+  .ts_section { min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: clamp(4rem, 8vh, 6rem) 0; }
+  .ts_head { text-align: center; padding: 0 1rem; margin-bottom: 2.5rem; }
+  .ts_title { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(2.1rem, 4.2vw, 5.4rem); line-height: .95; text-transform: uppercase; letter-spacing: -.005em; }
+  .container { padding: 0 1rem; }
+
+  /* ---------- the slider ---------- */
+  .centered-slider-row { width: 100%; margin-top: 2em; margin-bottom: 2.5em; padding-top: 1em; padding-bottom: 1em; display: flex; position: relative; overflow: clip; }
+  .centered-slider-list { flex-flow: row; justify-content: flex-start; align-items: stretch; width: 100%; display: flex; cursor: grab; }
+  .centered-slider-list:active { cursor: grabbing; }
+  .centered-slider-slide { flex: none; display: flex; padding: 1.25em; position: relative; }
+  .centered-slider-slide__inner {
+    position: relative; display: flex; width: 26em; padding: 1.5em; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 2.5em;
+    border: 1px solid var(--hair); border-radius: var(--corner); background-color: var(--panel); user-select: none; -webkit-user-select: none;
+  }
+
+  /* the orange corners: four real pieces, so they can travel, spread and boil (wall.js) */
+  .ts_c { position: absolute; left: 0; top: 0; z-index: 3; width: var(--c); height: var(--c); pointer-events: none; }
+  .ts_c i { display: block; width: 100%; height: 100%; border: 0 solid var(--brand); }
+  .ts_c.is--tl i { border-width: 2px 0 0 2px; transform-origin: 0 0; }
+  .ts_c.is--tr i { border-width: 2px 2px 0 0; transform-origin: 100% 0; }
+  .ts_c.is--bl i { border-width: 0 0 2px 2px; transform-origin: 0 100%; }
+  .ts_c.is--br i { border-width: 0 2px 2px 0; transform-origin: 100% 100%; }
+
+  /* the card's own corners: --k is how close the card is to the middle (wall.js), so they fade and close as it lands */
+  .ts_cc { position: absolute; inset: -.5em; z-index: 2; pointer-events: none; opacity: var(--k, 0); --out: calc((1 - var(--k, 0)) * 1em); }
+  .ts_cc b { position: absolute; width: 1.25em; height: 1.25em; border: 0 solid var(--brand); }
+  .ts_cc b:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px; transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
+  .ts_cc b:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0; transform: translate(var(--out), calc(var(--out) * -1)); }
+  .ts_cc b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px; transform: translate(calc(var(--out) * -1), var(--out)); }
+  .ts_cc b:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; transform: translate(var(--out), var(--out)); }
+  html.no-corners .ts_cc { display: none; }
+
+  .centered-slider-bullet__list { --c: .75em; }
+
+  .slide-demo__description { margin: 0; font-size: 1.0625em; line-height: 1.5; color: var(--fg); }
+  .slide-demo__details { display: flex; gap: .875em; align-items: center; width: 100%; padding-top: 1.25em; border-top: 1px dashed var(--dash); }
+  .slide-demo__avatar { display: block; flex: none; width: 3.5em; height: 3.5em; object-fit: cover; border-radius: var(--corner); }
+  .slide-demo__who { display: grid; gap: .4em; min-width: 0; }
+  .slide-demo__eyebrow { text-transform: uppercase; font-family: var(--mono); font-size: .75em; line-height: 1.2; letter-spacing: .08em; }
+  .slide-demo__role { font-family: var(--mono); font-size: .6875em; line-height: 1.3; letter-spacing: .02em; color: var(--muted); }
+
+  /* ---------- the wall of faces ---------- */
+  .centered-slider-content { display: flex; justify-content: center; align-items: center; margin: 0 auto; }
+  .centered-slider-bullet__list { display: flex; flex-flow: row nowrap; justify-content: center; align-items: center; gap: 2.5em; position: relative; margin: 0; padding: 0; list-style: none; }
+  .centered-slider-bullet {
+    display: block; position: relative; width: 3.75em; height: 3.75em; padding: 0; border: 0; border-radius: var(--corner); background: transparent; font: inherit; cursor: pointer;
+  }
+  .centered-slider-bullet:focus { outline: none; }
+  .centered-slider-bullet img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: var(--corner); filter: grayscale(1); opacity: .6; transition: opacity .4s var(--ease); }
+  .centered-slider-bullet:hover img, .centered-slider-bullet:focus-visible img { opacity: 1; }
+  .centered-slider-bullet img.ts_col { position: absolute; inset: 0; filter: none; opacity: 1; clip-path: circle(0% at 50% 50%); }   /* the colour photo, wiped in over the grey one */
+
+  /* ---------- open slots: a quote still to come (lab only, never publish these) ---------- */
+  .centered-slider-slide__inner.is--open { background-color: transparent; border: 1px dashed var(--dash); }
+  .centered-slider-slide__inner.is--open .slide-demo__description { font-family: var(--mono); font-size: .8125em; letter-spacing: .02em; color: var(--muted); }
+  .slide-demo__avatar.is--open, .centered-slider-bullet.is--open span {
+    display: flex; justify-content: center; align-items: center; font-family: var(--mono); color: var(--muted); border: 1px dashed var(--dash); border-radius: var(--corner);
+  }
+  .centered-slider-bullet.is--open span { width: 100%; height: 100%; font-size: .875em; transition: color .4s var(--ease); }
+  .centered-slider-bullet.is--open:hover span, .centered-slider-bullet.is--open.active span { color: var(--fg); }
+
+  /* the ball: a brand block off the corner, fixed size so names and quotes never touch it. Only that corner is drawn */
+  .ts_ball { position: absolute; right: 0; bottom: 0; width: calc(var(--ball) * 1em + 12px); height: calc(var(--ball) * 1em + 12px); overflow: hidden; border-bottom-right-radius: var(--corner); pointer-events: none; }
+  .ts_ball canvas { display: block; width: 100%; height: 100%; }
+  .centered-slider-slide__inner > :not(.ts_ball):not(.ts_cc) { position: relative; z-index: 1; }
+  .slide-demo__details { border-top-color: transparent; padding-right: 5.25em; }
+
+  /* the one line worth reading: words from the quote itself, orange underline like the article links */
+  .ts_mark { text-decoration: underline 1px var(--brand); text-underline-offset: .22em; }
+
+  /* ---------- arrows ---------- */
+  .centered-slider-buttons { display: flex; gap: .5em; justify-content: center; align-items: center; }
+  .centered-slider-button {
+    display: flex; justify-content: center; align-items: center; width: 3em; height: 3em; padding: 0; font: inherit; color: inherit; cursor: pointer;
+    background-color: transparent; border: 1px solid var(--dash); border-radius: .3em; transition: border-color .3s, background-color .3s, color .3s;
+  }
+  .centered-slider-button:hover { background-color: var(--fg); border-color: var(--fg); color: var(--ground); }
+  .centered-slider-button:focus-visible { outline: 1px solid var(--brand); outline-offset: 2px; }
+  .centered-slider-button.is--prev { transform: rotate(-180deg); }
+  .slider-button-arrow { width: 1.25em; }
+
+  @media screen and (max-width: 767px) {
+    .centered-slider-content { display: block; }
+    .centered-slider-bullet__list { gap: clamp(.5em, 2.4vw, 1.25em); --c: .5em; }
+    .centered-slider-bullet__item { flex: 1 1 0; min-width: 0; max-width: 3.75em; }
+    .centered-slider-bullet { width: 100%; height: auto; aspect-ratio: 1; }
+  }
+  @media screen and (max-width: 479px) {
+    .centered-slider-slide { width: 85vw; }
+    .centered-slider-slide__inner { width: 100%; padding: 1.25em; gap: 2em; }
+    .centered-slider-slide { padding: .75em; }
+    :root { --ball: 5.25; }
+    .slide-demo__details { padding-right: 4em; }
+    .slide-demo__description { font-size: 1em; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .centered-slider-bullet img { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<section class="ts_section" aria-labelledby="ts-title">
+  <div class="ts_head">
+    <h2 class="ts_title" id="ts-title">Wall of love</h2>
+  </div>
+
+  <div data-slider-autoplay-duration="4" aria-label="Testimonial Slider" data-centered-slider="wrapper" data-slider-autoplay="true" class="centered-slider-group">
+    <div class="container">
+      <div class="centered-slider-content">
+        <ul role="tablist" class="centered-slider-bullet__list">
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6814a119064b8089269c364b_Tania_headshot.avif" alt="Tania Cappelluti" draggable="false"></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39c0faaf0f7db1290bf3_Marko.avif" alt="Marko Bosnjak" draggable="false"></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39c0076101fecd74e238_Sandra.avif" alt="Sandra Dreisbach" draggable="false"></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68343503b37d7f13b4a983fd_Leti_Chi.avif" alt="Leti &amp; Chi" draggable="false"></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" aria-label="Lieke, quote to come" class="centered-slider-bullet is--open"><span aria-hidden="true">L</span></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" aria-label="Lune, quote to come" class="centered-slider-bullet is--open"><span aria-hidden="true">L</span></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39c0487822dd1bdd34e5_Catherine.avif" alt="Catherine Hamilton" draggable="false"></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6720ee0b7a6a77a58319c714_HEADSHOT_Winnie.avif" alt="Winnie Looper" draggable="false"></button></li>
+          <li class="centered-slider-bullet__item"><button data-centered-slider="bullet" role="tab" aria-selected="false" class="centered-slider-bullet"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39bf61559e23e3c4d42c_Marv.avif" alt="Marvin Reingoud" draggable="false"></button></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="centered-slider-row">
+      <div aria-label="slides" data-centered-slider="list" role="group" class="centered-slider-list">
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description">Working with Rimout was a great experience! He’s friendly, responsive, and really took the time to understand what I wanted. He built everything from scratch and <span class="ts_mark">nailed the vibe</span>—clean, easy to use, and a great mix of design, functionality, and emotional connection. Even with some complex needs, he went above and beyond. I highly recommend him!</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6814a119064b8089269c364b_Tania_headshot.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Tania Cappelluti</span><span class="slide-demo__role">Founder, Charlies Angels</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description">Absolutely thrilled with our experience working with Rimbo Designs. Our e-commerce store has never looked better and the results speak for themselves – we're seeing <span class="ts_mark">real-world conversions</span> like never before. Highly recommend for anyone looking to take their online business to the next level!</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39c0faaf0f7db1290bf3_Marko.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Marko Bosnjak</span><span class="slide-demo__role">Co-Founder, Anapana</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description">Rimbout guided and clarified my vision, manifesting a beautiful brand and website. His rare talent combines organizational skill with creative talent. I highly recommend him. Rimbout turned a challenging task into <span class="ts_mark">a work of art</span>. If you're ready for innovative design, Rimbout is the designer for you.</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39c0076101fecd74e238_Sandra.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Sandra Dreisbach</span><span class="slide-demo__role">Leader in Psychedelic Ethics</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description">It's always a pleasure to work with Rimbout. He goes <span class="ts_mark">above and beyond what he promises</span>. We have worked with him on a couple branding, web design/development projects now and have recommended him to friends. Very happy to continue our collaboration.</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68343503b37d7f13b4a983fd_Leti_Chi.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Leti &amp; Chi</span><span class="slide-demo__role">Founders of MushroomTao</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner is--open">
+            <p class="slide-demo__description">Quote to come.</p>
+            <div class="slide-demo__details"><span class="slide-demo__avatar is--open" aria-hidden="true">L</span><div class="slide-demo__who"><span class="slide-demo__eyebrow">Lieke</span><span class="slide-demo__role">Co-Founder, Echo Agency</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner is--open">
+            <p class="slide-demo__description">Quote to come.</p>
+            <div class="slide-demo__details"><span class="slide-demo__avatar is--open" aria-hidden="true">L</span><div class="slide-demo__who"><span class="slide-demo__eyebrow">Lune</span><span class="slide-demo__role">Co-Founder, Echo Agency</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description">Rimbo is not only incredibly talented in design and technical aspects but also guides you through a branding process that helps you <span class="ts_mark">discover who you are</span> and what you're offering. He is patient, insightful, and great to work with, making the whole experience enjoyable.</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39c0487822dd1bdd34e5_Catherine.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Catherine Hamilton</span><span class="slide-demo__role">Freelance TRE®</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description">Rimbout is an expert! He made exactly what I wanted. <span class="ts_mark">He listens very carefully</span> to what you want and takes all your wishes into account. I am very happy with the result and collaboration. Thanks Rimbout!</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6720ee0b7a6a77a58319c714_HEADSHOT_Winnie.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Winnie Looper</span><span class="slide-demo__role">Founder, Pooh Balance</span></div></div>
+          </div>
+        </div>
+        <div data-centered-slider="slide" class="centered-slider-slide">
+          <div class="centered-slider-slide__inner">
+            <p class="slide-demo__description"><span class="ts_mark">Never a dull moment</span> with Rimbob on the team. He is a creative with a great imagination but surprised me with his inquisitive attitude. This is reflected in his work, but also in his personality. He is curious, analytical and occasionally a decent spacekees.</p>
+            <div class="slide-demo__details"><img src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66da39bf61559e23e3c4d42c_Marv.avif" alt="" class="slide-demo__avatar" draggable="false"><div class="slide-demo__who"><span class="slide-demo__eyebrow">Marvin Reingoud</span><span class="slide-demo__role">UX Designer @ theFactor.e</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="centered-slider-content">
+        <div class="centered-slider-buttons">
+          <button aria-label="previous slide" data-centered-slider="prev-button" class="centered-slider-button is--prev">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24" fill="none" class="slider-button-arrow"><path d="M14 19L21 12L14 5" stroke="currentColor" stroke-miterlimit="10"></path><path d="M21 12H2" stroke="currentColor" stroke-miterlimit="10"></path></svg>
+          </button>
+          <button aria-label="next slide" data-centered-slider="next-button" class="centered-slider-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24" fill="none" class="slider-button-arrow"><path d="M14 19L21 12L14 5" stroke="currentColor" stroke-miterlimit="10"></path><path d="M21 12H2" stroke="currentColor" stroke-miterlimit="10"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/Draggable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/CustomEase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/InertiaPlugin.min.js"></script>
+<script src="slider.js"></script>
+<script src="balls.js"></script>
+<script src="wall.js"></script>
+</body>
+</html>

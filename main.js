@@ -5822,6 +5822,650 @@
     window.addEventListener('resize', function () { last = -1; if (!raf) tick(); });
   }
 
+  // Wall of love (testimonials; lab: prototype/testimonials). Osmo's Centered Looping Slider with three things on top: the brand
+  // balls move by themselves (the calculator's shader), the colour and corners swoon from face to face, and each card's fade and
+  // corners read where the card really is, every frame, so they can't run ahead of it (Rimbo: the timed version "crashed").
+  // In the Designer: section.wall_section > [data-centered-slider="wrapper"] > .centered-slider-row > list > slides. To add a
+  // person, duplicate a slide: the row of faces and the arrows are built here from the slides. A slide with data-wall-open is a
+  // quote still to come: it shows on webflow.io only and never on the live site.
+  // Needs Draggable, InertiaPlugin and CustomEase in the page's head code, like the Osmo sliders on the hero.
+  function rdWall() {
+    var wrapper = qs('[data-centered-slider="wrapper"]');
+    if (!wrapper) return;
+    if (!window.Draggable || !window.InertiaPlugin || !window.CustomEase || !window.ScrollTrigger) { console.warn('[rimbo-designs] wall of love: GSAP plugins missing'); return; }
+    gsap.registerPlugin(CustomEase, ScrollTrigger, Draggable, InertiaPlugin);
+    CustomEase.create('osmo-ease', '0.625, 0.05, 0, 1');
+    CustomEase.create('wall-glide', '0.45, 0, 0.15, 1'); // Osmo's ease over .725 s moved half the distance in 85 ms
+
+    if (location.hostname.indexOf('webflow.io') === -1) qsa('[data-wall-open]', wrapper).forEach(function (s) { s.parentNode.removeChild(s); });
+
+    var style = document.createElement('style');
+    style.textContent = `
+      .wall_section { --ball: 7; --c: .75em; }
+      .wall_faces, .wall_arrows { display: flex; justify-content: center; align-items: center; padding: 0 1rem; }
+      .centered-slider-bullet__list { display: flex; flex-flow: row nowrap; justify-content: center; align-items: center; gap: 2.5em; position: relative; margin: 0; padding: 0; list-style: none; }
+      .centered-slider-bullet { display: block; position: relative; width: 3.75em; height: 3.75em; padding: 0; border: 0; border-radius: .25em; background: transparent; font: inherit; cursor: pointer; }
+      .centered-slider-bullet:focus { outline: none; }
+      .centered-slider-bullet img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: .25em; filter: grayscale(1); opacity: .6; transition: opacity .4s cubic-bezier(.625, .05, 0, 1); }
+      .centered-slider-bullet:hover img, .centered-slider-bullet:focus-visible img { opacity: 1; }
+      .centered-slider-bullet img.wall_col { position: absolute; inset: 0; filter: none; opacity: 1; clip-path: circle(0% at 50% 50%); }
+      .centered-slider-bullet.is--open span { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; font-family: var(--font--rm-mono), monospace; font-size: .875em; color: #a4a4a4; border: 1px dashed rgba(248, 245, 238, .22); border-radius: .25em; transition: color .4s cubic-bezier(.625, .05, 0, 1); }
+      .centered-slider-bullet.is--open:hover span, .centered-slider-bullet.is--open.active span { color: #f8f5ee; }
+      .wall_c { position: absolute; left: 0; top: 0; z-index: 3; width: var(--c); height: var(--c); pointer-events: none; }
+      .wall_c i { display: block; width: 100%; height: 100%; border: 0 solid var(--color--brand); }
+      .wall_c.is--tl i { border-width: 2px 0 0 2px; }
+      .wall_c.is--tr i { border-width: 2px 2px 0 0; }
+      .wall_c.is--bl i { border-width: 0 0 2px 2px; }
+      .wall_c.is--br i { border-width: 0 2px 2px 0; }
+      .wall_cc { position: absolute; inset: -.5em; z-index: 2; pointer-events: none; opacity: var(--k, 0); --out: calc((1 - var(--k, 0)) * 1em); }
+      .wall_cc b { position: absolute; width: 1.25em; height: 1.25em; border: 0 solid var(--color--brand); }
+      .wall_cc b:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px; transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
+      .wall_cc b:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0; transform: translate(var(--out), calc(var(--out) * -1)); }
+      .wall_cc b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px; transform: translate(calc(var(--out) * -1), var(--out)); }
+      .wall_cc b:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; transform: translate(var(--out), var(--out)); }
+      .wall_ball { position: absolute; right: 0; bottom: 0; width: calc(var(--ball) * 1em + 12px); height: calc(var(--ball) * 1em + 12px); overflow: hidden; border-bottom-right-radius: .25em; pointer-events: none; }
+      .wall_ball canvas { display: block; width: 100%; height: 100%; }
+      .centered-slider-slide__inner > :not(.wall_ball):not(.wall_cc) { position: relative; z-index: 1; }
+      .centered-slider-buttons { display: flex; gap: .5em; justify-content: center; align-items: center; }
+      .centered-slider-button { display: flex; justify-content: center; align-items: center; width: 3em; height: 3em; padding: 0; font: inherit; color: inherit; cursor: pointer; background-color: transparent; border: 1px solid rgba(248, 245, 238, .22); border-radius: .3em; transition: border-color .3s, background-color .3s, color .3s; }
+      .centered-slider-button:hover { background-color: #f8f5ee; border-color: #f8f5ee; color: #0c0c0c; }
+      .centered-slider-button:focus-visible { outline: 1px solid var(--color--brand); outline-offset: 2px; }
+      .centered-slider-button.is--prev { transform: rotate(-180deg); }
+      .slider-button-arrow { width: 1.25em; }
+      @media screen and (max-width: 767px) {
+        .wall_section { --c: .5em; }
+        .wall_faces { display: block; }
+        .centered-slider-bullet__list { gap: clamp(.5em, 2.4vw, 1.25em); }
+        .centered-slider-bullet__item { flex: 1 1 0; min-width: 0; max-width: 3.75em; }
+        .centered-slider-bullet { width: 100%; height: auto; aspect-ratio: 1; }
+      }
+      @media screen and (max-width: 479px) { .wall_section { --ball: 5.25; } }
+      @media (prefers-reduced-motion: reduce) { .centered-slider-bullet img { transition: none; } }
+    `;
+    document.head.appendChild(style);
+
+    // the faces and the arrows, built from the slides
+    var faces = document.createElement('div'), ul = document.createElement('ul');
+    faces.className = 'wall_faces'; ul.className = 'centered-slider-bullet__list'; ul.setAttribute('role', 'tablist');
+    qsa('[data-centered-slider="slide"]', wrapper).forEach(function (slide) {
+      var li = document.createElement('li'), btn = document.createElement('button'), photo = qs('img', slide), who = qs('.slide-demo__eyebrow', slide), name = who ? who.textContent.trim() : '';
+      li.className = 'centered-slider-bullet__item';
+      btn.type = 'button'; btn.className = 'centered-slider-bullet'; btn.setAttribute('role', 'tab'); btn.setAttribute('aria-label', name);
+      btn.setAttribute('data-centered-slider', 'bullet');
+      if (photo) {
+        var img = document.createElement('img');
+        img.src = photo.currentSrc || photo.src; img.alt = ''; img.draggable = false;
+        btn.appendChild(img);
+      } else {
+        var mark = document.createElement('span');
+        mark.textContent = name.charAt(0); mark.setAttribute('aria-hidden', 'true');
+        btn.classList.add('is--open'); btn.appendChild(mark);
+      }
+      li.appendChild(btn); ul.appendChild(li);
+    });
+    faces.appendChild(ul);
+    wrapper.insertBefore(faces, wrapper.firstChild);
+    var arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24" fill="none" class="slider-button-arrow"><path d="M14 19L21 12L14 5" stroke="currentColor" stroke-miterlimit="10"></path><path d="M21 12H2" stroke="currentColor" stroke-miterlimit="10"></path></svg>';
+    var arrows = document.createElement('div');
+    arrows.className = 'wall_arrows';
+    arrows.innerHTML = '<div class="centered-slider-buttons"><button type="button" aria-label="previous slide" data-centered-slider="prev-button" class="centered-slider-button is--prev">' + arrow + '</button><button type="button" aria-label="next slide" data-centered-slider="next-button" class="centered-slider-button">' + arrow + '</button></div>';
+    wrapper.appendChild(arrows);
+
+    /* ---------- Osmo's slider, as it comes, but for the card ease ---------- */
+    function initSliders() {
+      const sliderWrappers = gsap.utils.toArray(document.querySelectorAll('[data-centered-slider="wrapper"]'));
+
+      sliderWrappers.forEach((sliderWrapper) => {
+        const slides = gsap.utils.toArray(sliderWrapper.querySelectorAll('[data-centered-slider="slide"]'));
+        const bullets = gsap.utils.toArray(sliderWrapper.querySelectorAll('[data-centered-slider="bullet"]'));
+        const prevButton = sliderWrapper.querySelector('[data-centered-slider="prev-button"]');
+        const nextButton = sliderWrapper.querySelector('[data-centered-slider="next-button"]');
+
+        let activeElement;
+        let activeBullet;
+        let currentIndex = 0;
+        let autoplay;
+
+        // Autoplay is now enabled/disabled via a boolean attribute.
+        const autoplayEnabled = sliderWrapper.getAttribute('data-slider-autoplay') === 'true';
+
+        // If enabled, get the autoplay duration (in seconds) from the separate attribute.
+        const autoplayDuration = autoplayEnabled ? parseFloat(sliderWrapper.getAttribute('data-slider-autoplay-duration')) || 0 : 0;
+
+        // Dynamically assign unique IDs to slides
+        slides.forEach((slide, i) => {
+          slide.setAttribute("id", `slide-${i}`);
+        });
+
+        // Set ARIA attributes on bullets if they exist
+        if (bullets && bullets.length > 0) {
+          bullets.forEach((bullet, i) => {
+            bullet.setAttribute("aria-controls", `slide-${i}`);
+            bullet.setAttribute("aria-selected", i === currentIndex ? "true" : "false");
+          });
+        }
+
+        const loop = horizontalLoop(slides, {
+          paused: true,
+          draggable: true,
+          center: true,
+          onChange: (element, index) => {
+            currentIndex = index;
+
+            if (activeElement) activeElement.classList.remove("active");
+            element.classList.add("active");
+            activeElement = element;
+
+            if (bullets && bullets.length > 0) {
+              if (activeBullet) activeBullet.classList.remove("active");
+              if (bullets[index]) {
+                bullets[index].classList.add("active");
+                activeBullet = bullets[index];
+              }
+              bullets.forEach((bullet, i) => {
+                bullet.setAttribute("aria-selected", i === index ? "true" : "false");
+              });
+            }
+
+          }
+        });
+
+        // On initialization, center the slider
+        loop.toIndex(2, { duration: 0.01 });
+
+        function startAutoplay() {
+          if (autoplayDuration > 0 && !autoplay) {
+            const repeat = () => {
+              loop.next({ ease: "wall-glide", duration: 1.1 });
+              autoplay = gsap.delayedCall(autoplayDuration, repeat);
+            };
+            autoplay = gsap.delayedCall(autoplayDuration, repeat);
+          }
+        }
+
+        function stopAutoplay() {
+          if (autoplay) {
+            autoplay.kill();
+            autoplay = null;
+          }
+        }
+
+        // Start/stop autoplay based on viewport visibility via ScrollTrigger
+        ScrollTrigger.create({
+          trigger: sliderWrapper,
+          start: "top bottom",
+          end: "bottom top",
+          onEnter: startAutoplay,
+          onLeave: stopAutoplay,
+          onEnterBack: startAutoplay,
+          onLeaveBack: stopAutoplay
+        });
+
+        // Pause autoplay on mouse hover over the slider
+        sliderWrapper.addEventListener("mouseenter", stopAutoplay);
+        sliderWrapper.addEventListener("mouseleave", () => {
+          if (ScrollTrigger.isInViewport(sliderWrapper)) startAutoplay();
+        });
+
+        // Slide click event for direct navigation
+        slides.forEach((slide, i) => {
+          slide.addEventListener("click", () => {
+            loop.toIndex(i, { ease: "wall-glide", duration: 1.1 });
+          });
+        });
+
+        // Bullets click event for direct navigation (if available)
+        if (bullets && bullets.length > 0) {
+          bullets.forEach((bullet, i) => {
+            bullet.addEventListener("click", () => {
+              loop.toIndex(i, { ease: "wall-glide", duration: 1.1 });
+              if (activeBullet) activeBullet.classList.remove("active");
+              bullet.classList.add("active");
+              activeBullet = bullet;
+              bullets.forEach((b, j) => {
+                b.setAttribute("aria-selected", j === i ? "true" : "false");
+              });
+            });
+          });
+        }
+
+        // Prev/Next button listeners (if the buttons exist)
+        if (prevButton) {
+          prevButton.addEventListener("click", () => {
+            let newIndex = currentIndex - 1;
+            if (newIndex < 0) newIndex = slides.length - 1;
+            loop.toIndex(newIndex, { ease: "wall-glide", duration: 1.1 });
+          });
+        }
+
+        if (nextButton) {
+          nextButton.addEventListener("click", () => {
+            let newIndex = currentIndex + 1;
+            if (newIndex >= slides.length) newIndex = 0;
+            loop.toIndex(newIndex, { ease: "wall-glide", duration: 1.1 });
+          });
+        }
+
+      });
+    }
+
+    // GSAP Helper function to create a looping slider
+    // Read more: https://gsap.com/docs/v3/HelperFunctions/helpers/seamlessLoop
+    function horizontalLoop(items, config) {
+      let timeline;
+      items = gsap.utils.toArray(items);
+      config = config || {};
+      gsap.context(() => {
+        let onChange = config.onChange,
+          lastIndex = 0,
+          tl = gsap.timeline({repeat: config.repeat, onUpdate: onChange && function() {
+              let i = tl.closestIndex();
+              if (lastIndex !== i) {
+                lastIndex = i;
+                onChange(items[i], i);
+              }
+            }, paused: config.paused, defaults: {ease: "none"}, onReverseComplete: () => tl.totalTime(tl.rawTime() + tl.duration() * 100)}),
+          length = items.length,
+          startX = items[0].offsetLeft,
+          times = [],
+          widths = [],
+          spaceBefore = [],
+          xPercents = [],
+          curIndex = 0,
+          indexIsDirty = false,
+          center = config.center,
+          pixelsPerSecond = (config.speed || 1) * 100,
+          snap = config.snap === false ? v => v : gsap.utils.snap(config.snap || 1),
+          timeOffset = 0,
+          container = center === true ? items[0].parentNode : gsap.utils.toArray(center)[0] || items[0].parentNode,
+          totalWidth,
+          getTotalWidth = () => items[length-1].offsetLeft + xPercents[length-1] / 100 * widths[length-1] - startX + spaceBefore[0] + items[length-1].offsetWidth * gsap.getProperty(items[length-1], "scaleX") + (parseFloat(config.paddingRight) || 0),
+          populateWidths = () => {
+            let b1 = container.getBoundingClientRect(), b2;
+            items.forEach((el, i) => {
+              widths[i] = parseFloat(gsap.getProperty(el, "width", "px"));
+              xPercents[i] = snap(parseFloat(gsap.getProperty(el, "x", "px")) / widths[i] * 100 + gsap.getProperty(el, "xPercent"));
+              b2 = el.getBoundingClientRect();
+              spaceBefore[i] = b2.left - (i ? b1.right : b1.left);
+              b1 = b2;
+            });
+            gsap.set(items, {
+              xPercent: i => xPercents[i]
+            });
+            totalWidth = getTotalWidth();
+          },
+          timeWrap,
+          populateOffsets = () => {
+            timeOffset = center ? tl.duration() * (container.offsetWidth / 2) / totalWidth : 0;
+            center && times.forEach((t, i) => {
+              times[i] = timeWrap(tl.labels["label" + i] + tl.duration() * widths[i] / 2 / totalWidth - timeOffset);
+            });
+          },
+          getClosest = (values, value, wrap) => {
+            let i = values.length,
+              closest = 1e10,
+              index = 0, d;
+            while (i--) {
+              d = Math.abs(values[i] - value);
+              if (d > wrap / 2) {
+                d = wrap - d;
+              }
+              if (d < closest) {
+                closest = d;
+                index = i;
+              }
+            }
+            return index;
+          },
+          populateTimeline = () => {
+            let i, item, curX, distanceToStart, distanceToLoop;
+            tl.clear();
+            for (i = 0; i < length; i++) {
+              item = items[i];
+              curX = xPercents[i] / 100 * widths[i];
+              distanceToStart = item.offsetLeft + curX - startX + spaceBefore[0];
+              distanceToLoop = distanceToStart + widths[i] * gsap.getProperty(item, "scaleX");
+              tl.to(item, {xPercent: snap((curX - distanceToLoop) / widths[i] * 100), duration: distanceToLoop / pixelsPerSecond}, 0)
+                .fromTo(item, {xPercent: snap((curX - distanceToLoop + totalWidth) / widths[i] * 100)}, {xPercent: xPercents[i], duration: (curX - distanceToLoop + totalWidth - curX) / pixelsPerSecond, immediateRender: false}, distanceToLoop / pixelsPerSecond)
+                .add("label" + i, distanceToStart / pixelsPerSecond);
+              times[i] = distanceToStart / pixelsPerSecond;
+            }
+            timeWrap = gsap.utils.wrap(0, tl.duration());
+          },
+          refresh = (deep) => {
+            let progress = tl.progress();
+            tl.progress(0, true);
+            populateWidths();
+            deep && populateTimeline();
+            populateOffsets();
+            deep && tl.draggable ? tl.time(times[curIndex], true) : tl.progress(progress, true);
+          },
+          onResize = () => refresh(true),
+          proxy;
+        gsap.set(items, {x: 0});
+        populateWidths();
+        populateTimeline();
+        populateOffsets();
+        window.addEventListener("resize", onResize);
+        function toIndex(index, vars) {
+          vars = vars || {};
+          (Math.abs(index - curIndex) > length / 2) && (index += index > curIndex ? -length : length); // always go in the shortest direction
+          let newIndex = gsap.utils.wrap(0, length, index),
+            time = times[newIndex];
+          if (time > tl.time() !== index > curIndex && index !== curIndex) { // if we're wrapping the timeline's playhead, make the proper adjustments
+            time += tl.duration() * (index > curIndex ? 1 : -1);
+          }
+          if (time < 0 || time > tl.duration()) {
+            vars.modifiers = {time: timeWrap};
+          }
+          curIndex = newIndex;
+          vars.overwrite = true;
+          gsap.killTweensOf(proxy);
+          return vars.duration === 0 ? tl.time(timeWrap(time)) : tl.tweenTo(time, vars);
+        }
+        tl.toIndex = (index, vars) => toIndex(index, vars);
+        tl.closestIndex = setCurrent => {
+          let index = getClosest(times, tl.time(), tl.duration());
+          if (setCurrent) {
+            curIndex = index;
+            indexIsDirty = false;
+          }
+          return index;
+        };
+        tl.current = () => indexIsDirty ? tl.closestIndex(true) : curIndex;
+        tl.next = vars => toIndex(tl.current()+1, vars);
+        tl.previous = vars => toIndex(tl.current()-1, vars);
+        tl.times = times;
+        tl.progress(1, true).progress(0, true); // pre-render for performance
+        if (config.reversed) {
+          tl.vars.onReverseComplete();
+          tl.reverse();
+        }
+        if (config.draggable && typeof(Draggable) === "function") {
+          proxy = document.createElement("div")
+          let wrap = gsap.utils.wrap(0, 1),
+            ratio, startProgress, draggable, dragSnap, lastSnap, initChangeX, wasPlaying,
+            align = () => tl.progress(wrap(startProgress + (draggable.startX - draggable.x) * ratio)),
+            syncIndex = () => tl.closestIndex(true);
+          typeof(InertiaPlugin) === "undefined" && console.warn("InertiaPlugin required for momentum-based scrolling and snapping. https://greensock.com/club");
+          draggable = Draggable.create(proxy, {
+            trigger: items[0].parentNode,
+            type: "x",
+            onPressInit() {
+              let x = this.x;
+              gsap.killTweensOf(tl);
+              wasPlaying = !tl.paused();
+              tl.pause();
+              startProgress = tl.progress();
+              refresh();
+              ratio = 1 / totalWidth;
+              initChangeX = (startProgress / -ratio) - x;
+              gsap.set(proxy, {x: startProgress / -ratio});
+            },
+            onDrag: align,
+            onThrowUpdate: align,
+            overshootTolerance: 0,
+            inertia: true,
+            snap(value) {
+              if (Math.abs(startProgress / -ratio - this.x) < 10) {
+                return lastSnap + initChangeX
+              }
+              let time = -(value * ratio) * tl.duration(),
+                wrappedTime = timeWrap(time),
+                snapTime = times[getClosest(times, wrappedTime, tl.duration())],
+                dif = snapTime - wrappedTime;
+              Math.abs(dif) > tl.duration() / 2 && (dif += dif < 0 ? tl.duration() : -tl.duration());
+              lastSnap = (time + dif) / tl.duration() / -ratio;
+              return lastSnap;
+            },
+            onRelease() {
+              syncIndex();
+              draggable.isThrowing && (indexIsDirty = true);
+            },
+            onThrowComplete: () => {
+              syncIndex();
+              wasPlaying && tl.play();
+            }
+          })[0];
+          tl.draggable = draggable;
+        }
+        tl.closestIndex(true);
+        lastIndex = curIndex;
+        onChange && onChange(items[curIndex], curIndex);
+        timeline = tl;
+        return () => window.removeEventListener("resize", onResize);
+      });
+      return timeline;
+
+    }
+
+    /* ---------- the brand ball: the calculator's shader, tuned for a ball you only see a quarter of ---------- */
+    const toRgb = h => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+    const s2l = v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+    function oklab(h) {
+      const [r, g, b] = toRgb(h).map(s2l);
+      const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b);
+      const m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b);
+      const s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
+      return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
+    }
+    const rgb01 = h => toRgb(h).map(v => v / 255);
+
+    const FRAG = "#version 300 es\n" +
+        "precision highp float;\n" +
+        "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
+        "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
+        "out vec4 outColor;\n" +
+        "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
+        "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
+        "  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n" +
+        "float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n" +
+        "float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n" +
+        "vec3 fromLab(vec3 c) {\n" +
+        "  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n" +
+        "  l = l * l * l; m = m * m * m; s = s * s * s;\n" +
+        "  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n" +
+        "}\n" +
+        "vec3 ramp(float v) { vec3 c = stops[0]; for (int i = 0; i < 3; i++) c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); return fromLab(c); }\n" +
+        "void main() {\n" +
+        "  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n" +
+        "  vec2 l = (p - center) / R;\n" +
+        "  float r = length(l), aa = 1.2 / R;\n" +
+        "  if (r > 1.0 + aa) { outColor = vec4(0.0); return; }\n" +
+        "  vec2 gp = floor(p / grainScale);\n" +
+        "  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
+        "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n" +
+        "  float h = hash(vec2(seed));\n" +
+        "  float ang = h * 6.2831 + t * 0.26;\n" + // the colours turn around inside the ball, wherever it's cropped
+        "  float g = 0.5 + 0.34 * dot(l, vec2(cos(ang), sin(ang)));\n" +
+        "  vec2 drift = vec2(sin(t * 0.34 + h * 6.2831), cos(t * 0.27 + h * 12.566)) * 0.62;\n" +
+        "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
+        "  float f = fbm(l * 1.7 + w * 1.3 + h * 90.0);\n" +
+        "  float v = g + (f - 0.5) * 1.0 + bias - heat * 0.45;\n" +
+        "  float dp = length(p - ptr) / max(ptrR, 1.0);\n" +
+        "  v -= ptrAmt * 0.6 * exp(-dp * dp);\n" +
+        "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n" +
+        "  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
+        "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
+        "}";
+
+    const gl = document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+    const U = {};
+    if (gl) {
+      const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, `#version 300 es
+    in vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog); gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      ['res', 'center', 'R', 'seed', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'stops', 'edges'].forEach(k => { U[k] = gl.getUniformLocation(prog, k); });
+      gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
+      gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
+    }
+
+    // o: cx, cy, R in the canvas's css pixels; t, seed, bias; px, py, pr, amt for the warm spot under the mouse
+    function drawBall(cv, o) {
+      if (!gl) return;
+      const box = cv.getBoundingClientRect();
+      if (!box.width) return;
+      const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
+      if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+      if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
+      gl.viewport(0, 0, W, H);
+      gl.uniform2f(U.res, W, H); gl.uniform2f(U.center, o.cx * dpr, o.cy * dpr); gl.uniform1f(U.R, o.R * dpr);
+      gl.uniform1f(U.seed, o.seed); gl.uniform1f(U.bias, o.bias); gl.uniform1f(U.heat, 0); gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, o.t);
+      gl.uniform2f(U.ptr, o.px * dpr, o.py * dpr); gl.uniform1f(U.ptrR, o.pr * dpr); gl.uniform1f(U.ptrAmt, o.amt);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      const c = cv.getContext('2d');
+      c.clearRect(0, 0, W, H);
+      c.drawImage(gl.canvas, 0, 0);
+    }
+
+    initSliders();
+
+    /* ---------- faces, corners and balls ---------- */
+    var calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var EASE = 'osmo-ease';
+    var balls = [];
+
+    /* ---------- corners ---------- */
+    function Corners(host) {
+      var els = ['tl', 'tr', 'bl', 'br'].map(function (k) {
+        var c = document.createElement('div'), i = document.createElement('i');
+        c.className = 'wall_c is--' + k; c.setAttribute('aria-hidden', 'true'); c.appendChild(i); host.appendChild(c);
+        return c;
+      });
+      function spots(r) {   // where each corner sits for a box {l, t, r, b}
+        var s = els[0].offsetWidth;
+        return [[r.l, r.t], [r.r - s, r.t], [r.l, r.b - s], [r.r - s, r.b - s]];
+      }
+      return {
+        set: function (r) { spots(r).forEach(function (p, i) { gsap.killTweensOf(els[i]); gsap.set(els[i], { x: p[0], y: p[1] }); }); },
+        // travel to a new box: the corners on the leading side go first, the others catch up, so the frame stretches on its way
+        travel: function (r, dir) {
+          var order = dir > 0 ? [1, 3, 0, 2] : [0, 2, 1, 3], p = spots(r);
+          order.forEach(function (i, n) { gsap.to(els[i], { x: p[i][0], y: p[i][1], duration: .75, delay: n * .045, ease: EASE, overwrite: true }); });
+        }
+      };
+    }
+
+    /* ---------- faces ---------- */
+    var list = document.querySelector('.centered-slider-bullet__list');
+    var row = document.querySelector('.centered-slider-row');
+    var bullets = Array.prototype.slice.call(list.querySelectorAll('[data-centered-slider="bullet"]'));
+    var cols = bullets.map(function (b) {
+      var img = b.querySelector('img');
+      if (!img) return null;
+      var c = img.cloneNode(); c.alt = ''; c.className = 'wall_col'; b.appendChild(c);
+      return c;
+    });
+    var LIFT = 1.16;
+    var marker = new Corners(list);
+
+    function faceBox(i) {
+      var li = bullets[i].parentNode, w = bullets[i].offsetWidth, pad = w * .12, half = w * LIFT / 2 + pad;
+      var x = li.offsetLeft + w / 2, y = li.offsetTop + bullets[i].offsetHeight / 2 - w * .07;
+      return { l: x - half, t: y - half, r: x + half, b: y + half };
+    }
+
+    var current = -1, ready = performance.now() + 400, lockUntil = 0;
+    function go(i, instant) {
+      if (i === current) return;
+      var from = current, dir = i > from ? 1 : -1;
+      current = i;
+      var up = { scale: LIFT, y: -bullets[i].offsetWidth * .07 }, wide = 'circle(150% at 50% 50%)';
+      if (instant || calm) {
+        if (from > -1) { gsap.set(bullets[from], { scale: 1, y: 0 }); if (cols[from]) gsap.set(cols[from], { clipPath: 'circle(0% at 50% 50%)' }); }
+        gsap.set(bullets[i], up); if (cols[i]) gsap.set(cols[i], { clipPath: wide });
+        marker.set(faceBox(i));
+        return;
+      }
+      var exit = dir > 0 ? '100%' : '0%', enter = dir > 0 ? '0%' : '100%';
+      // out: the colour drains off towards the new face, the photo sinks back
+      gsap.to(bullets[from], { scale: 1, y: 0, duration: .7, ease: EASE, overwrite: true });
+      if (cols[from]) gsap.fromTo(cols[from], { clipPath: 'circle(150% at ' + exit + ' 50%)' }, { clipPath: 'circle(0% at ' + exit + ' 50%)', duration: .6, ease: 'power2.inOut', overwrite: true });
+      // in: it arrives from the old face's side, a beat later, the photo rises to meet it
+      gsap.fromTo(bullets[i], { scale: .92 }, { scale: LIFT, y: up.y, duration: .85, delay: .1, ease: 'back.out(2.2)', overwrite: true });
+      if (cols[i]) gsap.fromTo(cols[i], { clipPath: 'circle(0% at ' + enter + ' 50%)' }, { clipPath: 'circle(150% at ' + enter + ' 50%)', duration: .8, delay: .16, ease: 'power2.out', overwrite: true });
+      marker.travel(faceBox(i), dir);
+      if (balls[i]) balls[i].stir = 1;
+    }
+    function sync() {
+      if (performance.now() < lockUntil) return;
+      var i = bullets.findIndex(function (b) { return b.classList.contains('active'); });
+      if (i > -1) go(i, performance.now() < ready);
+    }
+    // a click jumps over the faces in between; the slider still passes them, so hold the corners on the target
+    bullets.forEach(function (b, i) {
+      b.addEventListener('click', function () { go(i); lockUntil = performance.now() + 800; }, true);
+    });
+    new MutationObserver(sync).observe(list, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    sync();
+    addEventListener('resize', function () { if (current > -1) marker.set(faceBox(current)); });
+
+    /* ---------- balls and cards ---------- */
+    var FLOW = 1;   // the calculator's pace
+    // [px past the right edge, px past the bottom edge, seed, colour bias]: each ball its own crop and mix
+    var SPOTS = [[6, 10, 14, -.08], [2, 14, 5, -.06], [0, 8, 23, -.1], [8, 6, 2, -.08], [4, 12, 31, -.06], [10, 10, 6, -.1], [2, 6, 19, -.08], [6, 14, 41, -.06], [0, 12, 7, -.1]];
+    balls = Array.prototype.map.call(document.querySelectorAll('.centered-slider-slide__inner'), function (card, i) {
+      var w = document.createElement('div'), c = document.createElement('canvas'), s = SPOTS[i % SPOTS.length];
+      w.className = 'wall_ball'; w.setAttribute('aria-hidden', 'true'); w.appendChild(c); card.insertBefore(w, card.firstChild);
+      var cc = document.createElement('div');
+      cc.className = 'wall_cc'; cc.setAttribute('aria-hidden', 'true'); cc.innerHTML = '<b></b><b></b><b></b><b></b>'; card.appendChild(cc);
+      return { canvas: c, card: card, slide: card.parentNode, dx: s[0], dy: s[1], seed: s[2], bias: s[3], t: i * 11, float: i * 2.3, stir: 0, amt: 0, want: 0, px: 0, py: 0, tx: 0, ty: 0, s: 0, r: 0 };
+    });
+    function measure(b) {
+      b.s = b.canvas.getBoundingClientRect().width;
+      b.r = b.s - 12;     // the box leaves room for the ball to float
+      b.cx = b.s + b.dx; b.cy = b.s + b.dy;
+    }
+    function paint(b) {
+      // it floats and breathes a little, never far enough to reach the text
+      var fx = calm ? 0 : Math.sin(b.float * .47) * 4 + Math.sin(b.float * .19) * 2, fy = calm ? 0 : Math.cos(b.float * .37) * 5;
+      var breath = calm ? 1 : 1 + Math.sin(b.float * .55) * .025;
+      drawBall(b.canvas, { cx: b.cx + fx, cy: b.cy + fy, R: b.r * breath, t: b.t, seed: b.seed, bias: b.bias, px: b.px, py: b.py, pr: b.r * .45, amt: b.amt });
+    }
+    balls.forEach(function (b) { measure(b); paint(b); });
+    new ResizeObserver(function () { balls.forEach(function (b) { measure(b); paint(b); }); }).observe(balls[0].canvas);
+
+    // hover: only straight on the ball, the spot under the mouse warms up
+    addEventListener('pointermove', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      balls.forEach(function (b) {
+        var box = b.canvas.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
+        var on = Math.hypot(x - b.cx, y - b.cy) < b.r * 1.05 && x < b.s && y < b.s;
+        if (on) { if (!b.want) { b.px = x; b.py = y; } b.tx = x; b.ty = y; b.want = 1; } else b.want = 0;
+      });
+    }, { passive: true });
+
+    function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+    var seen = true, last = 0;
+    new IntersectionObserver(function (e) { seen = e[0].isIntersecting; }).observe(document.querySelector('.wall_section'));
+    function loop(now) {
+      requestAnimationFrame(loop);
+      var dt = Math.min((now - last) / 1000, .05); last = now;
+      if (!seen || document.hidden) return;
+      var mid = row.getBoundingClientRect().left + row.clientWidth / 2;
+      balls.forEach(function (b) {
+        var box = b.card.getBoundingClientRect(), off = Math.abs(box.left + box.width / 2 - mid) / box.width;
+        b.card.style.setProperty('--k', smooth(1 - off / .45).toFixed(3));     // corners: only in the last stretch of the landing
+        b.slide.style.opacity = (.45 + .55 * smooth(1 - off / .9)).toFixed(3);  // the card itself: over the whole way
+        if (calm) return;
+        b.stir *= Math.pow(.97, dt * 60);
+        b.t += dt * FLOW * (1 + b.stir * 5);
+        b.float += dt;
+        b.amt += (b.want - b.amt) * (1 - Math.exp(-dt * 3.5));
+        b.px += (b.tx - b.px) * (1 - Math.exp(-dt * 7)); b.py += (b.ty - b.py) * (1 - Math.exp(-dt * 7));
+        if (box.right > 0 && box.left < innerWidth) paint(b);
+      });
+    }
+    requestAnimationFrame(loop);
+  }
+
   // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
@@ -5851,6 +6495,7 @@
   if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
   run('location showcase', rdLocShow);
   run('location balls', rdLocBalls);
+  run('wall of love', rdWall);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
