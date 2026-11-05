@@ -90,21 +90,23 @@
       { id: "motion", legend: "Motion and feel" },
       { id: "more",   legend: "Add what you need" }
     ],
-    // DRAFT prices (2026-11-05, not confirmed by Rimbo yet): analytics, consent, training, a11y
+    // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250 and transitions
+    // to a medium page's €900, automations €500 (Rimbo, 2026-11-05)
     toggles: [
       { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site. Search and AI search are the same work, so they come together." },
-      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 400,  info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. Privacy-friendly by default. With Google Analytics you also need cookie consent." },
+      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. Privacy-friendly by default. With Google Analytics you also need cookie consent." },
       { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks. In the look of your site." },
-      { id: "training",   group: "search", label: "Content and SEO training",                  price: 500,  info: "A session on writing and publishing posts and pages that get found, recorded so your team can watch it again." },
+      { id: "training",   group: "search", label: "SEO training",                              price: 500,
+        info: "So you can write and publish pages and posts that get found. What you get:\nA recorded tutorial you can watch again.\nA one-on-one call about your own site.\nA checklist template for every new page or post." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
       { id: "migration",  group: "search", label: "Content migration",                         hourly: 97, hours: { min: 1, max: 40, start: 10 },
         info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Paid by the hour: set what you expect, the proposal confirms it." },
       { id: "loader",     group: "motion", label: "Custom page loader",                        price: 800,  info: "A branded intro animation while the site loads." },
-      { id: "transition", group: "motion", label: "Custom page transitions",                   price: 1500, info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
+      { id: "transition", group: "motion", label: "Custom page transitions",                   price: 900,  info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
       { id: "theme",      group: "motion", label: "Light and dark mode",                       price: 600,  info: "A light and a dark version of the whole site, with a switch." },
       { id: "legal",      group: "more",   label: "Legal pages, done for you",                 price: 500,  info: "Privacy, cookie and terms pages written for your business and checked against GDPR. You don't write a word." },
       { id: "a11y",       group: "more",   label: "Accessibility check",                       price: 800,  info: "The site tested for keyboard use, screen readers, contrast and text size against WCAG 2.2 AA, with the fixes made. More and more businesses need this under the European Accessibility Act." },
-      { id: "leads",      group: "more",   label: "Lead automation",                           price: 1500, info: "Form leads go straight into your CRM or mailing list, with automatic follow-up." },
+      { id: "leads",      group: "more",   label: "Automations",                               price: 500,  info: "Your site connected to your other tools: form leads into your CRM or mailing list, with an automatic follow-up." },
       { id: "chatbot",    group: "more",   label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
       { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system. This adds written documentation and a training session, so your team can build new pages with it." },
       { id: "members",    group: "more",   label: "Members area",                              price: 4000, info: "Log-in, member-only pages and gated content, with payments if needed." },
