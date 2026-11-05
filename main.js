@@ -3121,6 +3121,7 @@
     // (or data-band-step="N" on the section) sets the seconds per step, 0 switches it off (the wheel's default: it
     // drifts instead, below); off under prefers-reduced-motion. Clock: autoStep below.
     var slider = band ? null : (qs('[data-spatial-slider-init]', hero) || qs('[data-radial-slider-init]', hero));
+    var ring = band || slider ? null : qs('[data-ring]', hero); // home-extreme: Rimbo's roulette, built below (buildRing), no Osmo code involved
     var kind = slider && slider.hasAttribute('data-radial-slider-init') ? 'radial' : 'spatial'; // which Osmo slider: its data- attributes, and the handles its init leaves on the root
     var wheel = kind === 'radial' ? slider : null;
     var param = function (name, attr, fallback) { // ?name=N on the URL, else data-band-attr="N" on the section, else the default
@@ -3129,6 +3130,7 @@
       return isNaN(v) ? fallback : v;
     };
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
+    var pinScreens = ring ? param('pin', 'pin', 2.5) : 0; // home-extreme: screens of scroll the hero stays pinned while the ring tips over and turns
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
     var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
@@ -3155,18 +3157,18 @@
     // (background tab) or the hero has scrolled away; every hold restarts the wait, so a step never lands right
     // after a hand has let go or the pointer has left.
     var autoStep = function () {
-      if (!stepNext) return;
-      var zone = qs('[data-' + kind + '-slider-collection]', slider) || slider, over = false;
+      if (!stepNext && !ringApi) return;
+      var zone = ring || qs('[data-' + kind + '-slider-collection]', slider) || slider, over = false;
       zone.addEventListener('pointerenter', function () { over = true; });
       zone.addEventListener('pointerleave', function () { over = false; });
       var wait = stepEvery * 1000, due = performance.now() + wait;
       setInterval(function () {
-        var d = slider['_' + kind + 'SliderDraggable'], now = performance.now();
-        var held = over || hidden || document.hidden || scrolled || rollLeft > 0 || (d && (d.isPressed || d.isDragging || d.isThrowing));
+        var d = slider && slider['_' + kind + 'SliderDraggable'], now = performance.now();
+        var held = over || hidden || document.hidden || scrolled || rollLeft > 0 || (d && (d.isPressed || d.isDragging || d.isThrowing)) || (ringApi && ringApi.busy());
         if (held) { due = now + wait; return; }
         if (now < due) return;
         due = now + wait;
-        stepNext.click();
+        if (ringApi) ringApi.step(1); else stepNext.click();
       }, 200);
     };
 
@@ -3285,6 +3287,73 @@
         if (waiting.length) showArrivals();
       });
     };
+
+    // ---- home-extreme, the ring (Rimbo's roulette, from the drum lab): the slider root carries [data-ring] instead of
+    // Osmo's init attribute. The seven cards plus nine clones (made here, so dedupeClips turns them into canvases)
+    // sit on a full cylinder 22.5° apart, the axis behind the front card, the back half hidden: at rest it reads as
+    // the five-card arc of home-v4. The hero stays pinned for pinScreens screens of scroll: over the first third
+    // the ring tips about its axis until you look down on it, every card turning face-up and the ring shrinking to
+    // fit, the name of the card at the bottom fading in at its centre; the rest of the scroll turns it one full
+    // round. Steps (the clock) and drags turn it too; a drag settles on a card. ?pin=N sets the screens.
+    var ringApi = null;
+    var buildRing = function () {
+      var drum = qs('.spatial-gsap-slider__collection', ring) || ring.firstElementChild;
+      var list = qs('.spatial-gsap-slider__list', ring) || drum;
+      var originals = qsa('.spatial-gsap-slider__item', list);
+      if (!drum || originals.length < 2) return null;
+      var N = 16, STEP = 360 / N;
+      for (var i = originals.length; i < N; i++) {
+        var c = originals[i % originals.length].cloneNode(true);
+        c.setAttribute('data-ring-clone', ''); c.setAttribute('aria-hidden', 'true');
+        list.appendChild(c);
+      }
+      var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) {
+        var k = i <= N / 2 ? i : i - N; // 0 = the front card, ±1 its neighbours, ±8 the back
+        return { el: el, k: k, a: k * STEP, name: (qs('[data-band-name]', el) || el).getAttribute('data-band-name') || '' };
+      });
+      var label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label);
+      var bottomFade = qs('.band_fade.is-bottom', hero); // covers the clip edge at rest; it lifts while the ring lies flat, so the lower cards stay bright
+      var st = { steps: 0, scroll: 0, tip: 0, scale: 1, y: 0, R: 0, pitch: 0, drag: null, tween: null, front: -1 };
+      var measure = function () {
+        var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025;
+        st.pitch = w + gap; st.R = st.pitch / (2 * Math.sin(STEP / 2 * Math.PI / 180));
+      };
+      var render = function () {
+        var turn = st.steps + st.scroll;
+        // written as strings: the order matters (a card turns about the axis first, then moves out to the cylinder), and GSAP would translate first
+        drum.style.transform = 'translate3d(0,' + st.y.toFixed(1) + 'px,' + (-st.R).toFixed(1) + 'px) rotateX(' + st.tip.toFixed(3) + 'deg) rotateY(' + (-turn * STEP).toFixed(3) + 'deg) scale3d(' + st.scale.toFixed(4) + ',' + st.scale.toFixed(4) + ',' + st.scale.toFixed(4) + ')';
+        items.forEach(function (it) { it.el.style.transform = 'rotateY(' + it.a + 'deg) translateZ(' + st.R.toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; });
+        var front = ((Math.round(turn) % N) + N) % N;
+        if (front !== st.front) { st.front = front; label.textContent = items[front].name; }
+      };
+      measure(); render();
+      var rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
+      // drags: a pitch of pointer travel is one card; on release it settles on the nearest card, a flick adds a little
+      var down = null;
+      ring.addEventListener('pointerdown', function (e) { if (e.button) return; if (st.tween) st.tween.kill(); down = { x: e.clientX, steps: st.steps, t: performance.now(), v: 0, last: e.clientX }; ring.setPointerCapture(e.pointerId); });
+      ring.addEventListener('pointermove', function (e) { if (!down) return; var now = performance.now(); down.v = (e.clientX - down.last) / Math.max(1, now - down.t); down.last = e.clientX; down.t = now; st.steps = down.steps - (e.clientX - down.x) / st.pitch; render(); }); // v: px per ms
+      var up = function () { if (!down) return; var v = down.v; down = null; settle(-v * 150 / st.pitch); }; // a flick carries on a little: 150 px of travel per px/ms
+      ring.addEventListener('pointerup', up); ring.addEventListener('pointercancel', up);
+      var settle = function (extra) { var to = Math.round(st.steps + (extra || 0)); st.tween = gsap.to(st, { steps: to, duration: 0.8, ease: 'power3.out', onUpdate: render }); };
+      var ease3 = function (q) { q = Math.max(0, Math.min(1, q)); return 1 - Math.pow(1 - q, 3); };
+      return {
+        busy: function () { return !!down; },
+        step: function (n) { if (st.tween) st.tween.kill(); st.tween = gsap.to(st, { steps: Math.round(st.steps) + n, duration: 1, ease: 'power3.inOut', onUpdate: render }); },
+        state: function () { return { steps: st.steps, scroll: st.scroll, tip: st.tip, scale: st.scale, front: st.front }; },
+        scroll: function (q) { // q: 0..1 over the pinned distance
+          var screens = q * pinScreens, gone = Math.max(0, Math.min(1, screens / fadeFrac)); // the copy goes within fadeFrac of a screen, as on home-v4
+          if (copy) { copy.style.transition = 'none'; gsap.set(copy, { opacity: 1 - gone, filter: 'blur(' + (10 * gone).toFixed(1) + 'px)' }); }
+          if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - Math.max(0, Math.min(1, screens / 0.07)) }); }
+          var e = ease3(q / 0.35);
+          st.tip = 90 * e; st.scale = 1 - 0.6 * e; st.y = -window.innerHeight * 0.1 * e;
+          if (bottomFade) gsap.set(bottomFade, { opacity: 1 - e });
+          st.scroll = q > 0.35 ? (q - 0.35) / 0.65 * N : 0; // one full round over the rest
+          gsap.set(label, { opacity: Math.max(0, Math.min(1, (q - 0.3) / 0.1)) });
+          render();
+        }
+      };
+    };
+    if (ring && window.gsap) { ringApi = buildRing(); hero._ring = ringApi; } // _ring: for the headless checks
 
     // ---- clips: play every video once (the marquee clones the row after this; re-touching a running video makes it hiccup)
     function tune() {
@@ -3504,6 +3573,12 @@
     // Rimbo saw. The 3D exit: as the hero leaves, the whole drum tips over about its centre (no recede, it keeps its
     // size), on a 3D layer from the first frame so nothing re-rasterizes when the tip starts. And the scroll turn:
     // drumTurn cards over the first screen, back on the way up, settling on a card at the top.
+    if (window.ScrollTrigger && ringApi && pinScreens > 0) { // home-extreme: the hero holds while the ring tips over and turns, then the page goes on
+      ScrollTrigger.create({
+        trigger: hero, start: 'top top', end: function () { return '+=' + Math.round(window.innerHeight * pinScreens); }, pin: true, pinSpacing: true, invalidateOnRefresh: true,
+        onUpdate: function (st) { scrolled = st.progress > 0.02; ringApi.scroll(st.progress); }
+      });
+    }
     if (window.ScrollTrigger && !reduced && slider && kind === 'spatial') {
       if (exitTilt) {
         gsap.set(slider, { rotationX: 0, transformPerspective: exitDepth, transformOrigin: '50% 50%', force3D: true });
@@ -3543,15 +3618,15 @@
         var spun = 0;
         ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
       }
-      if (copy) {
+      if (copy && !ring) {
         gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
         // pinned while it blurs (Rimbo, 4 Nov): the copy rides the scroll back exactly as the hero moves up, so it
         // stays put on screen and the band slides away underneath it. Only for the in-flow hero; a fixed one is pinned already.
-        if (!spacer) gsap.to(copy, { y: function () { return hero.offsetHeight; }, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } });
+        if (!spacer && !ring) gsap.to(copy, { y: function () { return hero.offsetHeight; }, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } }); // (a pinned hero keeps it in place by itself)
       }
       // the scroll line is still fading in (its CSS entrance runs 1.6-2.8 s after the opening), so its
       // scrub waits for that to end, then takes over without the transition fighting every scroll step
-      if (scrollLine) setTimeout(function () {
+      if (scrollLine && !ring) setTimeout(function () {
         scrollLine.style.transition = 'none';
         gsap.fromTo(scrollLine, { opacity: 1 }, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: scrollRef, start: 'top top', end: function () { return '+=' + Math.round(window.innerHeight * 0.07); }, scrub: true, invalidateOnRefresh: true } }); // the scroll prompt is gone well before the copy
       }, 1100);
@@ -3624,7 +3699,7 @@
       // The wheel (home-v3) does not wait: it rolls in with the reveal (startDrift above, from an empty wheel), unless
       // ?rollin=0, when it opens title-first like V4: the top card alone slides in from the right, then the others
       // grow in at their places (the flyAfter block below).
-      var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      var cardsAfter = ((!!slider && kind === 'spatial') || !!ringApi) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       var flyAfter = !!wheel && !rollIn && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
