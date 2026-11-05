@@ -19,7 +19,24 @@
       underText: "My projects start at €3,000. If that is more than you have right now, the tools at Digital Feng Shui might get you further.",
       underLink: "Have a look at Digital Feng Shui",
       error: "Something went wrong sending this. Please try again.",
-      missing: "Please fill in the highlighted fields."
+      missing: "Please fill in the highlighted fields.",
+
+      underMinimum: "You haven't met the {min} minimum yet.",
+
+      // Personal links (?make = Rimbo's maker view, #for=… = the link a lead gets)
+      makeEyebrow: "Personal link · only you see this view",
+      makeName: "Project name",
+      makeCta: "Create link",
+      makeNeedName: "Give it a project name first.",
+      makeDone: "Link copied. It opens with this scope, and they can change it.",
+      makeOpen: "Open it",
+      clientEyebrow: "Scoped by Rimbo",
+      clientLede: "This is what I'd build for you. Switch things on or off and the price follows.",
+      recommended: "Recommended",
+      reset: "Back to my recommendation",
+      clientCta: "Send me your version",
+      clientDone: "Link copied. Paste it in your reply to me.",
+      copyFailed: "Copy the link below."
     },
 
     base: 2000,              // every build: getting to know the brand, kickoff, design system, QA, launch
@@ -82,8 +99,56 @@
   function eur(n) { return "€" + Math.round(n).toLocaleString("en-GB"); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; }
 
+  // Personal links. Three views of the same page:
+  //   public  the calculator as it is (apply at the end)
+  //   make    ?make: Rimbo types the project name and a line in the header, sets the scope, "Create link" copies a link
+  //   client  #for=…: the lead sees their project name, Rimbo's pick marked "Recommended", and can change it
+  // Everything sits after the # (browsers never send that part to a server): n = name, m = line,
+  // r = Rimbo's pick, c = the lead's own version (only when it differs).
+  var byId = {};
+  CONFIG.brand.items.concat(CONFIG.toggles).forEach(function (t) { byId[t.id] = t; });
+  function isBrandPart(id) { return CONFIG.brand.items.indexOf(byId[id]) >= 0; }
+
+  function b64e(str) { var s = ""; new TextEncoder().encode(str).forEach(function (c) { s += String.fromCharCode(c); }); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  function b64d(s) { var bin = atob(s.replace(/-/g, "+").replace(/_/g, "/")), b = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return new TextDecoder().decode(b); }
+  function readShare() {
+    var m = location.hash.match(/[#&]for=([\w-]+)/);
+    if (!m) return null;
+    try { var o = JSON.parse(b64d(m[1])); return o && o.r && o.r.p ? o : null; } catch (e) { return null; }
+  }
+  function shareHash(o) { return "#for=" + b64e(JSON.stringify(o)); }
+  function clientLink(o) { return location.origin + location.pathname + shareHash(o); }
+
+  var share = readShare();
+  var mode = q.has("make") ? "make" : share ? "client" : "public";
+  addEventListener("hashchange", function () { location.reload(); }); // a different link pasted into the same tab
+
+  // The scope as a small object: page counts, branding on/off, the ids that are on (brand parts only with branding on)
+  function snap() {
+    return {
+      p: CONFIG.pages.map(function (p) { return state.pages[p.id]; }),
+      b: state.brandOn ? 1 : 0,
+      t: Object.keys(byId).filter(function (id) { return state.toggles[id] && (state.brandOn || !isBrandPart(id)); }).sort()
+    };
+  }
+  function applySnap(s) {
+    CONFIG.pages.forEach(function (p, i) { state.pages[p.id] = Math.max(0, Math.min(p.max, Math.round(+s.p[i]) || 0)); });
+    state.brandOn = !!s.b; state.brandTouched = !!s.b;
+    state.toggles = {};
+    (s.t || []).forEach(function (id) { if (byId[id]) state.toggles[id] = true; });
+  }
+  function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify({ p: b.p, b: b.b ? 1 : 0, t: (b.t || []).slice().sort() }); }
+
+  // Nothing picked yet: no build line, an empty bar
+  function picked() {
+    return CONFIG.pages.some(function (p) { return state.pages[p.id]; }) ||
+      (state.brandOn && CONFIG.brand.items.some(function (t) { return state.toggles[t.id]; })) ||
+      CONFIG.toggles.some(function (t) { return !t.pct && state.toggles[t.id]; });
+  }
+
   // The selected items as [label, price] lines, plus the scope (before minimum and priority) and the total
   function calc() {
+    if (!picked()) return { lines: [], scope: 0, total: CONFIG.minimum };
     var out = [["Build (brand discovery, design system, QA, launch)", CONFIG.base]];
     CONFIG.pages.forEach(function (p) {
       var n = state.pages[p.id];
@@ -263,9 +328,10 @@
     // Under the minimum: a bar that fills as the scope grows, gone once the minimum is reached
     $("meter").hidden = reached;
     $("meter-fill").style.width = Math.min(100, r.scope / CONFIG.minimum * 100) + "%";
-    $("meter-text").textContent = "Your scope: " + eur(r.scope) + " of the " + eur(CONFIG.minimum) + " minimum";
+    $("meter-text").textContent = CONFIG.copy.underMinimum.replace("{min}", eur(CONFIG.minimum));
 
     var ul = $("lines");
+    ul.hidden = !r.lines.length;
     ul.innerHTML = "";
     r.lines.forEach(function (x) {
       var li = el("li");
@@ -277,7 +343,85 @@
     $("scope-summary").textContent = current.scope;
     $("f-selections").value = current.scope.split("\nEstimate shown:")[0];
     $("f-range").value = current.range;
+    if (mode !== "public") syncShare();
     queueWire();
+  }
+
+  // Personal links: the address bar always holds the current version, so a reload keeps it
+  function shareData() {
+    if (mode === "make") return { v: 1, n: $("make-name").value.trim(), m: $("make-line").value.trim(), r: snap() };
+    var o = { v: 1, n: share.n, m: share.m, r: share.r }, s = snap();
+    if (!sameSnap(s, share.r)) o.c = s;
+    return o;
+  }
+  function syncShare() {
+    var o = shareData();
+    history.replaceState(null, "", location.pathname + (mode === "make" ? "?make" : "") + shareHash(o));
+    if (mode === "client") $("reset").hidden = !o.c;
+    $("made").hidden = true; // the scope changed: the copied link is no longer this version
+  }
+
+  function setupShare() {
+    var C = CONFIG.copy, cta = $("cta");
+    cta.removeAttribute("aria-controls"); cta.removeAttribute("aria-expanded");
+    $("eyebrow").textContent = mode === "make" ? C.makeEyebrow : C.clientEyebrow;
+
+    if (mode === "make") {
+      // The header becomes the two fields, styled as what the lead will see
+      var name = el("input", "calc_edit"); name.id = "make-name"; name.type = "text"; name.maxLength = 60;
+      name.placeholder = C.makeName; name.setAttribute("aria-label", C.makeName); name.autocomplete = "off";
+      var line = el("textarea", "calc_edit"); line.id = "make-line"; line.rows = 2; line.maxLength = 160;
+      line.placeholder = C.clientLede; line.setAttribute("aria-label", "A line for them (optional)");
+      if (share) { name.value = share.n || ""; line.value = share.m || ""; }
+      $("title").textContent = ""; $("title").appendChild(name);
+      $("lede").textContent = ""; $("lede").appendChild(line);
+      [name, line].forEach(function (f) { f.addEventListener("input", function () { f.removeAttribute("aria-invalid"); syncShare(); }); });
+      cta.textContent = C.makeCta;
+    } else {
+      $("title").textContent = share.n || "Your project";
+      $("lede").textContent = share.m || C.clientLede;
+      document.title = (share.n || "Your project") + " · Rimbo Designs";
+      cta.textContent = C.clientCta;
+      markRecommended(share.r);
+      $("reset").textContent = C.reset;
+      $("reset").addEventListener("click", function () { applySnap(share.r); render(); });
+    }
+
+    cta.addEventListener("click", function () {
+      if (mode === "make" && !$("make-name").value.trim()) {
+        $("make-name").setAttribute("aria-invalid", "true"); $("make-name").focus();
+        $("made-text").textContent = C.makeNeedName; $("made-link").hidden = true; $("made-open").hidden = true; $("made").hidden = false;
+        return;
+      }
+      var link = mode === "make" ? clientLink(shareData()) : location.href;
+      $("made-link").value = link; $("made-link").hidden = false;
+      $("made-open").href = link; $("made-open").textContent = C.makeOpen; $("made-open").hidden = mode !== "make";
+      function done(ok) { $("made-text").textContent = ok ? (mode === "make" ? C.makeDone : C.clientDone) : C.copyFailed; $("made").hidden = false; }
+      function oldCopy() { // browsers that block the clipboard API: select the field and copy
+        $("made").hidden = false; var f = $("made-link"); f.focus(); f.select();
+        var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+        done(ok);
+      }
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(function () { done(true); }, oldCopy);
+      else oldCopy();
+    });
+    $("made-link").addEventListener("focus", function () { this.select(); });
+  }
+
+  // The lead's view: Rimbo's pick is marked on each item
+  function markRecommended(r) {
+    var C = CONFIG.copy;
+    CONFIG.pages.forEach(function (p, i) {
+      var n = Math.round(+r.p[i]) || 0;
+      if (n) $("n-" + p.id).closest(".calc_row").querySelector(".calc_hint").appendChild(el("span", "calc_rec_hint", " · " + C.recommended.toLowerCase() + ": " + n));
+    });
+    var on = (r.t || []).filter(function (id) { return byId[id] && (r.b || !isBrandPart(id)); });
+    if (r.b) on.push("brand");
+    on.forEach(function (id) {
+      var price = $("price-" + id); if (!price) return;
+      var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", C.recommended));
+      price.parentNode.insertBefore(tag, price);
+    });
   }
 
   var current = { scope: "", range: "" };
@@ -358,6 +502,9 @@
   buildBranding();
   buildPages();
   buildToggles();
-  setupApply();
+  document.documentElement.setAttribute("data-mode", mode);
+  if (share) applySnap(share.c || share.r);
+  else if (mode === "make") applySnap({ p: [0, 0, 0], b: 0, t: [] }); // a new lead starts from nothing
+  if (mode === "public") setupApply(); else setupShare();
   render();
 })();
