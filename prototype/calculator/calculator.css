@@ -124,6 +124,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_cta:hover { background: var(--muted); }
 .calc_fine { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
 .calc_lines[hidden] { display: none; }
+/* What every price includes: one line with its (i), above the button */
+.calc_included { margin: 0 0 20px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.calc_included .calc_label { font-size: 12px; }
+.calc_included .calc_info { vertical-align: -3px; margin-left: 2px; }
+.calc_included.is-lit .calc_label { color: var(--text); }
+.calc_tip_line { display: block; }
+.calc_tip_line + .calc_tip_line { margin-top: 8px; }
 
 /* Personal links. Maker view (?make): the title and the line are fields that look like what the lead sees */
 .calc_edit { display: block; width: 100%; margin: 0; padding: 0 0 6px; border: 0; border-bottom: 1px dashed var(--field-line); border-radius: 0;

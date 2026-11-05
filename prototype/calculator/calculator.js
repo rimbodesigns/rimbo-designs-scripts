@@ -39,18 +39,29 @@
       copyFailed: "Copy the link below."
     },
 
-    base: 2000,              // every build: getting to know the brand, kickoff, design system, QA, launch
+    // No fixed build fee (2026-11-05): strategy, design system, QA and launch grow with the project,
+    // so they sit inside the page prices (the old €2,000 base, spread over the pages). The minimum
+    // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
     priorityPct: 0.25,       // priority start: jump the queue
     totalLabel: { below: "Projects start at", reached: "Your project" },
+    included: {
+      line: "Every price includes strategy, the design system, QA and launch.",
+      title: "Included in every price",
+      text: "Getting to know your brand, and the strategy behind the site.\n" +
+        "A design system: colours, type, spacing and components, so every page fits and new ones are quick to add.\n" +
+        "Navigation, footer and the motion that runs through the whole site.\n" +
+        "QA on every page: checked on phone, tablet and desktop, in Chrome, Safari, Firefox and Edge.\n" +
+        "Launch: domain, forms and a final speed check."
+    },
 
     // Pages, by complexity: one counter each
     pages: [
-      { id: "simple",  label: "Simple pages",  hint: "Contact, thank-you, a plain text page", price: 300,  max: 20,
+      { id: "simple",  label: "Simple pages",  hint: "Contact, thank-you, a plain text page", price: 400,  max: 20,
         info: "A page with one job and a few sections. Same design standard as the rest, with light animation." },
-      { id: "medium",  label: "Medium pages",  hint: "Services, about, a case study",         price: 700,  max: 20,
+      { id: "medium",  label: "Medium pages",  hint: "Services, about, a case study",         price: 900,  max: 20,
         info: "A page with several sections, some interaction and animation. Most pages of a site are medium." },
-      { id: "complex", label: "Complex pages", hint: "Home, a scroll story, heavy animation",  price: 1600, max: 10,
+      { id: "complex", label: "Complex pages", hint: "Home, a scroll story, heavy animation",  price: 2100, max: 10,
         info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." }
     ],
 
@@ -139,7 +150,7 @@
   }
   function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify({ p: b.p, b: b.b ? 1 : 0, t: (b.t || []).slice().sort() }); }
 
-  // Nothing picked yet: no build line, an empty bar
+  // Nothing picked yet: no lines, an empty bar
   function picked() {
     return CONFIG.pages.some(function (p) { return state.pages[p.id]; }) ||
       (state.brandOn && CONFIG.brand.items.some(function (t) { return state.toggles[t.id]; })) ||
@@ -149,7 +160,7 @@
   // The selected items as [label, price] lines, plus the scope (before minimum and priority) and the total
   function calc() {
     if (!picked()) return { lines: [], scope: 0, total: CONFIG.minimum };
-    var out = [["Build (brand discovery, design system, QA, launch)", CONFIG.base]];
+    var out = [];
     CONFIG.pages.forEach(function (p) {
       var n = state.pages[p.id];
       if (n) out.push([n + " × " + p.label.toLowerCase(), n * p.price]);
@@ -193,7 +204,8 @@
     if (!key) { box.hidden = true; drawWire(); return; }
     if (box.hidden || box.dataset.key !== key) {
       $("tip-title").textContent = info[key].label;
-      $("tip-text").textContent = info[key].text;
+      var tt = $("tip-text"); tt.textContent = "";
+      info[key].text.split("\n").forEach(function (line) { tt.appendChild(el("span", "calc_tip_line", line)); });
       box.dataset.key = key;
       box.classList.remove("is-in"); void box.offsetWidth; box.classList.add("is-in");
     }
@@ -204,8 +216,9 @@
   // The dashed line: from the right edge of the item's box, at the "i", to the tip card's title
   function drawWire() {
     var svg = $("wire"), key = tip.hover || tip.pinned, box = $("tip");
-    if (!key || box.hidden || matchMedia("(max-width: 860px)").matches) { svg.classList.remove("is-on"); return; }
-    var b = info[key].btn.getBoundingClientRect(), s = info[key].row.closest(".calc_step").getBoundingClientRect(), t = box.getBoundingClientRect();
+    var step = key && info[key].row.closest(".calc_step"); // the price card's own (i) sits right above the tip: no line
+    if (!key || !step || box.hidden || matchMedia("(max-width: 860px)").matches) { svg.classList.remove("is-on"); return; }
+    var b = info[key].btn.getBoundingClientRect(), s = step.getBoundingClientRect(), t = box.getBoundingClientRect();
     var x1 = Math.round(s.right) + .5, y1 = Math.round(b.top + b.height / 2) + .5;
     var x2 = Math.round(t.left) + .5, y2 = Math.round(t.top + 38) + .5, xm = Math.round((x1 + x2) / 2) + .5;
     $("wire-path").setAttribute("d", "M" + x1 + " " + y1 + " H" + xm + " V" + y2 + " H" + x2);
@@ -499,6 +512,15 @@
 
   $("tip-close").addEventListener("click", function () { tip.pinned = tip.hover = null; showTip(); });
 
+  // In the price card: what every price includes, with its (i)
+  function buildIncluded() {
+    var I = CONFIG.included, p = $("included");
+    p.appendChild(el("span", "calc_label", I.line));
+    p.appendChild(document.createTextNode(" "));
+    p.appendChild(addInfo("included", I.title, I.text, p));
+  }
+
+  buildIncluded();
   buildBranding();
   buildPages();
   buildToggles();
