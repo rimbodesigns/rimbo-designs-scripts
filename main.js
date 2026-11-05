@@ -5322,13 +5322,14 @@
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var logoSrc = brushLogoSrc();
-    // two grounds. Dark is the site's own Ink. Beige is for pages that come from a light section (Rimbo, 5 Nov: black under a
-    // light page is too hard a jump). data-footer="light" or "dark" on any element of the page picks one, ?ftheme= tries it out;
-    // without the attribute posts are beige (their page is light, and they are one template) and the rest dark
+    // two grounds. Dark is the default everywhere: the page's own dark (--color--black), so the classic #131313 and whatever a
+    // page sets itself. Beige is an experiment for pages that come from a light section (Rimbo: keep it dark most places, the
+    // light one stays experimental), so it only runs on the Groningen page. data-footer="light" or "dark" on any element of a
+    // page picks one, ?ftheme= tries it out
     var themeEl = qs('[data-footer]');
-    var theme = (/[?&]ftheme=(light|dark)/.exec(location.search) || [])[1] || (themeEl && themeEl.getAttribute('data-footer')) || (document.documentElement.classList.contains('rf') ? 'light' : 'dark');
+    var theme = (/[?&]ftheme=(light|dark)/.exec(location.search) || [])[1] || (themeEl && themeEl.getAttribute('data-footer')) || (/-in-groningen\/?$/.test(location.pathname) ? 'light' : 'dark');
     var light = theme === 'light';
-    var ACCENT = [228, 68, 28], LOGO_FILL = light ? [19, 19, 19] : [248, 245, 238];
+    var ACCENT = light ? [75, 120, 136] : [228, 68, 28], LOGO_FILL = light ? [19, 19, 19] : [248, 245, 238];
     var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
     var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
     var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
@@ -5336,9 +5337,9 @@
 
     var ease = 'cubic-bezier(.625, .05, 0, 1)';
     var css = [
-      '.rdf { --rdf-bg: #131313; --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
+      '.rdf { --rdf-bg: var(--color--black, #131313); --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
       '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; margin-top: -2rem; overflow: hidden; background: var(--rdf-bg); color: var(--rdf-fg); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
-      '.rdf.is-light { --rdf-bg: #ece5d6; --rdf-fg: #131313; --rdf-grey: #5e574b; --rdf-hair: rgba(19, 19, 19, .14); --rdf-dash: rgba(19, 19, 19, .26); --rdf-lift: rgba(248, 245, 238, .55); --rdf-key: #3c6473; --rdf-str: #b43414; }',
+      '.rdf.is-light { --rdf-bg: #ece5d6; --rdf-fg: #131313; --rdf-grey: #5e574b; --rdf-brand: #4b7888; --rdf-hair: rgba(19, 19, 19, .14); --rdf-dash: rgba(19, 19, 19, .26); --rdf-lift: rgba(248, 245, 238, .4); --rdf-key: #5e574b; --rdf-str: #3c6473; }',
       '.rdf *, .rdf *::before, .rdf *::after { box-sizing: border-box; }',
       '.rdf a, .rdf a:hover, .rdf a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles (size, coral hover) stay out
       '.rdf i { font-style: normal; }',
@@ -5354,7 +5355,7 @@
       '.rdf-ruler span { position: absolute; left: 50%; top: -.6rem; transform: translateX(-50%); padding: 0 .6rem; font-size: .58rem; letter-spacing: .18em; color: var(--rdf-grey); white-space: nowrap; }',
       '.rdf-grid { flex: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)) auto; }',
       '.rdf-cell { position: relative; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 1.4rem 1.6rem; transition: background-color .4s ' + ease + '; }',
-      '.rdf-cell:hover { background-color: var(--rdf-lift); }',
+      '.rdf-cell.is-drawn { background-color: var(--rdf-lift); }',
       '.rdf-logo { grid-column: 1 / 9; grid-row: 1 / 5; justify-content: flex-end; align-items: flex-start; padding: 2.4rem 1.6rem 2.6rem; }',
       '.rdf-logo-art { position: relative; display: block; margin: -30px; }',
       '.rdf-logo-art canvas { display: block; }',
@@ -5363,14 +5364,14 @@
       '.rdf-pt > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
       '.rdf-pt > span + span { transform: translateY(110%); }',
       '.rdf-page > i { font-family: var(--rdf-mono); color: var(--rdf-grey); transform: translateX(-.4em); opacity: 0; transition: transform .45s ' + ease + ', opacity .3s, color .3s; }',
-      '.rdf-page:hover > i { transform: none; opacity: 1; color: var(--rdf-fg); }',
+      '.rdf-page.is-drawn > i { transform: none; opacity: 1; color: var(--rdf-fg); }',
       '.rdf-mail { grid-column: 1 / 9; grid-row: 5; } .rdf-where { grid-column: 9 / 13; grid-row: 5; }',
       '.rdf-label { margin: 0; font-size: .64rem; letter-spacing: .2em; text-transform: uppercase; color: var(--rdf-grey); }',
       '.rdf-swap { position: relative; display: grid; overflow: hidden; font-size: clamp(.78rem, 1.05vw, .95rem); letter-spacing: .16em; text-transform: uppercase; line-height: 1.5; }',
       '.rdf-swap b { font-weight: 400; }',
       '.rdf-swap > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
       '.rdf-swap > span + span { transform: translateY(110%); color: var(--rdf-fg); }',
-      '@media (hover: hover) { .rdf-cell:hover .rdf-swap > span:first-child, .rdf-page:hover .rdf-pt > span:first-child { transform: translateY(-110%); } .rdf-cell:hover .rdf-swap > span + span, .rdf-page:hover .rdf-pt > span + span { transform: none; } }',
+      '.rdf-cell.is-drawn .rdf-swap > span:first-child, .rdf-page.is-drawn .rdf-pt > span:first-child { transform: translateY(-110%); } .rdf-cell.is-drawn .rdf-swap > span + span, .rdf-page.is-drawn .rdf-pt > span + span { transform: none; }',
       '.rdf-base { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--rdf-grey); }',
       '.rdf-base-l { grid-column: 1 / 9; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 2rem; padding: 1rem 1.6rem; }',
       '.rdf-socials { grid-column: 9 / 13; display: grid; grid-template-columns: 1fr 1fr; }',
@@ -5725,36 +5726,39 @@
     window.addEventListener('resize', function () { if (!rulerOn) return; clearTimeout(rulerTimer); rulerTimer = setTimeout(function () { sizeLabel(true); }, 120); });
 
     // ---- hover (mouse only): the HTML types back in (not on the email and Based in, they swap) + an orange outline ----
-    var done = false;
+    // one hover state for the whole cell, and only once the footer is built. A pointer already resting on a cell while the
+    // footer scrolls in gets it the moment the build is done (it used to get the lighter ground without its outline)
+    var done = false, over = null;
     if (canHover) {
       qsa('.rdf-cell', foot).forEach(function (cell) {
         var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'rdf-draw'); svg.setAttribute('aria-hidden', 'true');
         var p1 = document.createElementNS(NS, 'path'), p2 = document.createElementNS(NS, 'path');
         [p1, p2].forEach(function (pth) { pth.setAttribute('pathLength', '1'); svg.appendChild(pth); });
         cell.appendChild(svg);
-        cell.addEventListener('mouseenter', function () {
-          if (!done) return;
+        cell.rdfOn = function () {
           var w = cell.offsetWidth, h = cell.offsetHeight;
           svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
           p1.setAttribute('d', 'M.5 .5H' + (w - 0.5) + 'V' + (h - 0.5));
           p2.setAttribute('d', 'M.5 .5V' + (h - 0.5) + 'H' + (w - 0.5));
           cell.classList.add('is-drawn');
-        });
-        cell.addEventListener('mouseleave', function () { cell.classList.remove('is-drawn'); });
+        };
+        cell.rdfOff = function () { cell.classList.remove('is-drawn'); };
+        cell.addEventListener('mouseenter', function () { over = cell; if (done) cell.rdfOn(); });
+        cell.addEventListener('mouseleave', function () { over = null; cell.rdfOff(); });
       });
       boxes.forEach(function (b) {
         if (!b.el.classList.contains('rdf-cell') || b.el.hasAttribute('data-swap')) return;
-        var raf = 0;
-        b.el.addEventListener('mouseenter', function () {
-          if (!done) return;
+        var raf = 0, cellOn = b.el.rdfOn, cellOff = b.el.rdfOff;
+        b.el.rdfOn = function () {
+          cellOn();
           var t0 = performance.now(); cancelAnimationFrame(raf); b.code.classList.add('is-hover');
           (function step() {
             var k = Math.min(1, (performance.now() - t0) / 420);
             renderCode(b.code, b.chars, Math.round(b.chars.length * k), true);
             if (k < 1) raf = requestAnimationFrame(step);
           })();
-        });
-        b.el.addEventListener('mouseleave', function () { cancelAnimationFrame(raf); b.code.classList.remove('is-hover'); });
+        };
+        b.el.rdfOff = function () { cellOff(); cancelAnimationFrame(raf); b.code.classList.remove('is-hover'); };
       });
     }
 
@@ -5796,7 +5800,7 @@
           b.caret.style.top = typed.a.y + 'px'; b.caret.style.height = typed.a.h + 'px';
         } else b.caret.style.opacity = 0;
       });
-      done = p > 0.9;
+      if ((p > 0.9) !== done) { done = p > 0.9; if (over) over[done ? 'rdfOn' : 'rdfOff'](); }
     }
 
     // ---- the engine: the footer rises at half the scroll speed, so the page seems to slide off it ----
