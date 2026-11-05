@@ -3114,7 +3114,7 @@
       var wait = stepEvery * 1000, due = performance.now() + wait;
       setInterval(function () {
         var d = slider['_' + kind + 'SliderDraggable'], now = performance.now();
-        var held = over || hidden || document.hidden || scrolled || (d && (d.isPressed || d.isDragging || d.isThrowing));
+        var held = over || hidden || document.hidden || scrolled || rollLeft > 0 || (d && (d.isPressed || d.isDragging || d.isThrowing));
         if (held) { due = now + wait; return; }
         if (now < due) return;
         due = now + wait;
@@ -3124,15 +3124,19 @@
 
     // ---- the wheel (home-v3, Osmo's radial slider): three turns on top of Osmo's drag, all through the slider's
     // own proxy and render (turn below), so a hand on the wheel always wins and the layout maths stays Osmo's.
-    //   roll-in  the opening: the wheel waits turned N degrees on and rolls back to rest while the title rises, the
-    //            same way round as the drift, so the motion never turns about (Rimbo: the first cut rolled in to the
-    //            right and then drifted left) (?rollin=N / data-band-rollin, default 90; 0 = the fly-in instead)
-    //   fly-in   the other opening (?rollin=0; Rimbo, 2026-11-05: "the first one has to come in, and after that it's
-    //            just always kind of circular"): title first, then the top card alone slides in fast from beyond the
-    //            right edge straight to its place, the others grow in at their places on the circle, the nearest pair
-    //            first, and only then the wheel turns (the drift, or the step clock). Knobs: ?fly=S the slide (s),
-    //            ?fill=S when the others start (s after the slide sets off), ?spread=S per ring outward, ?grow=S one
-    //            card's growth (data-band-fly/-fill/-spread/-grow on the section). Built in open() below (flyAfter).
+    //   roll-in  the opening (Rimbo, 2026-11-05: "in the beginning you don't see any of them... the first comes in and
+    //            slides to the left, the second follows, the third, the fourth, and then it's a circle that keeps
+    //            looping; it rolls in from zero, but already on the track of the circle"): every card starts hidden,
+    //            the wheel rolls one full loop from the reveal (Osmo keeps the cards wrapped around the top, half the
+    //            loop either side, so a card leaving on the left comes back on the right: one loop = every card comes
+    //            in from the right exactly once) and each card is shown the moment it comes round past 100 degrees
+    //            on the right, still off screen. The roll's speed falls off in a straight line into the drift's over
+    //            ?roll=S seconds, so the wheel never stops: the roll becomes the loop. ?rollin=N rolls N degrees
+    //            instead of one loop (data-band-rollin; 0 = the fly-in below), ?roll=S / data-band-roll, default 6.
+    //            No rise and no fade for the stage. A hand on the wheel ends the roll where it is and shows the rest.
+    //   fly-in   ?rollin=0 (rejected: V5 2026-11-05 "not working", V3 the same night "weird"): title first, then the
+    //            top card alone slides in straight from the right, the others grow in at their places, then the wheel
+    //            turns. Knobs ?fly= ?fill= ?spread= ?grow= (data-band-fly/-fill/-spread/-grow). In open() (flyAfter).
     //   drift    at rest the wheel keeps turning, N degrees a second, so the next card drifts into the middle every
     //            few seconds; it holds during a drag or its throw, during a step or the roll-in, in a hidden tab or
     //            once the hero has scrolled away, and eases back up to speed after; it does not stop for a pointer
@@ -3140,8 +3144,9 @@
     //   spin     scrolling the hero away turns the wheel N degrees over that first screen, so it rolls out under the
     //            copy and rolls back on the way up (?spin=N / data-band-spin, default 24; 0 = off)
     // All three are off under prefers-reduced-motion.
-    var rollIn = wheel ? param('rollin', 'rollin', 90) : 0, drift = wheel ? param('drift', 'drift', 3) : 0, spin = wheel ? param('spin', 'spin', 24) : 0;
+    var rollIn = wheel ? param('rollin', 'rollin', -1) : 0, drift = wheel ? param('drift', 'drift', 3) : 0, spin = wheel ? param('spin', 'spin', 24) : 0; // rollin < 0 = one full loop
     if (reduced) rollIn = drift = spin = 0;
+    var rollDur = Math.max(0.1, param('roll', 'roll', 6)); // s, the roll-in's length: its extra speed is gone by then and the drift carries on
     var flyIn = Math.max(0, param('fly', 'fly', 0.9)), fillStart = Math.max(0, param('fill', 'fill', 0.5)), fillSpread = Math.max(0, param('spread', 'spread', 0.1)), fillGrow = Math.max(0, param('grow', 'grow', 0.8)); // the fly-in's timings (seconds)
     var wheelHeld = function () { var d = wheel && wheel._radialSliderDraggable; return !d || d.isPressed || d.isDragging || d.isThrowing; };
     var turn = function (deg) { // turn the wheel by deg from outside a drag: the proxy moves, the Draggable syncs to it, the cards follow
@@ -3177,22 +3182,53 @@
       if (Math.abs(to - x) < 0.5) return;
       gsap.to(proxy, { x: to, duration: 0.6, ease: 'power2.out', onUpdate: render, onComplete: function () { d.update(); render(); } });
     };
-    var rollWheelIn = function () { // called by the opening: the wheel is already turned on by rollIn; this rolls it back to rest
-      var proxy = wheel && wheel._radialSliderProxy, d = wheel && wheel._radialSliderDraggable, render = wheel && wheel._radialSliderRender;
-      if (!rollIn || !proxy || !d || !render) return;
-      // a long, even slow-down: the stage itself fades in over its first 1.2 s, so a quick ease would be over before the wheel is seen
-      gsap.to(proxy, { rotation: 0, duration: 3.6, delay: 0.15, ease: 'power2.out', onUpdate: render, onComplete: function () { d.update(); render(); } });
+    // The wheel's own motion, one ticker: the roll-in (once, from the opening) and the drift. The roll-in is extra
+    // speed on top of the drift that falls off in a straight line to nothing over rollDur, sized so the wheel covers
+    // roll degrees in that time (drift x rollDur + extra x rollDur / 2); when it is gone the drift is simply still
+    // running, so the roll becomes the loop without a stop. The cards start hidden and each is shown as it comes
+    // round the right side past entryDeg (off screen), so they arrive one after another; whatever is still hidden
+    // when the roll ends, or when a hand ends it, fades in where it is.
+    var rollWait = 0, rollLeft = 0, rollExtra = 0, wheelRunning = false, waiting = []; // waiting: the hidden cards
+    var entryDeg = 100; // a card this far round on the right is off screen on every layout, and inside Osmo's wrap
+    var itemRot = function (it) { return parseFloat(gsap.getProperty(it, 'rotation')) || 0; };
+    var hideCards = function () { // called by the opening before the stage shows
+      waiting = qsa('[data-radial-slider-item]', wheel);
+      waiting.forEach(function (it) { it.__rollRot = itemRot(it); });
+      gsap.set(waiting, { autoAlpha: 0 });
     };
-    var startDrift = function () {
-      if (!wheel || !drift) return;
-      var v = 0; // degrees a second right now, easing towards drift or 0
+    var showArrivals = function () { // the cards that have just come round past entryDeg on the right
+      for (var i = waiting.length - 1; i >= 0; i--) {
+        var it = waiting[i], r = itemRot(it), was = it.__rollRot;
+        it.__rollRot = r;
+        if (r - was > 90) was = 9999; // it wrapped from the far left to the far right this frame
+        if (was > entryDeg && r <= entryDeg && r > 0) { gsap.set(it, { clearProps: 'opacity,visibility' }); waiting.splice(i, 1); }
+      }
+    };
+    var rollDone = function () {
+      rollLeft = 0;
+      if (waiting.length) gsap.to(waiting, { autoAlpha: 1, duration: 0.5, overwrite: true, clearProps: 'opacity,visibility' });
+      waiting = [];
+    };
+    var startDrift = function (roll) { // roll: degrees for the roll-in, or nothing (the drift alone)
+      if (!wheel) return;
+      if (roll && rollDur) { rollWait = 0.15; rollLeft = rollDur; rollExtra = Math.max(0, 2 * (roll - drift * rollDur) / rollDur); }
+      if (wheelRunning || (!drift && !roll)) return;
+      wheelRunning = true;
+      var v = roll ? drift : 0; // degrees a second right now (the drift's share), easing towards drift or 0; the roll-in sets off at full drift speed
       gsap.ticker.add(function (t, dt) {
-        var proxy = wheel._radialSliderProxy;
+        var proxy = wheel._radialSliderProxy, s = dt / 1000;
+        if (rollWait > 0) { rollWait -= s; return; }
         var want = (hidden || document.hidden || wheelHeld() || (proxy && gsap.isTweening(proxy))) ? 0 : drift;
-        v += (want - v) * Math.min(1, dt / 1000 * (want ? 1.5 : 6)); // up to speed in about a second and a half, off within a beat
-        if (Math.abs(v) < 0.01) { v = 0; return; }
+        v += (want - v) * Math.min(1, s * (want ? 1.5 : 6)); // up to speed in about a second and a half, off within a beat
+        var extra = 0;
+        if (rollLeft > 0) {
+          if (wheelHeld()) rollDone();
+          else { extra = rollExtra * rollLeft / rollDur; rollLeft -= s; if (rollLeft <= 0) rollDone(); }
+        }
+        if (Math.abs(v) + extra < 0.01) { v = 0; return; }
         if (wheelHeld()) return;
-        turn(-v * dt / 1000);
+        turn(-(v + extra) * s);
+        if (waiting.length) showArrivals();
       });
     };
 
@@ -3531,16 +3567,21 @@
       // home-v4 (Rimbo): the copy first, then the cards. No rise and no fade for the stage (Rimbo: not needed);
       // once the title is nearly in, each whole card (frame, shadow and clip as one) grows from one pixel at its
       // centre to full size, the middle card first and the rest following outward.
-      // The wheel (home-v3) does not wait: it rolls in with the reveal instead (rollWheelIn above) — unless ?rollin=0,
-      // when it opens title-first like V4: the top card alone slides in from the right, then the others grow in at
-      // their places (the flyAfter block below).
+      // The wheel (home-v3) does not wait: it rolls in with the reveal (startDrift above, from an empty wheel), unless
+      // ?rollin=0, when it opens title-first like V4: the top card alone slides in from the right, then the others
+      // grow in at their places (the flyAfter block below).
       var cardsAfter = !!slider && kind === 'spatial' && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       var flyAfter = !!wheel && !rollIn && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
       // The glass wheel (data-glass-carousel-arc) opens like V3 instead: the stage with the reveal, rolling in (Rimbo, 2026-11-05: the title-first fly-in was sent back).
       var glassAfter = !!qs('[data-glass-carousel]:not([data-glass-carousel-arc])', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
-      if (rollIn && wheel && wheel._radialSliderProxy) { turn(rollIn); rollWheelIn(); }
+      if (rollIn && wheel && wheel._radialSliderProxy) { // the roll-in: every card hidden, the wheel rolling one loop (or rollIn degrees) from the reveal
+        if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // no rise and no fade: the cards arrive along the circle, nothing else moves
+        var rollStep = Math.abs(parseFloat(getComputedStyle(wheel).getPropertyValue('--slider-rotate'))) || 18;
+        var rollDeg = rollIn > 0 ? rollIn : qsa('[data-radial-slider-item]', wheel).length * rollStep; // one loop: every card comes in once and the wheel ends where it began
+        hideCards(); turn(rollDeg); startDrift(rollDeg);
+      }
       var stageNow = !(cardsAfter || glassAfter || flyAfter);
       [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
