@@ -5288,15 +5288,17 @@
 
     var ease = 'cubic-bezier(.625, .05, 0, 1)';
     var css = [
-      '.rdf { --rdf-bg: var(--color--black, #131313); --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
-      '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; margin-top: -2rem; overflow: hidden; background: var(--rdf-bg); color: var(--rdf-fg); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
-      '.rdf.is-light { --rdf-bg: #ece5d6; --rdf-fg: #131313; --rdf-grey: #5e574b; --rdf-brand: #4b7888; --rdf-hair: rgba(19, 19, 19, .14); --rdf-dash: rgba(19, 19, 19, .26); --rdf-lift: rgba(248, 245, 238, .4); --rdf-key: #5e574b; --rdf-str: #3c6473; }',
+      '.rdf { --rdf-bg: var(--color--black, #131313); --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; --rdf-drop: 0, 0, 0; --rdf-drop-a: .62; --rdf-edge: rgba(248, 245, 238, .08); --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
+      '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; overflow: hidden; background: var(--rdf-bg); color: var(--rdf-fg); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
+      '.rdf.is-light { --rdf-bg: var(--color--rimbobage, #f8f5ee); --rdf-fg: #131313; --rdf-grey: #5e574b; --rdf-brand: #4b7888; --rdf-hair: rgba(19, 19, 19, .14); --rdf-dash: rgba(19, 19, 19, .26); --rdf-lift: rgba(255, 255, 255, .45); --rdf-key: #5e574b; --rdf-str: #3c6473; --rdf-drop: 118, 84, 36; --rdf-drop-a: .34; --rdf-edge: rgba(118, 84, 36, .16); }',
       '.rdf *, .rdf *::before, .rdf *::after { box-sizing: border-box; }',
       '.rdf a, .rdf a:hover, .rdf a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles (size, coral hover) stay out
       '.rdf i { font-style: normal; }',
-      // the section above lifts away from the footer along one straight line (Rimbo: no rounded corners)
-      '.rdf-prev { position: relative; z-index: 2 !important; box-shadow: 0 2rem 4rem rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(248, 245, 238, .08); }',
-      '.rdf-prev.rdf-prev-soft { box-shadow: 0 .75rem 2rem rgba(94, 74, 40, .1), inset 0 -1px 0 rgba(94, 74, 40, .1); }',
+      // the page above lifts away along one straight line, and its shade falls on the footer from exactly that line
+      // (in the footer, so it runs the full width and can fade once the page has gone; no overlap, no rounded corners: Rimbo)
+      '.rdf-prev { position: relative; z-index: 2 !important; }',
+      '.rdf::before { content: ""; position: absolute; left: 0; right: 0; top: 0; z-index: 6; height: clamp(9rem, 34vh, 18rem); pointer-events: none; border-top: 1px solid var(--rdf-edge); opacity: var(--rdf-drop-k, 1); background: linear-gradient(to bottom, rgba(var(--rdf-drop), var(--rdf-drop-a)), rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .62)) 16%, rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .36)) 36%, rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .16)) 58%, rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .05)) 80%, rgba(var(--rdf-drop), 0)); }',
+      '.rdf .rdf-grain.grain { position: absolute; inset: 0; z-index: 7; pointer-events: none; }',
       '.rdf-in { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 5.5rem var(--rdf-pad) 1.6rem; will-change: transform; }',
       '.rdf-in::after { content: ""; position: absolute; inset: 0; background: var(--rdf-bg); opacity: var(--rdf-shade, 0); pointer-events: none; z-index: 5; }',
       '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
@@ -5419,7 +5421,14 @@
     var prev = top;
     while (prev && prev.lastElementChild && getComputedStyle(prev).backgroundColor === 'rgba(0, 0, 0, 0)') prev = prev.lastElementChild;
     if (prev && prev.offsetWidth < foot.offsetWidth * .9) prev = top; // a small element at the end of the page (a language pill) is not a section
-    if (prev) { prev.classList.add('rdf-prev'); if (light) prev.classList.add('rdf-prev-soft'); }
+    if (prev) prev.classList.add('rdf-prev');
+    // the same grain as the page: where it sits behind the page (city pages) the footer would cover it and look flat next to it
+    var pageGrain = qs('.grain');
+    if (pageGrain && !pageGrain.closest('.rdf-prev') && parseInt(getComputedStyle(pageGrain).zIndex, 10) < 0) {
+      var ftGrain = pageGrain.cloneNode(false);
+      ftGrain.classList.add('rdf-grain');
+      foot.appendChild(ftGrain);
+    }
     var inner = qs('.rdf-in', foot);
 
     // the clock in Based in
@@ -5758,6 +5767,7 @@
     function curtain(p) {
       inner.style.transform = 'translate3d(0,' + (-(1 - p) * foot.offsetHeight * 0.5).toFixed(1) + 'px,0)';
       inner.style.setProperty('--rdf-shade', ((1 - p) * 0.8).toFixed(3));
+      foot.style.setProperty('--rdf-drop-k', (1 - smooth(0.6, 1, p)).toFixed(3)); // the page's shade goes with the page
     }
     if (reduce) { curtain(1); draw(1); return; }
     curtain(0); draw(0);

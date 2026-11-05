@@ -20,7 +20,7 @@ Deep Orange is the brand. Dark and beige carry the pages, and the orange marks w
 | Ink | `#131313` | `Color/Black` | Text on beige, dark sections, the footer |
 | Night | `#0C0C0C` | none | Darkest ground: the menu |
 | Beige | `#F8F5EE` | `Color/Rimbobage` | Page background, text on dark |
-| Deep Beige | `#ECE5D6` | none | The balls, beige blocks and the experimental light footer. The page background stays Beige |
+| Deep Beige | `#ECE5D6` | none | The balls and beige blocks only. The page background stays Beige |
 | Steel | `#5B8D9F` | none | Counter colour. Balls and blocks only, never text or buttons |
 | Hot Edge | `#E4566A` | none | Only where orange meets steel inside a ball |
 
@@ -46,7 +46,9 @@ Contrast ratio, 4.5 or more is fine for all text.
 
 Dark, everywhere. It takes the page's own dark (`--color--black`), so `#131313` on the classic pages and `#0C0C0C` on the V4 home, where the page sets that itself.
 
-The beige one is an experiment and only runs on the Groningen page: Deep Beige ground, ink logo and text, and steel for the build lines and the hover outline where the dark one has orange. `data-footer="light"` or `"dark"` as a custom attribute on any element of a page picks one. `?ftheme=light` or `?ftheme=dark` tries one out on any page.
+The light one is an experiment and only runs on the Groningen page: the page's own Beige, ink logo and text, and steel for the build lines and the hover outline where the dark one has orange.
+
+Both match the page, so the shade the page drops on the footer is what separates them. It starts at the page's edge and fades as the page leaves. `data-footer="light"` or `"dark"` as a custom attribute on any element of a page picks one. `?ftheme=light` or `?ftheme=dark` tries one out on any page.
 
 ## The balls
 
