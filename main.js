@@ -5345,7 +5345,7 @@
     window.addEventListener('resize', relayout);
     // and whenever a cell changes size (on phones the logo cell only gets its height once the logo has loaded)
     if ('ResizeObserver' in window) {
-      var ro = new ResizeObserver(function () { cancelAnimationFrame(relayT); relayT = requestAnimationFrame(layout); });
+      var ro = new ResizeObserver(function () { layout(); }); // straight away: the lines must match the cells before the next frame
       qsa('.rdf-cell, .rdf-base', foot).forEach(function (el) { ro.observe(el); });
     }
     layout();
@@ -5400,7 +5400,7 @@
       logo.paint(p);
       vs.forEach(function (l, i) { l.style.clipPath = 'inset(0 0 ' + cut(smooth(0.02 + i * 0.03, 0.36 + i * 0.03, p)) + ' 0)'; });
       hs.forEach(function (l, i) { l.style.clipPath = 'inset(0 ' + cut(smooth(0.04 + i * 0.025, 0.38 + i * 0.025, p)) + ' 0 0)'; });
-      ruler.style.clipPath = 'inset(0 ' + cut(smooth(0.04, 0.3, p)) + ' 0 0)';
+      ruler.style.clipPath = 'inset(-1.5rem ' + cut(smooth(0.04, 0.3, p)) + ' 0 0)'; // -1.5rem: room for the width label above the ticks
       if (p > 0.2 && !rulerOn) { rulerOn = true; rulerLabel.style.opacity = 1; sizeLabel(true); }
       else if (p < 0.05 && rulerOn) { rulerOn = false; rulerLabel.style.opacity = 0; if (window.gsap) gsap.killTweensOf(rulerLabel); rulerLabel.textContent = ''; }
       var settle = smooth(0.74, 0.88, p);
