@@ -5142,8 +5142,8 @@
       '.rdf *, .rdf *::before, .rdf *::after { box-sizing: border-box; }',
       '.rdf a, .rdf a:hover, .rdf a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles (size, coral hover) stay out
       '.rdf i { font-style: normal; }',
-      // the section above lifts away from the footer like a card; the footer sits under its rounded corners
-      '.rdf-prev { position: relative; z-index: 2 !important; border-radius: 0 0 1.75rem 1.75rem; box-shadow: 0 2rem 4rem rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(248, 245, 238, .08); }',
+      // the section above lifts away from the footer along one straight line (Rimbo: no rounded corners)
+      '.rdf-prev { position: relative; z-index: 2 !important; box-shadow: 0 2rem 4rem rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(248, 245, 238, .08); }',
       '.rdf-in { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 5.5rem var(--rdf-pad) 1.6rem; will-change: transform; }',
       '.rdf-in::after { content: ""; position: absolute; inset: 0; background: var(--rdf-black); opacity: var(--rdf-shade, 0); pointer-events: none; z-index: 5; }',
       '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
