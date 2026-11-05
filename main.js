@@ -5042,9 +5042,9 @@
   }
 
   // =========================================================
-  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past. The
-  // page stays light; only the drum sits on Ink (.loc_dark), which dissolves into the page (rdLocWave). A scroll fade
-  // and a hard edge were both rejected. Not rdBand: that one belongs to a hero at the top of the page.
+  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past, on
+  // the beige page: every dark version (scroll fade, hard edge, grainy wave) was dropped, and the tops of the cards
+  // peeking into the first screen are the cue to scroll. Not rdBand: that one belongs to a hero at the top of the page.
   // Here Osmo's slider starts when the section comes near, posters load then too, each clip only loads and plays
   // once its card is on screen, and a hidden Next button steps the drum every 5 s while it is in view.
   // =========================================================
@@ -5067,7 +5067,7 @@
     qsa('[data-btn-alt-nl]').forEach(function (b) { b.setAttribute('data-btn-alt', b.getAttribute('data-btn-alt-nl')); });
   }
 
-  // City pages, Zo werken we: one living ball per plain beige card, running off the edge and a bit bigger at each step.
+  // City pages, Zo werken we: one living ball per plain beige card, running off the edge, calm at step 1 and alive at 3.
   // Shader and motion come from the calculator (prototype/calculator/ball.js, the brand's ball with a see-through
   // outside): the colours flow and turn inside it and it floats and breathes on its own; the pointer only warms the
   // spot under it. One shared WebGL2 context, copied to a 2D canvas per card; runs only while the cards are on screen.
@@ -5134,10 +5134,12 @@
     }
     gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
     gl.uniform2fv(U.edges, new Float32Array([0.12, 0.28, 0.26, 0.46, 0.5, 0.84]));
-    gl.uniform1f(U.bias, 0.06); gl.uniform1f(U.heat, 0);
+    gl.uniform1f(U.heat, 0);
 
     var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var SPEC = [{ r: 0.3, cy: 0.24, seed: 14 }, { r: 0.36, cy: 0.26, seed: 23 }, { r: 0.42, cy: 0.28, seed: 37 }];
+    // One size. The steps go from calm to alive: bias walks the ball along the fade (high = beige and steel, low = red),
+    // flow is how fast the colours move. Meet is beige and blue, Design more blue with a little pink and orange, Build red
+    var SPEC = [{ seed: 14, bias: 0.26, flow: 0.6 }, { seed: 23, bias: -0.02, flow: 1 }, { seed: 37, bias: -0.2, flow: 1.5 }];
     var time = 0, last = 0, lastDraw = 0, onScreen = false, running = false;
     function draw(b) {
       var box = b.card.getBoundingClientRect();
@@ -5146,11 +5148,11 @@
       if (b.cv.width !== W || b.cv.height !== H) { b.cv.width = W; b.cv.height = H; }
       if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
       gl.viewport(0, 0, W, H);
-      var f = time + b.off; // it floats and breathes on its own
+      var f = time * b.s.flow + b.off; // it floats and breathes on its own
       var fx = calm ? 0 : Math.sin(f * 0.31) * 16 + Math.sin(f * 0.13) * 10, fy = calm ? 0 : Math.cos(f * 0.23) * 14;
-      var R = b.s.r * box.height * (calm ? 1 : 1 + Math.sin(f * 0.37) * 0.022);
-      gl.uniform2f(U.res, W, H); gl.uniform2f(U.center, (box.width - R * 0.2 + fx) * dpr, (b.s.cy * box.height + fy) * dpr);
-      gl.uniform1f(U.R, R * dpr); gl.uniform1f(U.seed, b.s.seed); gl.uniform1f(U.grainScale, dpr * 0.75); gl.uniform1f(U.t, f);
+      var R = 0.36 * box.height * (calm ? 1 : 1 + Math.sin(f * 0.37) * 0.022);
+      gl.uniform2f(U.res, W, H); gl.uniform2f(U.center, (box.width - R * 0.2 + fx) * dpr, (0.26 * box.height + fy) * dpr);
+      gl.uniform1f(U.R, R * dpr); gl.uniform1f(U.seed, b.s.seed); gl.uniform1f(U.bias, b.s.bias); gl.uniform1f(U.grainScale, dpr * 0.75); gl.uniform1f(U.t, f);
       gl.uniform2f(U.ptr, b.x * dpr, b.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(R * 0.4, 80), 200) * dpr); gl.uniform1f(U.ptrAmt, b.amt);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -5194,77 +5196,6 @@
     window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { balls.forEach(draw); }, 150); });
   }
 
-  // City pages: the dark behind the drum has no edge. Above and below it the ink dissolves into the page as a grainy,
-  // slowly moving wave, a stipple like the brand's balls instead of a smooth fade (a smooth one goes grey), and the top
-  // one already shows at the bottom of the first screen, which is the cue to scroll. See-through, so the page's grain
-  // stays. Without WebGL2 the section is simply solid. Each runs only while it is on screen.
-  function rdLocWave() {
-    var dark = qs('.loc_dark');
-    if (!dark || !document.createElement('canvas').getContext('webgl2')) return;
-    var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var FRAG = '#version 300 es\n' +
-      'precision highp float;\n' +
-      'uniform vec2 res; uniform float t; uniform float flip; uniform float grainScale;\n' +
-      'out vec4 outColor;\n' +
-      'float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n' +
-      'float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n' +
-      '  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n' +
-      'float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n' +
-      'void main() {\n' +
-      '  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n' +
-      '  float y = p.y / res.y;\n' +
-      '  if (flip > 0.5) y = 1.0 - y;\n' + // y runs from the page (0) to the dark (1)
-      '  float x = p.x / res.y;\n' +
-      '  float w = (fbm(vec2(x * 0.8 + t * 0.06, t * 0.05 + flip * 9.0)) - 0.5) * 0.8 + sin(x * 1.5 + t * 0.2 + flip * 3.0) * 0.13 + sin(x * 3.7 - t * 0.14) * 0.05;\n' +
-      '  float d = y + w * smoothstep(0.0, 0.3, y) * smoothstep(1.0, 0.7, y);\n' +
-      '  float dens = smoothstep(0.2, 0.74, d) * smoothstep(0.0, 0.16, y);\n' +
-      '  dens = mix(dens, 1.0, smoothstep(0.84, 1.0, y));\n' +
-      '  float g = 0.04 + hash(floor(p / grainScale)) * 0.92;\n' + // kept off 0 and 1, so the stipple ends where the wave ends: no straight line at either end
-      '  outColor = vec4(0.0745, 0.0745, 0.0745, mix(dens, smoothstep(g - 0.04, g + 0.04, dens), 0.5));\n' +
-      '}';
-    function wave(flip) {
-      var cv = document.createElement('canvas');
-      cv.className = 'loc_wave ' + (flip ? 'is-bottom' : 'is-top'); cv.setAttribute('aria-hidden', 'true');
-      dark.insertBefore(cv, dark.firstChild);
-      var gl = cv.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false });
-      function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; }
-      var prog = gl.createProgram();
-      gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
-      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
-      gl.useProgram(prog);
-      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-      var U = {}, time = flip * 40, last = 0, lastDraw = 0, seen = false, running = false;
-      ['res', 't', 'flip', 'grainScale'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
-      gl.uniform1f(U.flip, flip);
-      function draw() {
-        var dpr = Math.min(window.devicePixelRatio || 1, 1.5), W = Math.round(cv.clientWidth * dpr), H = Math.round(cv.clientHeight * dpr);
-        if (!W || !H) return;
-        if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; gl.viewport(0, 0, W, H); }
-        gl.uniform2f(U.res, W, H); gl.uniform1f(U.t, time); gl.uniform1f(U.grainScale, dpr * 1.1);
-        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-      }
-      function frame(now) {
-        if (!seen || document.hidden) { running = false; return; }
-        requestAnimationFrame(frame);
-        time += last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now;
-        if (now - lastDraw < 33) return;
-        lastDraw = now; draw();
-      }
-      function go() { if (running || calm) return; running = true; last = 0; requestAnimationFrame(frame); }
-      new IntersectionObserver(function (entries) { seen = entries[0].isIntersecting; if (seen) { draw(); go(); } }).observe(cv);
-      document.addEventListener('visibilitychange', function () { if (seen && !document.hidden) go(); });
-      var rt = null;
-      window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(draw, 150); });
-      return cv;
-    }
-    if (wave(0) && wave(1)) dark.classList.add('has-wave');
-  }
-
   function rdLocShow() {
     var sec = qs('.loc_show'), slider = sec && qs('[data-spatial-slider-init]', sec);
     if (!slider) return;
@@ -5282,7 +5213,7 @@
             if (p && p.catch) p.catch(function () {});
           } else v.pause();
         });
-      }, { threshold: 0.2 });
+      }, { threshold: 0.5 }); // the peek in the first screen shows posters only: a clip starts once its card is half on screen
       qsa('video', sec).forEach(function (v) { v.muted = true; v.loop = true; v.setAttribute('playsinline', ''); io.observe(v); });
       return io;
     }
@@ -6520,7 +6451,6 @@
   if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
   run('location showcase', rdLocShow);
   run('location balls', rdLocBalls);
-  run('location wave', rdLocWave);
   run('wall of love', rdWall);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
