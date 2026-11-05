@@ -3135,6 +3135,17 @@
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
     var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
     var exitDepth = param('exitdepth', 'exit-depth', 2400); // home-v4: the perspective of that tip in px; lower = the near half swells more
+    // ---- home-v4-landing (Rimbo, 5 Nov: "reverse the scroll-up experience as the loading"): the opening is the exit played
+    // backwards. The drum comes in from the top tipped over as it is at the end of the exit, descends and untips into its
+    // resting pose while it turns back onto its card (the landing), and only then the title comes in. On the way back up
+    // the copy does not un-blur along the scroll: it simply appears (fadeBehind). Keyed by data-band-opening="land" on the
+    // section (?opening=land tries it on any staging drum page); home-v4 itself is untouched.
+    var opening = (/(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname) && (/[?&]opening=(\w+)/.exec(location.search) || [])[1]) || hero.getAttribute('data-band-opening') || '';
+    var landing = opening === 'land' && !!slider && kind === 'spatial' && !reduced && !!window.gsap;
+    var landDur = param('land', 'land', 1.8); // seconds the landing takes (power3.out: quick in, a long settle)
+    var landFrom = param('landfrom', 'land-from', 0.6); // screens above its resting place the drum sets off from
+    var landTilt = param('landtilt', 'land-tilt', exitTilt); // degrees it is tipped over as it sets off (the exit's end)
+    var landTurn = param('landturn', 'land-turn', 1); // cards it turns back while it lands (negative: the other way, 0: none)
     var scrolled = false; // the hero has started to scroll away: the auto-step clock holds, the drum belongs to the scroll
     var stepNext = null;
     if (slider && stepEvery > 0 && !reduced) {
@@ -3598,6 +3609,17 @@
         });
       }
     }
+    // home-v4-landing: the start pose, on 3D layers from the first frame like the exit's hooks. The descent is the stage's
+    // (the bottom fade inside it is held in place, it is structural) and the tilt the collection's: the slider root keeps
+    // the exit's own rotationX hooks untouched, so a ScrollTrigger refresh mid-landing can never record the tipped pose as
+    // the exit's starting point. The opening (open below) plays it all back to rest.
+    var landCol = landing ? qs('[data-spatial-slider-collection]', slider) : null, landFade = landing && stage ? qs('.band_fade.is-bottom', stage) : null;
+    if (landing && stage) {
+      stage.style.transition = 'none'; // no rise and no fade for the stage: the landing is the entrance
+      gsap.set(stage, { y: -landFrom * window.innerHeight, force3D: true });
+      if (landFade) gsap.set(landFade, { y: landFrom * window.innerHeight });
+      if (landCol) gsap.set(landCol, { rotationX: landTilt, transformPerspective: exitDepth, transformOrigin: '50% 50%', force3D: true });
+    }
     // "See the work" points at #work: the section after the hero answers to it, and the hero's in-page
     // links scroll with Lenis (the Webflow jQuery scroller would fight it)
     var next = qs('[data-band-next]');
@@ -3619,7 +3641,17 @@
         ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
       }
       if (copy && !ring) {
-        gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
+        if (landing) {
+          // home-v4-landing (Rimbo): scrolling down the copy blurs out with the scroll as on home-v4 (a short catch-up tween
+          // instead of a scrub, so a change of direction never pops it); scrolling up it does not un-blur along the way, it
+          // simply appears, in a beat, as soon as the page is back inside the fade zone at the top.
+          var gone = gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', paused: true });
+          var aim = function (p, dur) { gsap.to(gone, { progress: p, duration: dur, ease: 'power1.out', overwrite: true }); };
+          ScrollTrigger.create({
+            trigger: scrollRef, start: 'top top', end: quick, invalidateOnRefresh: true,
+            onUpdate: function (st) { if (st.direction < 0 && st.progress < 1) aim(0, 0.25); else aim(st.progress, 0.15); }
+          });
+        } else gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
         // pinned while it blurs (Rimbo, 4 Nov): the copy rides the scroll back exactly as the hero moves up, so it
         // stays put on screen and the band slides away underneath it. Only for the in-flow hero; a fixed one is pinned already.
         if (!spacer && !ring) gsap.to(copy, { y: function () { return hero.offsetHeight; }, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } }); // (a pinned hero keeps it in place by itself)
@@ -3699,7 +3731,7 @@
       // The wheel (home-v3) does not wait: it rolls in with the reveal (startDrift above, from an empty wheel), unless
       // ?rollin=0, when it opens title-first like V4: the top card alone slides in from the right, then the others
       // grow in at their places (the flyAfter block below).
-      var cardsAfter = ((!!slider && kind === 'spatial') || !!ringApi) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      var cardsAfter = ((!!slider && kind === 'spatial') || !!ringApi) && !landing && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       var flyAfter = !!wheel && !rollIn && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
       // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
       // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
@@ -3713,7 +3745,8 @@
       }
       var stageNow = !(cardsAfter || glassAfter || flyAfter);
       if (stageNow && stage && !reduced && qs('[data-glass-carousel-arc]', hero)) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the glass wheel: no rise and no fade, its panels arrive one by one (V3)
-      [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
+      if (loader && landing) loader.style.transition = 'opacity .5s ease-out'; // the landing starts under the loader: a quicker fade, so the drum is seen setting off
+      [stageNow ? stage : null, landing ? null : copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); }); // the landing shows the copy only when the title comes in (its halo would veil the drum passing behind it)
       if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
@@ -3725,11 +3758,31 @@
         setTimeout(function () { if (copy) copy.style.transition = 'none'; fadeBehind(); }, 1900);
       };
       if (reduced || !window.gsap || typeof SplitText === 'undefined') return done();
+      // home-v4-landing: the drum lands first. The stage (with the bottom fade held in place) comes down from landFrom screens
+      // up while the collection untips from landTilt and the drum turns back landTurn cards, all in landDur with one ease, so
+      // it arrives quick and settles slow like the exit run backwards. A scroll during the landing ends it at once: from the
+      // first scrolled pixel the drum belongs to the exit. The title starts once the drum is nearly down (at 70% of the landing).
+      var titleAt = 0;
+      if (landing) {
+        var ld = slider._spatialSliderDraggable, lproxy = slider._spatialSliderProxy, lrender = ld && ld.vars && ld.vars.onDrag, lstep = drumStep();
+        var land = gsap.timeline({ onUpdate: function () { if (land.progress() < 1 && (window.scrollY || document.documentElement.scrollTop) > 2) { land.progress(1); if (window.ScrollTrigger) ScrollTrigger.update(); } } });
+        if (stage) land.to(stage, { y: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, 0);
+        if (landFade) land.to(landFade, { y: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, 0);
+        if (landCol) land.to(landCol, { rotationX: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, 0);
+        if (lproxy && lrender && lstep && landTurn) {
+          var lx = parseFloat(gsap.getProperty(lproxy, 'x')) || 0;
+          gsap.set(lproxy, { x: lx - landTurn * lstep }); lrender(); // as the exit leaves it: landTurn cards on; the landing turns them back
+          land.to(lproxy, { x: lx, duration: landDur, ease: 'power3.out', onUpdate: lrender, onComplete: function () { ld.update(); lrender(); } }, 0);
+        }
+        titleAt = Math.max(0, landDur * 0.7 - 0.3);
+      }
       var chars = title ? split(title).chars : [];
-      var tl = gsap.timeline({ delay: 0.3, onComplete: done })
-        .from(chars, heroCharsIn(), 0)
-        .from(eyebrow, { opacity: 0, y: 8, duration: 0.8, ease: 'expo.out' }, 0.35)
-        .from(buttons, { opacity: 0, y: 14, duration: 0.9, ease: 'expo.out', stagger: 0.08, clearProps: 'opacity,transform' }, 0.55);
+      var t0 = landing ? 0.3 : 0; // the landing shows the copy from the timeline's start and the letters follow a beat later, as home-v4's delay does
+      var tl = gsap.timeline({ delay: landing ? titleAt : 0.3, onComplete: done });
+      if (landing && copy) tl.call(function () { copy.classList.add('is-ready'); }, null, 0);
+      tl.from(chars, heroCharsIn(), t0)
+        .from(eyebrow, { opacity: 0, y: 8, duration: 0.8, ease: 'expo.out' }, t0 + 0.35)
+        .from(buttons, { opacity: 0, y: 14, duration: 0.9, ease: 'expo.out', stagger: 0.08, clearProps: 'opacity,transform' }, t0 + 0.55);
       if (cardsAfter) {
         var cx = window.innerWidth / 2;
         var panels = qsa('.band_panel', hero).map(function (p) { var r = p.getBoundingClientRect(); return { el: p, d: Math.abs(r.left + r.width / 2 - cx) }; })
@@ -4817,7 +4870,7 @@
     }
     var here = clean(location.pathname);
     var skip = [prefix || '/', here];
-    if (/^\/home-(copy|v\d+)$/.test(here.replace(prefix, ''))) skip.push(prefix || '/'); // a home exploration page is the home: no Home link
+    if (/^\/home-(copy|v\d+(-[a-z]+)?)$/.test(here.replace(prefix, ''))) skip.push(prefix || '/'); // a home exploration page (home-v4, home-v4-landing…) is the home: no Home link
 
     var source = qsa('.pop-up_nav_menu .nav_link');
     var items = (source.length ? source.map(function (a) {
@@ -4828,7 +4881,7 @@
     ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
-    if (/^\/home-v4$/.test(here.replace(prefix, ''))) logoSrc = brushLogoSrc(); // home V4 tries the F Brush logo first, like its footer (Rimbo, 5 Nov)
+    if (/^\/home-v4(-landing)?$/.test(here.replace(prefix, ''))) logoSrc = brushLogoSrc(); // home V4 (and its landing exploration) tries the F Brush logo first, like its footer (Rimbo, 5 Nov)
     var mode = (location.search.match(/[?&]menu=(flat|blur)/) || [])[1] || 'curve';
     // hover extras to try, alone or combined: ?hover=magnet,blur,stretch,lean (default: only the fade)
     var hover = ((location.search.match(/[?&]hover=([a-z,]+)/) || [])[1] || '').split(',');
@@ -5271,6 +5324,9 @@
       var cv = qs('canvas', logoCell), ctx = cv.getContext('2d');
       var VB = { w: 72, h: 25.1 }, M = 30, T = { guide: 0.3, outline: 0.44, fill: 0.6 };
       var letters = [], rows = [], dpr = 1, S = 1, W = 0, H = 0, ready = false, pNow = 0;
+      // the size label (Rimbo, 5 Nov: "it flashes in and is gone"): once the dimension line has completed, the
+      // guides and the label stay for HOLD ms whatever the scroll does, then fade over half a second
+      var HOLD = 1600, labelAt = 0, holdRaf = 0;
       fetch(logoSrc).then(function (r) { return r.text(); }).then(function (txt) {
         var doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
         var NS = 'http://www.w3.org/2000/svg';
@@ -5310,11 +5366,18 @@
         if (!ready || !W) return;
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
         var settle = smooth(0.74, 0.88, p), lw = 72 * S, lh = 25.1 * S;
+        // the dimension line completes at p = .58 (it was .7, which left the label four scroll-percent before the fade)
+        var kdNow = smooth(T.guide + 0.12, T.guide + 0.28, p), now = performance.now();
+        if (kdNow > 0.98) { if (!labelAt) labelAt = now; } else labelAt = 0;
+        var timeFade = labelAt ? smooth(HOLD, HOLD + 500, now - labelAt) : 1;
+        var settleG = Math.min(settle, timeFade); // the guide layer settles on scroll, but never before the hold is over
+        cancelAnimationFrame(holdRaf);
+        if (labelAt && timeFade < 1) holdRaf = requestAnimationFrame(function () { paint(pNow); });
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.lineWidth = 1;
-        if (settle < 1) {
+        if (settleG < 1) {
           ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = rgba(ACCENT, 0.9 * (1 - settle));
+          ctx.strokeStyle = rgba(ACCENT, 0.9 * (1 - settleG));
           ctx.beginPath();
           rows.forEach(function (y, i) {
             var yy = Math.round(M + y * S) + 0.5, k = smooth(T.guide + i * 0.03, T.guide + 0.26 + i * 0.03, p);
@@ -5325,10 +5388,10 @@
             ctx.moveTo(xx, 0); ctx.lineTo(xx, H * k);
           });
           ctx.stroke(); ctx.setLineDash([]);
-          var kd = smooth(T.guide + 0.2, T.guide + 0.4, p);
+          var kd = kdNow;
           if (kd > 0) {
             var dy = Math.round(M + lh + M * 0.55) + 0.5, x1 = M + lw * kd;
-            ctx.globalAlpha = 1 - settle;
+            ctx.globalAlpha = 1 - settleG;
             ctx.strokeStyle = rgba(ACCENT, 0.9); ctx.fillStyle = rgba(ACCENT, 1);
             ctx.beginPath(); ctx.moveTo(M, dy); ctx.lineTo(x1, dy); ctx.moveTo(M, dy - 4); ctx.lineTo(M, dy + 4);
             if (kd > 0.98) { ctx.moveTo(x1, dy - 4); ctx.lineTo(x1, dy + 4); }
@@ -5550,7 +5613,7 @@
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
-  var navFull = path === '/home-copy' || path === '/home-v4' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov)
+  var navFull = path === '/home-copy' || path === '/home-v4' || path === '/home-v4-landing' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go (home-v4 + its landing exploration: Rimbo, 5 Nov)
   if (navFull) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
   if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
   run('band', rdBand);   // builds the home-opening rows before the marquees start
@@ -5560,7 +5623,7 @@
   run('menu', rdMenu);
   run('post cards', rdPostCards);
   // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
-  if (path === '/home-v4' || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
+  if (path === '/home-v4' || path === '/home-v4-landing' || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
