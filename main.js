@@ -5182,6 +5182,69 @@
   }
 
   // =========================================================
+  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past,
+  // and the light page goes black while it is on screen. Not rdBand: that one belongs to a hero at the top of the
+  // page. Here Osmo's slider starts when the section comes near, the clips only load and play on screen, and a
+  // hidden Next button steps the drum every 5 s. .loc_bg is the black layer behind the page (CSS in the template head).
+  // =========================================================
+  function rdLocShow() {
+    var sec = qs('.loc_show'), slider = sec && qs('[data-spatial-slider-init]', sec);
+    if (!slider) return;
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var bg = document.createElement('div');
+    bg.className = 'loc_bg'; bg.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(bg);
+    if (window.ScrollTrigger) {
+      gsap.timeline({ scrollTrigger: { trigger: sec, start: 'top 85%', end: 'bottom 15%', scrub: true } })
+        .fromTo(bg, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'none' })
+        .to(bg, { opacity: 1, duration: 0.5 })
+        .to(bg, { opacity: 0, duration: 0.25, ease: 'none' });
+    }
+
+    function watchClips() {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          var v = en.target;
+          if (en.isIntersecting && !reduced) {
+            v.playbackRate = parseFloat(v.getAttribute('data-rate')) || 1;
+            var p = v.play();
+            if (p && p.catch) p.catch(function () {});
+          } else v.pause();
+        });
+      }, { threshold: 0.2 });
+      qsa('video', sec).forEach(function (v) { v.muted = true; v.loop = true; v.setAttribute('playsinline', ''); io.observe(v); });
+      return io;
+    }
+
+    var started = false, onScreen = false, clips = null, next = null;
+    function start() {
+      if (started || !window.Draggable || !window.InertiaPlugin || !window.CustomEase) return;
+      started = true;
+      next = document.createElement('button'); // Osmo wires every control it finds, so a timer can press Next like a visitor
+      next.type = 'button'; next.tabIndex = -1;
+      next.setAttribute('data-spatial-slider-control', 'next'); next.setAttribute('aria-hidden', 'true');
+      next.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;overflow:hidden;pointer-events:none';
+      slider.appendChild(next);
+      initSpatialCardsSlider();
+      clips = watchClips();
+      var rt = null; // Osmo re-clones the cards after a width change: watch the new clips too
+      window.addEventListener('resize', function () {
+        clearTimeout(rt);
+        rt = setTimeout(function () { if (clips) clips.disconnect(); clips = watchClips(); }, 450);
+      });
+      if (!reduced) setInterval(function () {
+        if (onScreen && !document.hidden && slider.getAttribute('data-spatial-slider-drag-status') !== 'grabbing') next.click();
+      }, 5000);
+    }
+    new IntersectionObserver(function (entries) { if (entries[0].isIntersecting) start(); }, { rootMargin: '60% 0px' }).observe(sec);
+    new IntersectionObserver(function (entries) { onScreen = entries[0].isIntersecting; }, { threshold: 0.3 }).observe(sec);
+
+    sec.addEventListener('mouseover', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p) { var l = qs('.band_panel-label', p); if (l) l.classList.add('is-on'); } });
+    sec.addEventListener('mouseout', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p && !p.contains(e.relatedTarget)) { var l = qs('.band_panel-label', p); if (l) l.classList.remove('is-on'); } });
+  }
+
+  // =========================================================
   // FOOTER — the Blueprint footer from the footer lab (prototype/footer, version D, Rimbo's pick on 5 Nov):
   // as it scrolls in, every cell types its own HTML in orange, then its content types (big text) or
   // scrambles (small text) in, the F Brush logo draws itself, and the dashed guide lines stay behind.
@@ -5715,7 +5778,8 @@
   run('menu', rdMenu);
   run('post cards', rdPostCards);
   // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
-  if (path === '/home-v4' || path === '/home-v4-landing' || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
+  if (path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
+  run('location showcase', rdLocShow);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
