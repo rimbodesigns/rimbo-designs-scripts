@@ -4551,29 +4551,28 @@
     // end of the page: one project block, then keep reading (the dark post cards from rdPostCards)
     '.rf .lead_mag { display: none; }',
     '.rf [data-component]:has(> .cta_container) { display: none; }',
-    '.rf-project { position: relative; overflow: hidden; display: flex; gap: 2rem; align-items: flex-start; width: min(52rem, 100vw - 16rem); margin: 6rem auto 0; padding: 2.5rem; background: var(--rf-dark); color: #f8f5ee; border-radius: .25rem; }',
-    '.rf-project::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .06; background: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e1ea39aa716d6f6bddcb07_GRAIN%20V1.gif) repeat; }',
-    '.rf-project__img { width: 7.5rem; height: 7.5rem; object-fit: cover; border-radius: 50%; flex: none; }',
-    '.rf-project .rf-eyebrow { color: #a4a4a4; }',
-    '.rf-project__title { font-family: var(--font--display-font); font-size: 2rem; line-height: 1.15; color: #f8f5ee; margin: .875rem 0 1rem; }',
-    '.rf-project__text { font-size: 1.125rem; line-height: 1.55; color: #cfcfcf; max-width: 34rem; margin: 0 0 1.75rem; }',
-    '.rf-project__actions { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; position: relative; z-index: 1; }',
-    '.rf-mail { font-family: var(--rf-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #a4a4a4; text-decoration: underline; text-underline-offset: .35em; }',
-    '.rf-mail:hover { color: #f8f5ee; }',
-    '@media (max-width: 767px) {' +
-      ' .rf-project { flex-direction: column; gap: 1rem; padding: 1.5rem; width: 90vw; margin-top: 4rem; }' +
-      ' .rf-project__img { width: 3.5rem; height: 3.5rem; }' +
-      ' .rf-project__title { font-size: 1.625rem; }' +
-      ' .rf-project__actions { flex-direction: column; align-items: stretch; gap: 1rem; }' +
-      ' .rf-project__actions .btn { justify-content: center; min-height: 48px; }' +
-    ' }',
-    '@media (min-width: 768px) and (max-width: 991px) { .rf-project { width: 90vw; } }',
+    // the closing CTA: Webflow's duo_* block from /resources; these are the rules from that page's embed
+    '.rf .duo_section { margin-top: 6rem; }',
+    '.duo_me:hover, .duo_me:focus-visible { color: #f8f5ee; }',
+    '.duo_dfs:hover, .duo_dfs:focus-visible { color: #e0dbcf; }',
+    '.duo_me:focus-visible, .duo_dfs:focus-visible { outline: 2px solid #f8f5ee; outline-offset: 3px; }',
+    '.duo_me:hover .duo_arrow, .duo_dfs:hover .duo_arrow, .duo_me:focus-visible .duo_arrow, .duo_dfs:focus-visible .duo_arrow { transform: rotate(-45deg); }',
+    '.duo_svg .m-ring, .duo_svg .m-inner { transform-box: view-box; transform-origin: 20.42px 20.42px; transition: transform .6s cubic-bezier(.625, .05, 0, 1); }',
+    '@media (max-width: 767px) { .rf .duo_section { margin-top: 4rem; } }',
+    // the page lifts off the new footer like a card: it needs its own background (the grain sits on it)
+    '.rf .main-wrapper { background-color: var(--color--rimbobage, #f8f5ee); }',
     '.rf .blog_section .padding-section-large { padding-top: 8rem; }',
+    '.rf .blog_section .padding-global { padding-left: 0; padding-right: 0; }',
+    '.rf .blog_section .container-large { width: 90vw; max-width: none; }',
+    '.rf .blog_section .blog_wrapper { display: block; }',
+    '.rf .blog_section .blog_list { width: 100%; }',
     '.rf .blog_section .blog_highlight { align-items: stretch; }',
     '.rf .blog_section .blog_text { display: block; margin-bottom: 2rem; }',
     '.rf-kr-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }',
     '.rf-kr-title { font-family: var(--font--display-font); font-size: 2.25rem; line-height: 1.15; margin: .75rem 0 0; color: var(--rf-ink); }',
-    '.rf-kr-all { font-family: var(--rf-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--rf-ink); text-decoration: underline; text-decoration-color: var(--rf-red); text-underline-offset: .35em; white-space: nowrap; padding: 8px 0; }',
+    '.rf .btn.rf-kr-all { flex: none; background-color: var(--rf-ink); border-color: var(--rf-ink); color: #f8f5ee; box-shadow: none; }',
+    '.rf .btn.rf-kr-all:hover { color: #f8f5ee; }',
+    '.rf .btn.rf-kr-all.is-hover { box-shadow: 0 .5rem 1.4rem rgba(19, 19, 19, .28); }',
     '.rf .rf-hide { display: none !important; }',
     '@media (min-width: 992px) { .rf .blog_section .blog_list.rf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rf .blog_section .blog_list.rf-two .blog_container { width: 100%; } }',
     '.rf .blog_section .btn-animate-chars { display: none; }', // "See All Resources": the header row has "All articles"
@@ -4584,7 +4583,8 @@
     ' }'
   ].join('\n');
 
-  var POST_REFRESH_CAL = 'https://cal.com/rimbo-designs/45-minute-discovery-call?overlayCalendar=true&layout=month_view';
+  // The closing CTA, as published on /resources (Webflow classes duo_*, styled site-wide)
+  var POST_CTA_HTML = '<div class="duo_section"><div class="duo_wrap"><a href="/apply" class="duo_me w-inline-block"><div class="duo_top"><span class="duo_eyebrow">Rimbo Designs</span><h2 class="duo_title">Let\'s Work Together.</h2><p class="duo_text">I build rich digital experiences for a few clients a year. Apply and I\'ll reply within 2 working days.</p></div><div class="duo_cta"><div data-btn-alt="Unlock your next level" class="btn is-large"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">Apply to work with me</div></div></div></div></div></div></a><a href="https://www.digital-fengshui.com/" rel="noopener" class="duo_dfs w-inline-block"><div class="duo_top"><span class="duo_eyebrow">Also by me</span><div class="duo_logo"><svg fill="currentColor" aria-label="Digital Feng Shui" role="img" viewBox="0 0 105 41" class="duo_svg duo_svg"><defs><mask height="61" width="61" y="-10" x="-10" maskUnits="userSpaceOnUse" id="dfs-hole-b"><path d="M26.9639 6.54102H34.2969V13.8779H34.2979L40.8398 20.4189L34.2979 26.959L34.2969 26.958V34.2881H26.9629L26.9639 34.2891L20.4209 40.8301L13.8789 34.2891L13.8799 34.2881H6.54199V26.959L0 20.4189L6.54199 13.8779V6.54102H13.8789L20.4209 0L26.9639 6.54102Z" fill="#fff" class="m-ring"></path><path d="M15.7939 15.791H8.45508L13.084 20.4189L8.46484 25.0371H15.7939V32.374L20.4209 27.749L25.0449 32.3701V25.0371H32.375L27.7559 20.4189L32.3848 15.791H25.0449V8.45898L20.4209 13.0811L15.7939 8.45508V15.791Z" fill="#000" class="m-inner"></path></mask></defs><rect mask="url(#dfs-hole-b)" height="61" width="61" y="-10" x="-10"></rect><path d="M100.125 30.8218V29.8213H101.99V23.8638H100.125V22.8633H104.947V23.8638H103.093V29.8213H104.947V30.8218H100.125Z"></path><path d="M95.7281 30.9469C94.0336 30.9469 93.1465 29.9236 93.1465 27.9681V22.8633H94.2496V27.9909C94.2496 29.3211 94.7046 29.9236 95.7167 29.9236C96.7289 29.9236 97.1838 29.3211 97.1838 27.9909V22.8633H98.287V27.9681C98.287 29.9236 97.4113 30.9469 95.7281 30.9469Z"></path><path d="M86.373 30.8218V22.8633H87.4762V26.24H90.3194V22.8633H91.4226V30.8218H90.3194V27.2632H87.4762V30.8218H86.373Z"></path><path d="M82.2258 30.943C80.4744 30.943 79.3371 30.0676 79.2461 28.3508H80.3493C80.4289 29.4082 81.0544 29.988 82.2258 29.988C83.2721 29.988 83.8862 29.5332 83.8862 28.6578C83.8862 27.9529 83.4995 27.6914 82.3736 27.3617L81.532 27.1116C80.0649 26.6795 79.4622 26.077 79.4622 24.9173C79.4622 23.5757 80.4744 22.7344 82.0438 22.7344C83.4995 22.7344 84.6141 23.4279 84.7847 25.1219H83.6815C83.545 24.0987 82.9309 23.6894 82.0666 23.6894C81.1112 23.6894 80.5653 24.1101 80.5653 24.8718C80.5653 25.554 80.952 25.8609 81.9301 26.1452L82.7603 26.3839C84.3411 26.8387 84.9894 27.4527 84.9894 28.6237C84.9894 30.0562 83.9203 30.943 82.2258 30.943Z"></path><path d="M70.392 30.943C68.5724 30.943 67.5488 29.4423 67.5488 26.8273C67.5488 24.2806 68.5838 22.7344 70.4034 22.7344C71.8478 22.7344 72.7462 23.7121 73.0646 25.3834H71.9387C71.6772 24.2351 71.245 23.7576 70.4034 23.7576C69.2434 23.7576 68.652 24.7581 68.652 26.8387C68.652 28.942 69.2206 29.9198 70.4034 29.9198C71.4156 29.9198 71.916 29.2263 72.007 27.6346H70.4944V26.6341H73.1329V26.9979C73.1329 29.5105 72.1662 30.943 70.392 30.943Z"></path><path d="M61.0371 30.8218V22.8633H62.2085L64.9721 28.7867V22.8633H65.9957V30.8218H64.8129L62.0607 24.9211V30.8218H61.0371Z"></path><path d="M54.3652 30.8218V22.8633H59.1873V23.8865H55.4684V26.2286H58.63V27.2519H55.4684V29.7986H59.3124V30.8218H54.3652Z"></path><path d="M47.7988 30.8218V22.8633H52.4048V23.8865H48.902V26.4219H52.0636V27.4451H48.902V30.8218H47.7988Z"></path><path d="M88.6543 17.5562V9.59766H89.7575V16.533H93.3968V17.5562H88.6543Z"></path><path d="M80.834 17.5562L83.2905 9.59766H84.6666L87.1118 17.5562H85.9859L85.349 15.4188H82.574L81.9371 17.5562H80.834ZM82.8697 14.4183H85.0533L83.9615 10.7119L82.8697 14.4183Z"></path><path d="M76.6081 17.5562V10.6209H74.2539V9.59766H80.0654V10.6209H77.7112V17.5562H76.6081Z"></path><path d="M67.9258 17.5562V16.5557H69.7909V10.5982H67.9258V9.59766H72.7479V10.5982H70.8941V16.5557H72.7479V17.5562H67.9258Z"></path><path d="M63.5717 17.6813C61.7521 17.6813 60.7285 16.1806 60.7285 13.5656C60.7285 11.0189 61.7634 9.47266 63.5831 9.47266C65.0274 9.47266 65.9259 10.4504 66.2443 12.1217H65.1184C64.8568 10.9734 64.4247 10.4959 63.5831 10.4959C62.4231 10.4959 61.8317 11.4964 61.8317 13.577C61.8317 15.6803 62.4003 16.6581 63.5831 16.6581C64.5953 16.6581 65.0957 15.9646 65.1867 14.3728H63.6741V13.3723H66.3126V13.7362C66.3126 16.2488 65.3459 17.6813 63.5717 17.6813Z"></path><path d="M54.2852 17.5562V16.5557H56.1503V10.5982H54.2852V9.59766H59.1072V10.5982H57.2535V16.5557H59.1072V17.5562H54.2852Z"></path><path d="M47.3867 17.5562V9.59766H49.4793C51.4696 9.59766 52.6978 11.0757 52.6978 13.5201C52.6978 16.0213 51.4696 17.5562 49.5362 17.5562H47.3867ZM49.4793 16.533C50.8327 16.533 51.5947 15.4983 51.5947 13.5428C51.5947 11.6214 50.8441 10.6209 49.4793 10.6209H48.4899V16.533H49.4793Z"></path></svg></div><p class="duo_note">Beyond the website: the other half of my week I\'m a software engineer, building tools and education for focus and attention.</p></div><div class="duo_cta"><div data-btn-alt="Opens in a new tab" class="btn is-secondary"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">Visit Digital Feng Shui</div><div class="btn_arrow"><span class="duo_arrow">→</span></div></div></div></div></div></div></a></div></div>';
 
   // Scrolls to a section heading from the "In this article" list
   function postJumpTo(h) {
@@ -4626,7 +4626,8 @@
     var grain = document.createElement('div');
     grain.className = 'grain rf-grain';
     grain.setAttribute('aria-hidden', 'true');
-    document.body.insertBefore(grain, document.body.firstChild);
+    var page = qs('.main-wrapper');
+    (page || document.body).insertBefore(grain, (page || document.body).firstChild);
 
     // ---- hero
     var cat = qs('.blog_catagory .blogcatagory');
@@ -4714,31 +4715,35 @@
 
     // ---- end of the page: one project block, then keep reading
     var box = qs('.richtextbox');
-    if (box) box.insertAdjacentHTML('afterend',
-      '<section class="rf-project" aria-labelledby="rf-project-title">' +
-        '<img class="rf-project__img" src="https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/66dadf02f072700e68299232_384.avif" alt="Rimbout Bobeldijk" loading="lazy">' +
-        '<div class="rf-project__body">' +
-          '<div class="rf-eyebrow">Start a project</div>' +
-          '<h2 class="rf-project__title" id="rf-project-title">Got a project in mind?</h2>' +
-          '<p class="rf-project__text">I\'m Rimbout. I design and build brands and Webflow sites, one project at a time. Book a free 45-minute call and we\'ll look at what you need. No pitch, just honest advice.</p>' +
-          '<div class="rf-project__actions">' +
-            '<a rel="noopener" target="_blank" data-btn-alt="45 min · free" href="' + POST_REFRESH_CAL + '" class="btn w-inline-block"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">Book a call</div></div></div></div></a>' +
-            '<a class="rf-mail" href="mailto:hello@rimbodesigns.com">Or email hello@rimbodesigns.com</a>' +
-          '</div>' +
-        '</div>' +
-      '</section>');
+    if (box) box.insertAdjacentHTML('afterend', POST_CTA_HTML);
+    // the Digital Feng Shui mark turns now and then, as on /resources
+    var marks = qsa('.duo_svg'), turn = 0;
+    if (marks.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(function () {
+      turn += 45;
+      marks.forEach(function (m) {
+        var ring = qs('.m-ring', m), inner = qs('.m-inner', m);
+        if (ring && inner) { ring.style.transform = 'rotate(' + turn + 'deg)'; inner.style.transform = 'rotate(' + (-turn) + 'deg)'; }
+      });
+    }, 4400);
 
     // keep reading: these are the highlighted posts, not this post's category, so the heading stays general
     var text = qs('.blog_section .blog_text');
     if (text) text.innerHTML =
       '<div class="rf-kr-head"><div><div class="rf-eyebrow">Keep reading</div><h2 class="rf-kr-title">More articles</h2></div>' +
-      '<a class="rf-kr-all" href="/resources">All articles →</a></div>';
+      '<a href="/resources" data-btn-alt="Browse them all" class="btn rf-kr-all w-inline-block"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">All articles</div><div class="btn_arrow">→</div></div></div></div></a></div>';
     var current = qs('.blog_section .w--current');
-    if (current && current.closest('.post')) {
-      current.closest('.post').classList.add('rf-hide');
-      var list = current.closest('.blog_list');
-      if (list && qsa('.post', list).length - 1 === 2) list.classList.add('rf-two');
+    if (current && current.closest('.post')) current.closest('.post').classList.add('rf-hide');
+    // two recommendations read cleaner than three, whichever post you're on
+    var list = qs('.blog_section .blog_list');
+    if (list) {
+      qsa('.post:not(.rf-hide)', list).forEach(function (card, i) { if (i > 1) card.classList.add('rf-hide'); });
+      list.classList.add('rf-two');
     }
+
+    // the new footer (rdFooter) goes after the page, and the old footer and back-to-top leave it
+    var pageWrap = qs('.main-wrapper');
+    if (pageWrap && !byId('MainWrap')) pageWrap.id = 'MainWrap';
+    qsa('.scroll_wrap, .back-to-top').forEach(function (el) { el.parentNode.removeChild(el); });
 
   }
 
@@ -4855,8 +4860,8 @@
       { href: prefix + '/resources', text: 'Resources' }
     ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
-    var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
-    if (/^\/home-v4(-landing)?$/.test(here.replace(prefix, ''))) logoSrc = brushLogoSrc(); // home V4 (and its landing exploration) tries the F Brush logo first, like its footer (Rimbo, 5 Nov)
+    var logoSrc = brushLogoSrc();
+    qsa('img[src*="SVGLOGO2"]').forEach(function (img) { img.removeAttribute('srcset'); img.src = logoSrc; }); // the Webflow footer still points at the old logo file
     var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&amp;body=' +
       encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n"); // the footer's email
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5636,7 +5641,7 @@
   run('form validation', rdFormValidation);
   run('post cards', rdPostCards);
   // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
-  if (path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
+  if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
   run('location showcase', rdLocShow);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
