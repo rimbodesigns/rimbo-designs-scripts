@@ -3143,6 +3143,7 @@
     var opening = (/(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname) && (/[?&]opening=(\w+)/.exec(location.search) || [])[1]) || hero.getAttribute('data-band-opening') || '';
     var landing = opening === 'land' && !!slider && kind === 'spatial' && !reduced && !!window.gsap;
     var landDur = param('land', 'land', 1.8); // seconds the landing takes (power3.out: quick in, a long settle)
+    var landDelay = param('landdelay', 'land-delay', 0.25); // seconds the drum hangs at the top first, so it is seen setting off once the loader has gone
     var landFrom = param('landfrom', 'land-from', 0.6); // screens above its resting place the drum sets off from
     var landTilt = param('landtilt', 'land-tilt', exitTilt); // degrees it is tipped over as it sets off (the exit's end)
     var landTurn = param('landturn', 'land-turn', 1); // cards it turns back while it lands (negative: the other way, 0: none)
@@ -3766,15 +3767,15 @@
       if (landing) {
         var ld = slider._spatialSliderDraggable, lproxy = slider._spatialSliderProxy, lrender = ld && ld.vars && ld.vars.onDrag, lstep = drumStep();
         var land = gsap.timeline({ onUpdate: function () { if (land.progress() < 1 && (window.scrollY || document.documentElement.scrollTop) > 2) { land.progress(1); if (window.ScrollTrigger) ScrollTrigger.update(); } } });
-        if (stage) land.to(stage, { y: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, 0);
-        if (landFade) land.to(landFade, { y: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, 0);
-        if (landCol) land.to(landCol, { rotationX: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, 0);
+        if (stage) land.to(stage, { y: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, landDelay);
+        if (landFade) land.to(landFade, { y: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, landDelay);
+        if (landCol) land.to(landCol, { rotationX: 0, duration: landDur, ease: 'power3.out', clearProps: 'transform' }, landDelay);
         if (lproxy && lrender && lstep && landTurn) {
           var lx = parseFloat(gsap.getProperty(lproxy, 'x')) || 0;
           gsap.set(lproxy, { x: lx - landTurn * lstep }); lrender(); // as the exit leaves it: landTurn cards on; the landing turns them back
-          land.to(lproxy, { x: lx, duration: landDur, ease: 'power3.out', onUpdate: lrender, onComplete: function () { ld.update(); lrender(); } }, 0);
+          land.to(lproxy, { x: lx, duration: landDur, ease: 'power3.out', onUpdate: lrender, onComplete: function () { ld.update(); lrender(); } }, landDelay);
         }
-        titleAt = Math.max(0, landDur * 0.7 - 0.3);
+        titleAt = Math.max(0, landDelay + landDur * 0.7 - 0.3);
       }
       var chars = title ? split(title).chars : [];
       var t0 = landing ? 0.3 : 0; // the landing shows the copy from the timeline's start and the letters follow a beat later, as home-v4's delay does
