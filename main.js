@@ -4960,6 +4960,499 @@
   }
 
   // =========================================================
+  // FOOTER — the Blueprint footer from the footer lab (prototype/footer, version D, Rimbo's pick on 5 Nov):
+  // as it scrolls in, every cell types its own HTML in orange, then its content types (big text) or
+  // scrambles (small text) in, the F Brush logo draws itself, and the dashed guide lines stay behind.
+  // Hover (mouse only): the HTML types back in, an orange outline draws, the page links swap to a
+  // second line. One number p drives it all: 0 when the footer's top meets the bottom of the screen,
+  // 1 when it fills the screen; scrolling back plays it in reverse. Page by page until Rimbo's go.
+  // =========================================================
+  var FOOTER_SCRIPT = (document.currentScript && document.currentScript.src) || '';
+  function rdFooter() {
+    if (qs('.rdf')) return;
+    var nl = /^\/nl(\/|$)/.test(location.pathname), prefix = nl ? '/nl' : '';
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    // the logo file ships next to main.min.js (same tag); on localhost it comes from /media/
+    var logoSrc = /\/main(\.min)?\.js/.test(FOOTER_SCRIPT) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(FOOTER_SCRIPT)
+      ? FOOTER_SCRIPT.replace(/\/main(\.min)?\.js.*$/, '/media/logo-f-brush.svg') : '/media/logo-f-brush.svg';
+    var ACCENT = [243, 86, 46], CREAM = [248, 245, 238];
+    var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
+    var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+    var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
+    var rgba = function (c, a) { return 'rgba(' + c.join(',') + ',' + clamp(a).toFixed(3) + ')'; };
+
+    var ease = 'cubic-bezier(.625, .05, 0, 1)';
+    var css = [
+      '.rdf { --rdf-black: #0c0c0c; --rdf-cream: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #f3562e; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
+      '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; margin-top: -2rem; overflow: hidden; background: var(--rdf-black); color: var(--rdf-cream); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
+      '.rdf *, .rdf *::before, .rdf *::after { box-sizing: border-box; }',
+      '.rdf a, .rdf a:hover, .rdf a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles (size, coral hover) stay out
+      '.rdf i { font-style: normal; }',
+      // the section above lifts away from the footer like a card; the footer sits under its rounded corners
+      '.rdf-prev { position: relative; z-index: 2 !important; border-radius: 0 0 1.75rem 1.75rem; box-shadow: 0 2rem 4rem rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(248, 245, 238, .08); }',
+      '.rdf-in { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 5.5rem var(--rdf-pad) 1.6rem; will-change: transform; }',
+      '.rdf-in::after { content: ""; position: absolute; inset: 0; background: var(--rdf-black); opacity: var(--rdf-shade, 0); pointer-events: none; z-index: 5; }',
+      '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
+      '.rdf-v { position: absolute; border-left: 1px dashed var(--rdf-dash); }',
+      '.rdf-h { position: absolute; border-top: 1px dashed var(--rdf-dash); }',
+      '.rdf-ruler { position: relative; height: 1.4rem; background: repeating-linear-gradient(90deg, var(--rdf-hair) 0 1px, transparent 1px 10px) bottom / 100% 6px no-repeat, repeating-linear-gradient(90deg, var(--rdf-dash) 0 1px, transparent 1px 100px) bottom / 100% 12px no-repeat; }',
+      '.rdf-ruler span { position: absolute; left: 50%; top: -.6rem; transform: translateX(-50%); padding: 0 .6rem; font-size: .58rem; letter-spacing: .18em; color: var(--rdf-grey); white-space: nowrap; }',
+      '.rdf-grid { flex: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)) auto; }',
+      '.rdf-cell { position: relative; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 1.4rem 1.6rem; transition: background-color .4s ' + ease + '; }',
+      '.rdf-cell:hover { background-color: rgba(248, 245, 238, .025); }',
+      '.rdf-logo { grid-column: 1 / 9; grid-row: 1 / 5; justify-content: flex-end; align-items: flex-start; padding: 2.4rem 1.6rem 2.6rem; }',
+      '.rdf-logo-art { position: relative; display: block; margin: -30px; }',
+      '.rdf-logo-art canvas { display: block; }',
+      '.rdf-page { grid-column: 9 / 13; flex-direction: row; align-items: center; justify-content: space-between; }',
+      '.rdf-pt { display: inline-grid; overflow: hidden; flex: none; font: 400 clamp(1.1rem, 2vw, 1.9rem)/1 var(--rdf-display); text-transform: uppercase; }',
+      '.rdf-pt > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
+      '.rdf-pt > span + span { transform: translateY(110%); }',
+      '.rdf-page > i { font-family: var(--rdf-mono); color: var(--rdf-grey); transform: translateX(-.4em); opacity: 0; transition: transform .45s ' + ease + ', opacity .3s, color .3s; }',
+      '.rdf-page:hover > i { transform: none; opacity: 1; color: var(--rdf-cream); }',
+      '.rdf-mail { grid-column: 1 / 9; grid-row: 5; } .rdf-where { grid-column: 9 / 13; grid-row: 5; }',
+      '.rdf-label { margin: 0; font-size: .64rem; letter-spacing: .2em; text-transform: uppercase; color: var(--rdf-grey); }',
+      '.rdf-swap { position: relative; display: grid; overflow: hidden; font-size: clamp(.78rem, 1.05vw, .95rem); letter-spacing: .16em; text-transform: uppercase; line-height: 1.5; }',
+      '.rdf-swap b { font-weight: 400; }',
+      '.rdf-swap > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
+      '.rdf-swap > span + span { transform: translateY(110%); color: var(--rdf-cream); }',
+      '@media (hover: hover) { .rdf-cell:hover .rdf-swap > span:first-child, .rdf-page:hover .rdf-pt > span:first-child { transform: translateY(-110%); } .rdf-cell:hover .rdf-swap > span + span, .rdf-page:hover .rdf-pt > span + span { transform: none; } }',
+      '.rdf-base { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--rdf-grey); }',
+      '.rdf-base-l { grid-column: 1 / 9; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 2rem; padding: 1rem 1.6rem; }',
+      '.rdf-socials { grid-column: 9 / 13; display: grid; grid-template-columns: 1fr 1fr; }',
+      '.rdf-soc { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.6rem; color: var(--rdf-grey) !important; transition: color .3s, background-color .4s ' + ease + '; }',
+      '.rdf-soc i { opacity: 0; transform: translate(-.3em, .3em); transition: opacity .3s, transform .45s ' + ease + '; }',
+      '@media (hover: hover) { .rdf-soc:hover { color: var(--rdf-cream) !important; background-color: rgba(248, 245, 238, .025); } .rdf-soc:hover i { opacity: 1; transform: none; } }',
+      '.rdf-lang { display: inline-flex; gap: .7em; }',
+      '.rdf-lang a { opacity: .6; transition: opacity .3s; } .rdf-lang a.is-on { color: var(--rdf-cream) !important; opacity: 1; } .rdf-lang a:hover { opacity: 1; }',
+      '.rdf-lang a + a::before { content: "/"; margin-right: .7em; color: var(--rdf-grey); opacity: .5; }',
+      // the build: an outline per box, the HTML it types, the caret
+      '.rdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
+      '.rdf-frame rect { fill: none; stroke: rgba(243, 86, 46, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }',
+      '.rdf-rev { position: relative; z-index: 1; will-change: clip-path; }',
+      '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 3; }',
+      '.rdf-code { position: absolute; left: 1.6rem; top: 1.3rem; right: 1rem; z-index: 2; pointer-events: none; font-size: .64rem; line-height: 1.6; letter-spacing: .04em; white-space: pre-wrap; word-break: break-all; text-transform: none; color: var(--rdf-grey); transition: opacity .25s; }',
+      '.rdf-code .t { color: var(--rdf-cream); } .rdf-code .k { color: #8fb3ff; } .rdf-code .s { color: var(--rdf-brand); }',
+      '.rdf-code .cur { display: inline-block; width: .55em; height: 1.05em; margin-left: .1em; vertical-align: -.15em; background: var(--rdf-brand); animation: rdf-blink 1s steps(1) infinite; }',
+      '@keyframes rdf-blink { 50% { opacity: 0; } }',
+      '.rdf-code.is-hover { opacity: 1 !important; transform: none !important; }',
+      // hover: two strokes from the top-left corner, meeting bottom right
+      '.rdf-draw { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }',
+      '.rdf-draw path { fill: none; stroke: var(--rdf-brand); stroke-width: 1; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .45s cubic-bezier(.4, 0, .6, 1); }',
+      '.rdf-cell.is-drawn .rdf-draw path { stroke-dashoffset: 0; transition: stroke-dashoffset .8s cubic-bezier(.45, 0, .25, 1); }',
+      '@media (max-width: 800px) {',
+      '  .rdf { height: auto; min-height: 100vh; min-height: 100svh; }',
+      '  .rdf-in { position: relative; inset: auto; min-height: 100vh; min-height: 100svh; }',
+      '  .rdf-grid { grid-template-rows: auto; }',
+      '  .rdf-logo { grid-column: 1 / -1; grid-row: auto; padding: 2.4rem 1rem 3rem; }',
+      '  .rdf-page { grid-column: span 6; grid-row: auto; padding: 1.3rem 1rem; }',
+      '  .rdf-page > i { display: none; }',
+      '  .rdf-mail, .rdf-where { grid-column: 1 / -1; grid-row: auto; padding: 1.3rem 1rem; }',
+      '  .rdf-base-l, .rdf-socials { grid-column: 1 / -1; }',
+      '  .rdf-base-l, .rdf-soc { padding: 1rem; }',
+      '  .rdf-soc i { opacity: .6; transform: none; }',
+      '  .rdf-code { left: 1rem; top: 1.1rem; font-size: .58rem; }',
+      '}',
+      '@media (prefers-reduced-motion: reduce) { .rdf-code .cur { animation: none; } }'
+    ].join('\n');
+    var style = document.createElement('style');
+    style.textContent = css;
+    document.head.appendChild(style);
+
+    // ---- the markup (data-code: the HTML each box types first) ----
+    function escA(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var pages = [['service', 'Service', 'What I do'], ['work', 'Work', 'Live sites'], ['resources', 'Resources', 'Blog + guides'], ['contact', 'Contact', 'Say hello']];
+    // the email opens with a subject and a short start (Rimbo, 5 Nov: "open with a subject and a bit of text")
+    var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&body=' +
+      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n");
+    // the language links: the old menu's Webflow locale links know the right URL for this page
+    function localeHref(lang) {
+      var a = qs('a[hreflang="' + lang + '"]');
+      if (a) return a.getAttribute('href');
+      var bare = location.pathname.replace(/^\/nl(?=\/|$)/, '') || '/';
+      return lang === 'nl' ? '/nl' + (bare === '/' ? '' : bare) : bare;
+    }
+    var html =
+      '<div class="rdf-in">' +
+        '<div class="rdf-ruler" aria-hidden="true"><span data-rdf-width></span></div>' +
+        '<div class="rdf-grid">' +
+          '<a class="rdf-cell rdf-logo" href="' + (prefix || '/') + '" aria-label="Rimbo Designs, home" data-code="' + escA('<a class="ft_logo" href="/"><svg viewBox="0 0 72 26">…</svg></a>') + '">' +
+            '<span class="rdf-logo-art" data-own><canvas aria-hidden="true"></canvas></span></a>' +
+          pages.map(function (pg) {
+            return '<a class="rdf-cell rdf-page" href="' + prefix + '/' + pg[0] + '" data-code="' + escA('<a class="ft_link" href="/' + pg[0] + '">') + '">' +
+              '<span class="rdf-pt"><span>' + pg[1] + '</span><span aria-hidden="true">' + pg[2] + '</span></span><i aria-hidden="true">→</i></a>';
+          }).join('') +
+          '<a class="rdf-cell rdf-mail" href="' + escA(mail) + '" data-swap data-code="' + escA('<a class="ft_mail" href="mailto:hello@rimbodesigns.com">') + '">' +
+            '<span class="rdf-label">Got a project?</span>' +
+            '<span class="rdf-swap"><span>hello@rimbodesigns.com <i>→</i></span><span aria-hidden="true">Opens your mail app <i>→</i></span></span></a>' +
+          '<a class="rdf-cell rdf-where" href="' + prefix + '/locations" data-swap data-code="' + escA('<a class="ft_locations" href="/locations">') + '">' +
+            '<span class="rdf-label">Based in</span>' +
+            '<span class="rdf-swap"><span>Netherlands · <b data-rdf-clock>--:--</b></span><span aria-hidden="true">Where I work <i>→</i></span></span></a>' +
+        '</div>' +
+        '<div class="rdf-base" data-code="' + escA('<div class="ft_base">') + '">' +
+          '<div class="rdf-base-l"><span>© ' + new Date().getFullYear() + ' Rimbo Designs</span>' +
+            '<span class="rdf-lang" role="group" aria-label="Language"><a href="' + localeHref('en') + '" hreflang="en"' + (nl ? '' : ' class="is-on"') + '>EN</a><a href="' + localeHref('nl') + '" hreflang="nl"' + (nl ? ' class="is-on"' : '') + '>NL</a></span></div>' +
+          '<div class="rdf-socials" role="navigation" aria-label="Socials">' +
+            [['LinkedIn', 'https://www.linkedin.com/in/rimbout-bobeldijk-9836ba168/'], ['Instagram', 'https://www.instagram.com/rimbodesigns_/'],
+             ['YouTube', 'https://www.youtube.com/channel/UCc4hdQHoJp6KBOb2187392Q'], ['Twitter', 'https://twitter.com/rimbodesigns']].map(function (s) {
+              return '<a class="rdf-soc" href="' + s[1] + '" target="_blank" rel="noopener"><span>' + s[0] + '</span><i aria-hidden="true">↗</i></a>';
+            }).join('') +
+          '</div></div>' +
+      '</div>';
+
+    var foot = document.createElement('footer');
+    foot.className = 'rdf';
+    foot.innerHTML = html;
+    var main = byId('MainWrap'), wrap = main ? main.parentNode : document.body;
+    if (main) main.insertAdjacentElement('afterend', foot); else document.body.appendChild(foot);
+    // the last section with its own background lifts off the footer
+    var prev = foot.previousElementSibling;
+    while (prev && prev.lastElementChild && getComputedStyle(prev).backgroundColor === 'rgba(0, 0, 0, 0)') prev = prev.lastElementChild;
+    if (prev) prev.classList.add('rdf-prev');
+    var inner = qs('.rdf-in', foot);
+
+    // the clock in Based in
+    var clock = qs('[data-rdf-clock]', foot);
+    function tickClock() { clock.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }); }
+    tickClock(); setInterval(tickClock, 15000);
+
+    // the logo goes home, or back to the top on a home page
+    var logoCell = qs('.rdf-logo', foot);
+    var bare = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
+    if (bare === '/' || /^\/home-(copy|v\d+)$/.test(bare)) logoCell.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (window.lenis && window.lenis.scrollTo) window.lenis.scrollTo(0, { duration: 1.8 }); else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // ---- Osmo's Text Scramble for the small text; the plugin comes from Webflow's GSAP CDN when it isn't there ----
+    var scrambleOK = false;
+    function scrambleReady() {
+      if (!window.gsap || !window.ScrambleTextPlugin || !window.SplitText || reduce) return;
+      gsap.registerPlugin(ScrambleTextPlugin, SplitText); scrambleOK = true;
+    }
+    scrambleReady();
+    if (!scrambleOK && window.gsap && !reduce) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.prod.website-files.com/gsap/3.15.0/ScrambleTextPlugin.min.js';
+      sc.onload = scrambleReady;
+      document.head.appendChild(sc);
+    }
+    var scState = new Map();
+    function scrambleSet(kid, on) {
+      var s = scState.get(kid) || { on: null, splits: [], tws: [] };
+      if (s.on === on) return;
+      s.on = on; scState.set(kid, s);
+      s.tws.forEach(function (t) { t.kill(); }); s.tws = [];
+      s.splits.forEach(function (sp) { sp.revert(); }); s.splits = [];
+      kid.style.clipPath = 'none'; kid.style.opacity = on ? 1 : 0;
+      if (!on || !scrambleOK) return;
+      var targets = !kid.children.length ? [kid] : kid.classList.contains('rdf-swap') ? [kid.firstElementChild]
+        : qsa('span, a', kid).filter(function (el) { return !el.children.length && el.textContent.trim(); });
+      targets.forEach(function (el) {
+        var sp = new SplitText(el, { type: 'words, chars', wordsClass: 'rdf-w', charsClass: 'rdf-c' });
+        s.splits.push(sp);
+        s.tws.push(gsap.to(sp.words, {
+          duration: 1.4, stagger: 0.015, scrambleText: { text: '{original}', chars: 'upperCase', speed: 0.95 },
+          onComplete: function () { sp.revert(); s.splits = s.splits.filter(function (x) { return x !== sp; }); }
+        }));
+      });
+    }
+
+    // ---- the typed HTML, with a tiny highlighter ----
+    function classify(src) {
+      var out = [], inTag = false, inName = false, inStr = false, q = '';
+      Array.from(src).forEach(function (ch) {
+        var c = '';
+        if (inStr) { c = 's'; if (ch === q) inStr = false; }
+        else if (ch === '<') { inTag = true; inName = true; c = 't'; }
+        else if (inTag && (ch === '"' || ch === "'")) { inStr = true; q = ch; c = 's'; }
+        else if (inTag && ch === '>') { inTag = false; inName = false; c = 't'; }
+        else if (inTag && ch === ' ') { inName = false; }
+        else if (inTag && (inName || ch === '=' || ch === '/')) { c = 't'; }
+        else if (inTag) { c = 'k'; }
+        out.push({ ch: ch, c: c });
+      });
+      return out;
+    }
+    function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function renderCode(el, chars, n, cursor) {
+      var h = '', run = '', cls = null;
+      for (var i = 0; i < n; i++) {
+        var c = chars[i];
+        if (c.c !== cls) { if (run) h += cls ? '<span class="' + cls + '">' + esc(run) + '</span>' : esc(run); run = ''; cls = c.c; }
+        run += c.ch;
+      }
+      if (run) h += cls ? '<span class="' + cls + '">' + esc(run) + '</span>' : esc(run);
+      if (cursor) h += '<span class="cur"></span>';
+      if (el.__h !== h) { el.innerHTML = h; el.__h = h; }
+    }
+
+    // ---- the logo, drawn like a drawing: guides, a dimension line, each letter outlined, then filled cream ----
+    var logo = (function () {
+      var cv = qs('canvas', logoCell), ctx = cv.getContext('2d');
+      var VB = { w: 72, h: 25.1 }, M = 30, T = { guide: 0.3, outline: 0.44, fill: 0.6 };
+      var letters = [], rows = [], dpr = 1, S = 1, W = 0, H = 0, ready = false, pNow = 0;
+      fetch(logoSrc).then(function (r) { return r.text(); }).then(function (txt) {
+        var doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+        var NS = 'http://www.w3.org/2000/svg';
+        var probe = document.createElementNS(NS, 'svg');
+        probe.setAttribute('viewBox', '0 0 72 26');
+        probe.style.cssText = 'position:absolute;width:72px;height:26px;visibility:hidden;left:-999px;top:0';
+        document.body.appendChild(probe);
+        qsa('path', doc).forEach(function (src) {
+          var d = src.getAttribute('d');
+          var el = document.createElementNS(NS, 'path'); el.setAttribute('d', d); probe.appendChild(el);
+          var b = el.getBBox();
+          if (b.width * b.height < 0.01) return;
+          letters.push({ path: new Path2D(d), len: el.getTotalLength(), x: b.x, y: b.y, w: b.width, h: b.height });
+        });
+        probe.remove();
+        letters.sort(function (a, b) { return (a.y > 12) - (b.y > 12) || a.x - b.x; }); // RIMBO first, left to right
+        [letters.filter(function (l) { return l.y <= 12; }), letters.filter(function (l) { return l.y > 12; })].forEach(function (row) {
+          if (!row.length) return;
+          rows.push(Math.min.apply(null, row.map(function (l) { return l.y; })));
+          rows.push(Math.max.apply(null, row.map(function (l) { return l.y + l.h; })));
+        });
+        ready = true; layout();
+      }).catch(function (err) { console.error('[rimbo-designs] footer logo:', err); });
+
+      function layout() {
+        var cs = getComputedStyle(logoCell);
+        var cw = logoCell.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        var ch = logoCell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - M * 1.6;
+        S = Math.max(1, Math.min(cw / VB.w, (window.innerWidth > 800 ? ch : 9e9) / VB.h, 820 / VB.w)); // 820 px at most: on a big screen it got far too large
+        W = Math.round(VB.w * S) + M * 2; H = Math.round(VB.h * S) + M * 2;
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+        paint(pNow);
+      }
+      function paint(p) {
+        pNow = p;
+        if (!ready || !W) return;
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+        var settle = smooth(0.74, 0.88, p), lw = 72 * S, lh = 25.1 * S;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineWidth = 1;
+        if (settle < 1) {
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = rgba(ACCENT, 0.9 * (1 - settle));
+          ctx.beginPath();
+          rows.forEach(function (y, i) {
+            var yy = Math.round(M + y * S) + 0.5, k = smooth(T.guide + i * 0.03, T.guide + 0.26 + i * 0.03, p);
+            ctx.moveTo(0, yy); ctx.lineTo(W * k, yy);
+          });
+          [0, lw].forEach(function (x, i) {
+            var xx = Math.round(M + x) + 0.5, k = smooth(T.guide + 0.04 + i * 0.04, T.guide + 0.3 + i * 0.04, p);
+            ctx.moveTo(xx, 0); ctx.lineTo(xx, H * k);
+          });
+          ctx.stroke(); ctx.setLineDash([]);
+          var kd = smooth(T.guide + 0.2, T.guide + 0.4, p);
+          if (kd > 0) {
+            var dy = Math.round(M + lh + M * 0.55) + 0.5, x1 = M + lw * kd;
+            ctx.globalAlpha = 1 - settle;
+            ctx.strokeStyle = rgba(ACCENT, 0.9); ctx.fillStyle = rgba(ACCENT, 1);
+            ctx.beginPath(); ctx.moveTo(M, dy); ctx.lineTo(x1, dy); ctx.moveTo(M, dy - 4); ctx.lineTo(M, dy + 4);
+            if (kd > 0.98) { ctx.moveTo(x1, dy - 4); ctx.lineTo(x1, dy + 4); }
+            ctx.stroke();
+            if (kd > 0.98) {
+              var label = Math.round(lw) + ' × ' + Math.round(lh);
+              ctx.font = '9px "Rm Mono", "RM MONO", monospace'; ctx.textBaseline = 'middle';
+              var tw = ctx.measureText(label).width, lx = M + lw / 2 - tw / 2 - 6;
+              ctx.fillRect(lx, dy - 7, tw + 12, 14);
+              ctx.fillStyle = '#0c0c0c'; ctx.fillText(label, lx + 6, dy + 0.5);
+            }
+            ctx.globalAlpha = 1;
+          }
+        }
+        letters.forEach(function (L, i) {
+          var ko = smooth(T.outline + i * 0.022, T.outline + 0.26 + i * 0.022, p);
+          var kf = smooth(T.fill + i * 0.016, T.fill + 0.16 + i * 0.016, p);
+          ctx.setTransform(dpr * S, 0, 0, dpr * S, dpr * M, dpr * M);
+          if (kf > 0) { ctx.fillStyle = rgba(CREAM, kf); ctx.fill(L.path); }
+          if (ko > 0 && settle < 1) {
+            ctx.lineWidth = 1 / S; ctx.strokeStyle = rgba(ACCENT, 1 - settle);
+            ctx.setLineDash([L.len * ko, L.len]); ctx.stroke(L.path); ctx.setLineDash([]);
+          }
+        });
+      }
+      return { paint: paint, layout: layout };
+    })();
+
+    // ---- the boxes: an orange outline, the HTML it types, a caret ----
+    var NS = 'http://www.w3.org/2000/svg';
+    var boxes = qsa('[data-code]', foot).map(function (box) {
+      var kids = Array.prototype.slice.call(box.children).filter(function (el) { return !el.hasAttribute('data-own'); });
+      kids.forEach(function (k) { k.classList.add('rdf-rev'); });
+      var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'rdf-frame'); svg.setAttribute('aria-hidden', 'true');
+      var rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('x', '0'); rect.setAttribute('y', '0'); rect.setAttribute('width', '100%'); rect.setAttribute('height', '100%');
+      rect.setAttribute('pathLength', '1'); rect.style.strokeDasharray = '1 1';
+      svg.appendChild(rect); box.appendChild(svg);
+      var add = function (cls) { var e = document.createElement('span'); e.className = cls; e.setAttribute('aria-hidden', 'true'); box.appendChild(e); return e; };
+      return { el: box, kids: kids, rect: rect, code: add('rdf-code'), chars: classify(box.getAttribute('data-code')), caret: add('rdf-caret'), at: [] };
+    });
+
+    // ---- the dashed guide lines on every cell edge, cut where they would run through a cell ----
+    var guideWrap = document.createElement('div'); guideWrap.className = 'rdf-lines'; guideWrap.setAttribute('aria-hidden', 'true');
+    inner.insertBefore(guideWrap, inner.firstChild);
+    var vs = [], hs = [], last = -1;
+    function layout() {
+      var ir = inner.getBoundingClientRect(), xs = [], ys = [];
+      var addU = function (arr, val) { val = Math.round(val); if (!arr.some(function (a) { return Math.abs(a - val) < 3; })) arr.push(val); };
+      qsa('.rdf-cell, .rdf-base, .rdf-base-l, .rdf-soc', foot).forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        addU(xs, r.left - ir.left); addU(xs, r.right - ir.left - 1); addU(ys, r.top - ir.top); addU(ys, r.bottom - ir.top - 1);
+      });
+      guideWrap.textContent = ''; vs = []; hs = [];
+      var W = inner.clientWidth, H = inner.clientHeight;
+      var rects = qsa('.rdf-cell, .rdf-base-l, .rdf-soc', foot).map(function (el) {
+        var r = el.getBoundingClientRect(); return { l: r.left - ir.left, r: r.right - ir.left, t: r.top - ir.top, b: r.bottom - ir.top };
+      });
+      var segs = function (from, to, blocks) {
+        var out = [[from, to]];
+        blocks.forEach(function (bl) {
+          out = out.reduce(function (acc, sg) {
+            if (bl[1] <= sg[0] || bl[0] >= sg[1]) acc.push(sg);
+            else { if (bl[0] - sg[0] > 2) acc.push([sg[0], bl[0]]); if (sg[1] - bl[1] > 2) acc.push([bl[1], sg[1]]); }
+            return acc;
+          }, []);
+        });
+        return blocks.length ? out.filter(function (sg) { return sg[1] - sg[0] > 48; }) : out; // no little stubs where a line is cut
+      };
+      xs.sort(function (a, b) { return a - b; }).forEach(function (x) {
+        segs(0, H, rects.filter(function (c) { return x > c.l + 2 && x < c.r - 3; }).map(function (c) { return [c.t, c.b]; })).forEach(function (sg) {
+          var l = document.createElement('i'); l.className = 'rdf-v';
+          l.style.left = x + 'px'; l.style.top = sg[0] + 'px'; l.style.height = (sg[1] - sg[0]) + 'px';
+          guideWrap.appendChild(l); vs.push(l);
+        });
+      });
+      ys.sort(function (a, b) { return a - b; }).forEach(function (y) {
+        segs(0, W, rects.filter(function (c) { return y > c.t + 2 && y < c.b - 3; }).map(function (c) { return [c.l, c.r]; })).forEach(function (sg) {
+          var l = document.createElement('i'); l.className = 'rdf-h';
+          l.style.top = y + 'px'; l.style.left = sg[0] + 'px'; l.style.width = (sg[1] - sg[0]) + 'px';
+          guideWrap.appendChild(l); hs.push(l);
+        });
+      });
+      boxes.forEach(function (b) {
+        var br = b.el.getBoundingClientRect();
+        b.at = b.kids.map(function (k) { var r = k.getBoundingClientRect(); return { x: r.left - br.left, y: r.top - br.top, w: r.width, h: r.height }; });
+      });
+      last = -1;
+    }
+    var relayT = 0;
+    function relayout() { cancelAnimationFrame(relayT); relayT = requestAnimationFrame(function () { logo.layout(); layout(); }); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(relayout);
+    window.addEventListener('resize', relayout);
+    // and whenever a cell changes size (on phones the logo cell only gets its height once the logo has loaded)
+    if ('ResizeObserver' in window) {
+      var ro = new ResizeObserver(function () { cancelAnimationFrame(relayT); relayT = requestAnimationFrame(layout); });
+      qsa('.rdf-cell, .rdf-base', foot).forEach(function (el) { ro.observe(el); });
+    }
+    layout();
+
+    // ---- the ruler: the screen width scrambles in (digits only) once it has drawn, and again on a resize ----
+    var ruler = qs('.rdf-ruler', foot), rulerLabel = qs('[data-rdf-width]', foot), rulerOn = false, rulerTimer = 0;
+    function sizeLabel(animate) {
+      var t = window.innerWidth + ' PX';
+      if (animate && scrambleOK) gsap.to(rulerLabel, { duration: 0.9, overwrite: true, scrambleText: { text: t, chars: '0123456789', speed: 0.6 } });
+      else rulerLabel.textContent = t;
+    }
+    rulerLabel.style.opacity = 0;
+    window.addEventListener('resize', function () { if (!rulerOn) return; clearTimeout(rulerTimer); rulerTimer = setTimeout(function () { sizeLabel(true); }, 120); });
+
+    // ---- hover (mouse only): the HTML types back in (not on the email and Based in, they swap) + an orange outline ----
+    var done = false;
+    if (canHover) {
+      qsa('.rdf-cell', foot).forEach(function (cell) {
+        var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'rdf-draw'); svg.setAttribute('aria-hidden', 'true');
+        var p1 = document.createElementNS(NS, 'path'), p2 = document.createElementNS(NS, 'path');
+        [p1, p2].forEach(function (pth) { pth.setAttribute('pathLength', '1'); svg.appendChild(pth); });
+        cell.appendChild(svg);
+        cell.addEventListener('mouseenter', function () {
+          if (!done) return;
+          var w = cell.offsetWidth, h = cell.offsetHeight;
+          svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+          p1.setAttribute('d', 'M.5 .5H' + (w - 0.5) + 'V' + (h - 0.5));
+          p2.setAttribute('d', 'M.5 .5V' + (h - 0.5) + 'H' + (w - 0.5));
+          cell.classList.add('is-drawn');
+        });
+        cell.addEventListener('mouseleave', function () { cell.classList.remove('is-drawn'); });
+      });
+      boxes.forEach(function (b) {
+        if (!b.el.classList.contains('rdf-cell') || b.el.hasAttribute('data-swap')) return;
+        var raf = 0;
+        b.el.addEventListener('mouseenter', function () {
+          if (!done) return;
+          var t0 = performance.now(); cancelAnimationFrame(raf); b.code.classList.add('is-hover');
+          (function step() {
+            var k = Math.min(1, (performance.now() - t0) / 420);
+            renderCode(b.code, b.chars, Math.round(b.chars.length * k), true);
+            if (k < 1) raf = requestAnimationFrame(step);
+          })();
+        });
+        b.el.addEventListener('mouseleave', function () { cancelAnimationFrame(raf); b.code.classList.remove('is-hover'); });
+      });
+    }
+
+    var isBig = function (k) { return k.classList.contains('rdf-pt') || k.tagName === 'I'; };
+    var reveal = function (el, k) { el.style.clipPath = k >= 1 ? 'none' : 'inset(-20% ' + cut(k) + ' -20% 0)'; };
+    function draw(p) {
+      logo.paint(p);
+      vs.forEach(function (l, i) { l.style.clipPath = 'inset(0 0 ' + cut(smooth(0.02 + i * 0.03, 0.36 + i * 0.03, p)) + ' 0)'; });
+      hs.forEach(function (l, i) { l.style.clipPath = 'inset(0 ' + cut(smooth(0.04 + i * 0.025, 0.38 + i * 0.025, p)) + ' 0 0)'; });
+      ruler.style.clipPath = 'inset(0 ' + cut(smooth(0.04, 0.3, p)) + ' 0 0)';
+      if (p > 0.2 && !rulerOn) { rulerOn = true; rulerLabel.style.opacity = 1; sizeLabel(true); }
+      else if (p < 0.05 && rulerOn) { rulerOn = false; rulerLabel.style.opacity = 0; if (window.gsap) gsap.killTweensOf(rulerLabel); rulerLabel.textContent = ''; }
+      var settle = smooth(0.74, 0.88, p);
+      boxes.forEach(function (b, i) {
+        var o = i * 0.035;
+        b.rect.style.strokeDashoffset = (1 - smooth(0.08 + o, 0.32 + o, p)).toFixed(4);
+        b.rect.style.stroke = rgba(ACCENT, (1 - settle) * 0.8);
+        var kc = smooth(0.12 + o, 0.36 + o, p), kf = smooth(0.44 + o, 0.54 + o, p);
+        if (!b.code.classList.contains('is-hover')) {
+          renderCode(b.code, b.chars, Math.round(b.chars.length * kc), kc > 0 && kf < 1);
+          b.code.style.opacity = (1 - kf).toFixed(3);
+          b.code.style.transform = 'translate3d(0,' + (-kf * 8).toFixed(1) + 'px,0)';
+        }
+        var typed = null;
+        b.kids.forEach(function (k, j) {
+          var t0 = 0.5 + o + j * 0.03;
+          if (isBig(k)) {
+            var kr = smooth(t0, t0 + 0.14, p);
+            reveal(k, kr);
+            if (kr > 0 && kr < 1 && !typed) typed = { a: b.at[j], k: kr };
+          } else scrambleSet(k, p > t0 + 0.1); // the small text scrambles in a little after the big text
+        });
+        if (typed && typed.a) {
+          b.caret.style.opacity = 1;
+          b.caret.style.left = (typed.a.x + typed.a.w * typed.k) + 'px';
+          b.caret.style.top = typed.a.y + 'px'; b.caret.style.height = typed.a.h + 'px';
+        } else b.caret.style.opacity = 0;
+      });
+      done = p > 0.9;
+    }
+
+    // ---- the engine: the footer rises at half the scroll speed, so the page seems to slide off it ----
+    function curtain(p) {
+      inner.style.transform = 'translate3d(0,' + (-(1 - p) * foot.offsetHeight * 0.5).toFixed(1) + 'px,0)';
+      inner.style.setProperty('--rdf-shade', ((1 - p) * 0.8).toFixed(3));
+    }
+    if (reduce) { curtain(1); draw(1); return; }
+    curtain(0); draw(0);
+    var on = false;
+    new IntersectionObserver(function (es) { on = es[0].isIntersecting; }, { rootMargin: '0px 0px 10% 0px' }).observe(foot);
+    window.addEventListener('resize', function () { last = -1; });
+    (function tick() {
+      if (on) {
+        var r = foot.getBoundingClientRect();
+        var p = clamp((window.innerHeight - r.top) / r.height);
+        if (Math.abs(p - last) > 0.0005) { last = p; curtain(p); draw(p); }
+      }
+      requestAnimationFrame(tick);
+    })();
+  }
+
+  // =========================================================
   // RUN
   // Page sections run straight away, like the old Slater tags did. Each one
   // runs on its own, so a missing element on one page can't stop the rest.
@@ -4984,6 +5477,8 @@
   run('form validation', rdFormValidation);
   run('menu', rdMenu);
   run('post cards', rdPostCards);
+  // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
+  if (path === '/home-v4' || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
