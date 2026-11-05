@@ -78,19 +78,18 @@ body { font: 13px/1.6 "RM MONO", ui-monospace, Menlo, monospace; }
 .calc_subs[hidden] { display: none; }
 .calc_subs .calc_toggle { padding: 10px 0; }
 
-/* Hourly item (content migration): a slider for the hours under its switch */
-.calc_hours { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 6px 0 16px; }
+/* Item sold by amount (content migration): three choices under its switch */
+.calc_hours { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 4px 0 16px; }
 .calc_step > div > .calc_item:has(+ .calc_hours[hidden]:last-child) { border-bottom: 0; }
-.calc_hours_label { font-size: 12px; color: var(--muted); }
-.calc_hours_out { min-width: 5ch; font-size: 13px; font-variant-numeric: tabular-nums; }
 .calc_hours_rec { flex-basis: 100%; font-size: 12px; }
-.calc_range_input { flex: 1; min-width: 140px; max-width: 320px; height: 22px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.calc_range_input::-webkit-slider-runnable-track { height: 4px; border-radius: 1px; background: var(--track); }
-.calc_range_input::-moz-range-track { height: 4px; border-radius: 1px; background: var(--track); }
-.calc_range_input::-moz-range-progress { height: 4px; border-radius: 1px; background: var(--on); }
-.calc_range_input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 2px; background: var(--on); }
-.calc_range_input::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 2px; background: var(--on); }
-.calc_range_input:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.calc_seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.calc_seg_opt { position: relative; cursor: pointer; }
+.calc_seg_opt input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.calc_seg_opt span { display: block; padding: 8px 12px; border: 1px solid var(--field-line); border-radius: var(--r);
+  background: var(--field-bg); color: var(--muted); font-size: 12px; line-height: 1; transition: background .2s, color .2s, border-color .2s; }
+.calc_seg_opt:hover span { border-color: var(--text); color: var(--text); }
+.calc_seg_opt input:checked + span { background: var(--on); border-color: var(--on); color: #0b0b0b; }
+.calc_seg_opt input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .calc_item_parent .calc_label { font-size: 13px; }
 
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

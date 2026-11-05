@@ -1,6 +1,7 @@
 /* Project calculator. Plain JS, no build.
    Every price and every info text lives in CONFIG. Prices are the draft numbers from docs/offer.md.
-   Prices, not hours: the one exception is content migration, sold by the hour with a slider. */
+   Prices, not hours. Content migration is priced by amount (a little / quite a bit / a lot); the hours
+   behind those three live in CONFIG only. */
 (function () {
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
@@ -99,8 +100,10 @@
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
         info: "So you can write and publish pages and posts that get found. What you get:\nA recorded tutorial you can watch again.\nA one-on-one call about your own site.\nA checklist template for every new page or post." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
-      { id: "migration",  group: "search", label: "Content migration",                         hourly: 97, hours: { min: 1, max: 40, start: 10 },
-        info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Paid by the hour: set what you expect, the proposal confirms it." },
+      // Three amounts, not an hours field (Rimbo, 2026-11-05): €97 an hour behind the scenes
+      { id: "migration",  group: "search", label: "Content migration",                         hourly: 97,
+        levels: [{ label: "A little", hours: 2 }, { label: "Quite a bit", hours: 4 }, { label: "A lot", hours: 8 }], start: 0,
+        info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Pick roughly how much you have; the proposal confirms it." },
       { id: "loader",     group: "motion", label: "Custom page loader",                        price: 800,  info: "A branded intro animation while the site loads." },
       { id: "transition", group: "motion", label: "Custom page transitions",                   price: 900,  info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
       { id: "theme",      group: "motion", label: "Light and dark mode",                       price: 600,  info: "A light and a dark version of the whole site, with a switch." },
@@ -116,8 +119,8 @@
   };
 
   var state = { pages: { simple: 2, medium: 4, complex: 2, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
-  CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.hours.start; });
-  // An item's price: fixed, or hours × rate
+  CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.levels[t.start].hours; });
+  // An item's price: fixed, or the chosen amount's hours × rate
   function priceOf(t) { return t.hourly ? t.hourly * state.hours[t.id] : t.price; }
 
   var q = new URLSearchParams(location.search);
@@ -154,7 +157,7 @@
   addEventListener("hashchange", function () { location.reload(); }); // a different link pasted into the same tab
 
   // The scope as a small object: page counts, branding on/off, the ids that are on (brand parts only with
-  // branding on), and the hours of hourly items that are on
+  // branding on), and the hours behind the chosen amount of items that are on
   function snap() {
     var s = {
       p: CONFIG.pages.map(function (p) { return state.pages[p.id]; }),
@@ -164,7 +167,12 @@
     s.t.forEach(function (id) { if (byId[id].hourly) { s.h = s.h || {}; s.h[id] = state.hours[id]; } });
     return s;
   }
-  function clampHours(t, n) { return Math.max(t.hours.min, Math.min(t.hours.max, Math.round(+n) || t.hours.start)); }
+  // Any hours (also from older links) snap to the nearest of the item's amounts
+  function clampHours(t, n) {
+    n = +n; if (!n) return t.levels[t.start].hours;
+    return t.levels.reduce(function (best, l) { return Math.abs(l.hours - n) < Math.abs(best - n) ? l.hours : best; }, t.levels[0].hours);
+  }
+  function levelOf(t, h) { h = h || state.hours[t.id]; return t.levels.filter(function (l) { return l.hours === h; })[0] || t.levels[t.start]; }
   function applySnap(s) {
     CONFIG.pages.forEach(function (p, i) { state.pages[p.id] = Math.max(0, Math.min(p.max, Math.round(+s.p[i]) || 0)); });
     state.brandOn = !!s.b; state.brandTouched = !!s.b;
@@ -198,7 +206,7 @@
     });
     if (state.brandOn) CONFIG.brand.items.forEach(function (t) { if (state.toggles[t.id]) out.push(["Branding: " + t.label.toLowerCase(), t.price]); });
     CONFIG.toggles.forEach(function (t) {
-      if (!t.pct && state.toggles[t.id]) out.push([t.label + (t.hourly ? " (" + state.hours[t.id] + " h)" : ""), priceOf(t)]);
+      if (!t.pct && state.toggles[t.id]) out.push([t.label + (t.hourly ? " (" + levelOf(t).label.toLowerCase() + ")" : ""), priceOf(t)]);
     });
     var scope = out.reduce(function (a, x) { return a + x[1]; }, 0), sum = scope;
     if (sum < CONFIG.minimum) { out.push(["Minimum project top-up", CONFIG.minimum - sum]); sum = CONFIG.minimum; }
@@ -341,7 +349,7 @@
       box.appendChild(el("legend", "", String(gi + 3).padStart(2, "0") + " " + g.legend));
       box.appendChild(list);
       CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
-        var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
+        var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? "from " + eur(t.hourly * t.levels[0].hours) : "+" + eur(t.price);
         list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
         if (t.hourly) list.appendChild(makeHours(t));
       });
@@ -349,15 +357,18 @@
     });
   }
 
-  // Hourly item: switched on, a slider for the hours opens under it
+  // Item sold by amount: switched on, three choices open under it (real radio buttons, so arrow keys work)
   function makeHours(t) {
     var wrap = el("div", "calc_subs calc_hours"); wrap.id = "hours-" + t.id; wrap.hidden = true;
-    var lab = el("label", "calc_hours_label", "Hours"); lab.htmlFor = "range-" + t.id;
-    var range = el("input", "calc_range_input"); range.type = "range"; range.id = "range-" + t.id;
-    range.min = t.hours.min; range.max = t.hours.max; range.step = 1; range.value = state.hours[t.id];
-    var out = el("output", "calc_hours_out"); out.id = "hours-out-" + t.id; out.htmlFor = range.id;
-    range.addEventListener("input", function () { state.hours[t.id] = clampHours(t, range.value); render(true); });
-    wrap.appendChild(lab); wrap.appendChild(range); wrap.appendChild(out);
+    var group = el("div", "calc_seg"); group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", "How much is there to move?");
+    t.levels.forEach(function (l) {
+      var opt = el("label", "calc_seg_opt"), input = el("input");
+      input.type = "radio"; input.name = "level-" + t.id; input.value = l.hours;
+      input.addEventListener("change", function () { state.hours[t.id] = l.hours; render(); });
+      opt.appendChild(input); opt.appendChild(el("span", "", l.label));
+      group.appendChild(opt);
+    });
+    wrap.appendChild(group);
     return wrap;
   }
 
@@ -392,9 +403,8 @@
       if (!t.hourly) return;
       var on = !!state.toggles[t.id];
       $("hours-" + t.id).hidden = !on;
-      $("range-" + t.id).value = state.hours[t.id];
-      $("hours-out-" + t.id).textContent = state.hours[t.id] + " h";
-      $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
+      $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
+      $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : "from " + eur(t.hourly * t.levels[0].hours);
     });
 
     var r = calc(), reached = r.scope >= CONFIG.minimum;
@@ -498,20 +508,20 @@
       var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", C.recommended));
       price.parentNode.insertBefore(tag, price);
       var t = byId[id];
-      if (t && t.hourly) $("hours-" + id).appendChild(el("span", "calc_rec_hint calc_hours_rec", C.recommended.toLowerCase() + ": " + clampHours(t, r.h && r.h[id]) + " h"));
+      if (t && t.hourly) $("hours-" + id).appendChild(el("span", "calc_rec_hint calc_hours_rec", C.recommended.toLowerCase() + ": " + levelOf(t, clampHours(t, r.h && r.h[id])).label.toLowerCase()));
     });
   }
 
   var current = { scope: "", range: "" };
 
   // The scope as plain lines for the application. Prices of single items are left out on purpose;
-  // the only hours are those of hourly items (content migration), since that is what they are sold by.
+  // an item sold by amount says which amount.
   function scopeText(total) {
     var pages = CONFIG.pages.slice().reverse().filter(function (p) { return state.pages[p.id]; })
       .map(function (p) { return state.pages[p.id] + " " + p.id; });
     var b = state.brandOn ? CONFIG.brand.items.filter(function (t) { return state.toggles[t.id]; }).map(function (t) { return t.label.toLowerCase(); }) : [];
     var tg = CONFIG.toggles.filter(function (t) { return state.toggles[t.id]; })
-      .map(function (t) { return t.label + (t.hourly ? " (" + state.hours[t.id] + " h)" : ""); });
+      .map(function (t) { return t.label + (t.hourly ? " (" + levelOf(t).label.toLowerCase() + ")" : ""); });
     return "Pages: " + (pages.join(", ") || "none") + "\n" +
       "Branding: " + (b.join(", ") || "none") + "\n" +
       "Toggles: " + (tg.join(", ") || "none") + "\n" +
