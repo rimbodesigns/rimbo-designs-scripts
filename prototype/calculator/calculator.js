@@ -29,15 +29,17 @@
       makeName: "Project name",
       makeCta: "Create link",
       makeNeedName: "Give it a project name first.",
-      makeDone: "Link copied. It opens with this scope, and they can change it.",
+      needScope: "Pick something first.",
+      makeDone: "Link copied to your clipboard.",
+      copy: "Copy",
       makeOpen: "Open it",
       clientEyebrow: "Scoped by Rimbo",
       clientLede: "This is what I'd build for you. Switch things on or off and the price follows.",
       recommended: "Recommended",
       reset: "Back to my recommendation",
-      clientCta: "Send me your version",
+      clientCta: "Copy my version",
       clientDone: "Link copied. Paste it in your reply to me.",
-      copyFailed: "Copy the link below."
+      copyFailed: "Couldn't copy. Copy the link under the button."
     },
 
     // No fixed build fee (2026-11-05): strategy, design system, QA and launch grow with the project,
@@ -45,7 +47,7 @@
     // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
     priorityPct: 0.25,       // priority start: jump the queue
-    totalLabel: { below: "Projects start at", reached: "Your project" },
+    totalLabel: { below: "Your project", reached: "Your project" }, // the number starts at €0; the bar shows the minimum
     included: {
       line: "Every price includes strategy, the design system, QA and launch.",
       title: "Included in every price",
@@ -197,9 +199,12 @@
       CONFIG.toggles.some(function (t) { return !t.pct && state.toggles[t.id]; });
   }
 
-  // The selected items as [label, price] lines, plus the scope (before minimum and priority) and the total
+  // The selected items as [label, price] lines, plus:
+  //   scope  the items added up (before priority)
+  //   shown  the big number: starts at €0 and follows the scope, priority included
+  //   total  the estimate for the application: never below the minimum, priority on top
   function calc() {
-    if (!picked()) return { lines: [], scope: 0, total: CONFIG.minimum };
+    if (!picked()) return { lines: [], scope: 0, shown: 0, total: CONFIG.minimum };
     var out = [];
     CONFIG.pages.forEach(function (p) {
       var n = state.pages[p.id];
@@ -209,10 +214,9 @@
     CONFIG.toggles.forEach(function (t) {
       if (!t.pct && state.toggles[t.id]) out.push([t.label + (t.hourly ? " (" + levelOf(t).label.toLowerCase() + ")" : ""), priceOf(t)]);
     });
-    var scope = out.reduce(function (a, x) { return a + x[1]; }, 0), sum = scope;
-    if (sum < CONFIG.minimum) { out.push(["Minimum project top-up", CONFIG.minimum - sum]); sum = CONFIG.minimum; }
-    if (state.toggles.priority) { var extra = sum * CONFIG.priorityPct; out.push(["Priority start (+" + Math.round(CONFIG.priorityPct * 100) + "%)", extra]); sum += extra; }
-    return { lines: out, scope: scope, total: sum };
+    var scope = out.reduce(function (a, x) { return a + x[1]; }, 0), pr = state.toggles.priority ? CONFIG.priorityPct : 0;
+    if (pr) out.push(["Priority start (+" + Math.round(pr * 100) + "%)", scope * pr]);
+    return { lines: out, scope: scope, shown: scope * (1 + pr), total: Math.max(scope, CONFIG.minimum) * (1 + pr) };
   }
 
   function brandSum() {
@@ -412,7 +416,7 @@
 
     var r = calc(), reached = r.scope >= CONFIG.minimum;
     $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
-    setTotal(eur(r.total), instant === true);
+    setTotal(eur(r.shown), instant === true);
 
     // Under the minimum: a bar that fills as the scope grows, gone once the minimum is reached
     $("meter").hidden = reached;
@@ -428,9 +432,9 @@
       ul.appendChild(li);
     });
 
-    current = { scope: scopeText(eur(r.total)), range: eur(r.total) };
+    current = { scope: scopeText(eur(r.total) + (reached ? "" : ", the minimum")), range: eur(r.total) };
     $("scope-summary").textContent = current.scope;
-    $("f-selections").value = current.scope.split("\nEstimate shown:")[0];
+    $("f-selections").value = current.scope.split("\nEstimate:")[0];
     $("f-range").value = current.range;
     if (mode !== "public") syncShare();
     queueWire();
@@ -448,6 +452,15 @@
     history.replaceState(null, "", location.pathname + (mode === "make" ? "?make" : "") + shareHash(o));
     if (mode === "client") $("reset").hidden = !o.c;
     $("made").hidden = true; // the scope changed: the copied link is no longer this version
+  }
+
+  // A short pop-up at the bottom of the screen (copied, or what's missing)
+  var toastT = 0;
+  function toast(text, bad) {
+    var t = $("toast");
+    t.textContent = text; t.classList.toggle("is-bad", !!bad);
+    t.hidden = false; t.classList.remove("is-in"); void t.offsetWidth; t.classList.add("is-in");
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
   }
 
   function setupShare() {
@@ -476,16 +489,14 @@
       $("reset").addEventListener("click", function () { applySnap(share.r); render(); });
     }
 
-    cta.addEventListener("click", function () {
-      if (mode === "make" && !$("make-name").value.trim()) {
-        $("make-name").setAttribute("aria-invalid", "true"); $("make-name").focus();
-        $("made-text").textContent = C.makeNeedName; $("made-link").hidden = true; $("made-open").hidden = true; $("made").hidden = false;
-        return;
-      }
-      var link = mode === "make" ? clientLink(shareData()) : location.href;
-      $("made-link").value = link; $("made-link").hidden = false;
-      $("made-open").href = link; $("made-open").textContent = C.makeOpen; $("made-open").hidden = mode !== "make";
-      function done(ok) { $("made-text").textContent = ok ? (mode === "make" ? C.makeDone : C.clientDone) : C.copyFailed; $("made").hidden = false; }
+    $("made-copy").textContent = C.copy;
+    $("made-open").textContent = C.makeOpen;
+
+    // Copy a link; the pop-up says whether it worked. Maker: the link stays under the button with Copy
+    // and Open it. Lead: the link only shows when copying failed, so they can copy it by hand.
+    function copyLink(link) {
+      $("made-link").value = link; $("made-open").href = link; $("made-open").hidden = mode !== "make";
+      function done(ok) { toast(ok ? (mode === "make" ? C.makeDone : C.clientDone) : C.copyFailed, !ok); $("made").hidden = mode !== "make" && ok; }
       function oldCopy() { // browsers that block the clipboard API: select the field and copy
         $("made").hidden = false; var f = $("made-link"); f.focus(); f.select();
         var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
@@ -493,7 +504,18 @@
       }
       if (navigator.clipboard) navigator.clipboard.writeText(link).then(function () { done(true); }, oldCopy);
       else oldCopy();
+    }
+
+    cta.addEventListener("click", function () {
+      if (!picked()) { toast(C.needScope, true); return; }
+      if (mode === "make" && !$("make-name").value.trim()) {
+        $("make-name").setAttribute("aria-invalid", "true"); $("make-name").focus();
+        toast(C.makeNeedName, true);
+        return;
+      }
+      copyLink(mode === "make" ? clientLink(shareData()) : location.href);
     });
+    $("made-copy").addEventListener("click", function () { copyLink($("made-link").value); });
     $("made-link").addEventListener("focus", function () { this.select(); });
   }
 
@@ -526,7 +548,7 @@
     return "Pages: " + (pages.join(", ") || "none") + "\n" +
       "Branding: " + (b.join(", ") || "none") + "\n" +
       "Toggles: " + (tg.join(", ") || "none") + "\n" +
-      "Estimate shown: " + total + " (excl. VAT, an estimate, not a quote)";
+      "Estimate: " + total + " (excl. VAT, an estimate, not a quote)";
   }
 
   // Apply step: reveal, validate, submit (stub), confirm
@@ -567,7 +589,7 @@
       err.hidden = true;
       var data = {};
       new FormData(form).forEach(function (v, k) { data[k] = v; });
-      data.selections = current.scope.split("\nEstimate shown:")[0];
+      data.selections = current.scope.split("\nEstimate:")[0];
       data.range_shown = current.range;
       data.page = location.href;
       var btn = $("apply-submit"); btn.disabled = true;

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Calculator</title>
-<link rel="stylesheet" href="calculator.css?v=10">
+<link rel="stylesheet" href="calculator.css?v=11">
 </head>
 <body>
 <main class="calc">
@@ -42,9 +42,11 @@
       <p class="calc_included" id="included"></p>
       <button class="calc_cta" id="cta" type="button" aria-controls="apply" aria-expanded="false">Apply with this scope</button>
       <!-- Personal links only: the copied link, and a way back to Rimbo's pick -->
-      <div class="calc_made" id="made" role="status" hidden>
-        <p class="calc_made_text" id="made-text"></p>
-        <input class="calc_made_link" id="made-link" type="text" readonly aria-label="Link">
+      <div class="calc_made" id="made" hidden>
+        <div class="calc_made_row">
+          <input class="calc_made_link" id="made-link" type="text" readonly aria-label="Link">
+          <button class="calc_made_copy" id="made-copy" type="button"></button>
+        </div>
         <a class="calc_link" id="made-open" href="#" target="_blank" rel="noopener" hidden></a>
       </div>
       <button class="calc_reset" id="reset" type="button" hidden></button>
@@ -143,10 +145,11 @@
     </div>
   </section>
 </main>
+<div class="calc_toast" id="toast" role="status" aria-live="polite" hidden></div>
 <svg class="calc_wire" id="wire" aria-hidden="true"><path id="wire-path" d=""/><rect id="wire-a" width="5" height="5"/><rect id="wire-b" width="5" height="5"/></svg>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/ScrollTrigger.min.js"></script>
 <script src="odometer.js?v=3"></script>
-<script src="calculator.js?v=13"></script>
+<script src="calculator.js?v=15"></script>
 </body>
 </html>
