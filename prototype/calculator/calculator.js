@@ -62,7 +62,10 @@
       { id: "medium",  label: "Medium pages",  hint: "Services, about, a case study",         price: 900,  max: 20,
         info: "A page with several sections, some interaction and animation. Most pages of a site are medium." },
       { id: "complex", label: "Complex pages", hint: "Home, a scroll story, heavy animation",  price: 2100, max: 10,
-        info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." }
+        info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." },
+      // A CMS template is scoped like a medium page (Rimbo, 2026-11-05)
+      { id: "cms",     label: "CMS templates", hint: "Blog post, case study, team member",    price: 900,  max: 10,
+        info: "One design for a type of content, like a blog post or a case study. You add as many as you like in Webflow. The overview page that lists them counts as a normal page. The content itself is yours to write." }
     ],
 
     // Branding: one switch that opens the parts. Turning it on the first time selects the preset.
@@ -83,13 +86,16 @@
     // Everything else, in groups after Branding and Pages (numbered 03, 04, …).
     // Within a group: ranked by how often it is needed (the big builds last).
     groups: [
-      { id: "search", legend: "Search and content" },
+      { id: "search", legend: "Search and analytics" },
       { id: "motion", legend: "Motion and feel" },
       { id: "more",   legend: "Add what you need" }
     ],
+    // DRAFT prices (2026-11-05, not confirmed by Rimbo yet): analytics, consent, training, a11y
     toggles: [
       { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site. Search and AI search are the same work, so they come together." },
-      { id: "cms",        group: "search", label: "Blog / CMS, with content and SEO training", price: 2000, info: "A blog or collection you edit yourself in Webflow, plus a session on writing and publishing posts that get found." },
+      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 400,  info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. Privacy-friendly by default. With Google Analytics you also need cookie consent." },
+      { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks. In the look of your site." },
+      { id: "training",   group: "search", label: "Content and SEO training",                  price: 500,  info: "A session on writing and publishing posts and pages that get found, recorded so your team can watch it again." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
       { id: "migration",  group: "search", label: "Content migration",                         hourly: 97, hours: { min: 1, max: 40, start: 10 },
         info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Paid by the hour: set what you expect, the proposal confirms it." },
@@ -97,6 +103,7 @@
       { id: "transition", group: "motion", label: "Custom page transitions",                   price: 1500, info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
       { id: "theme",      group: "motion", label: "Light and dark mode",                       price: 600,  info: "A light and a dark version of the whole site, with a switch." },
       { id: "legal",      group: "more",   label: "Legal pages, done for you",                 price: 500,  info: "Privacy, cookie and terms pages written for your business and checked against GDPR. You don't write a word." },
+      { id: "a11y",       group: "more",   label: "Accessibility check",                       price: 800,  info: "The site tested for keyboard use, screen readers, contrast and text size against WCAG 2.2 AA, with the fixes made. More and more businesses need this under the European Accessibility Act." },
       { id: "leads",      group: "more",   label: "Lead automation",                           price: 1500, info: "Form leads go straight into your CRM or mailing list, with automatic follow-up." },
       { id: "chatbot",    group: "more",   label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
       { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system. This adds written documentation and a training session, so your team can build new pages with it." },
@@ -106,7 +113,7 @@
     ]
   };
 
-  var state = { pages: { simple: 2, medium: 4, complex: 2 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
+  var state = { pages: { simple: 2, medium: 4, complex: 2, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
   CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.hours.start; });
   // An item's price: fixed, or hours × rate
   function priceOf(t) { return t.hourly ? t.hourly * state.hours[t.id] : t.price; }
@@ -165,7 +172,8 @@
   }
   // A link's pick in the same shape as snap(), so the two compare
   function normSnap(b) {
-    var s = { p: b.p, b: b.b ? 1 : 0, t: (b.t || []).slice().sort() };
+    var s = { p: CONFIG.pages.map(function (p, i) { return Math.max(0, Math.min(p.max, Math.round(+b.p[i]) || 0)); }), b: b.b ? 1 : 0,
+      t: (b.t || []).filter(function (id) { return byId[id]; }).sort() }; // older links: fewer page types, retired items
     s.t.forEach(function (id) { var t = byId[id]; if (t && t.hourly) { s.h = s.h || {}; s.h[id] = clampHours(t, b.h && b.h[id]); } });
     return s;
   }
@@ -184,7 +192,7 @@
     var out = [];
     CONFIG.pages.forEach(function (p) {
       var n = state.pages[p.id];
-      if (n) out.push([n + " × " + p.label.toLowerCase(), n * p.price]);
+      if (n) out.push([n + " × " + p.label.replace(/^[A-Z][a-z]/, function (c) { return c.toLowerCase(); }), n * p.price]); // "simple pages", "CMS templates"
     });
     if (state.brandOn) CONFIG.brand.items.forEach(function (t) { if (state.toggles[t.id]) out.push(["Branding: " + t.label.toLowerCase(), t.price]); });
     CONFIG.toggles.forEach(function (t) {
