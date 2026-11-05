@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Drum lab — Rimbo Designs</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://cdn.prod.website-files.com" crossorigin>
+<link rel="stylesheet" href="drum.css">
+</head>
+<body>
+<header class="lab-head">
+  <span>Rimbo Designs <i>·</i> Drum lab <i>·</i> home V4</span>
+  <span>Ten ideas on one drum <i>·</i> scrub the scroll below, click a stage to enlarge it</span>
+</header>
+
+<main class="lab-grid" id="grid"></main>
+
+<footer class="lab-bar">
+  <button class="lab-play" id="play" type="button" aria-label="Play the scroll">Play</button>
+  <label class="lab-scrub"><span class="lab-scrub-t">Scroll away</span><input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="How far the hero has scrolled away"><span class="lab-scrub-v" id="scrubv">0%</span></label>
+</footer>
+
+<script src="https://cdn.prod.website-files.com/gsap/3.15.0/gsap.min.js"></script>
+<script src="drum.js"></script>
+</body>
+</html>
