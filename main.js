@@ -5698,14 +5698,11 @@
       if (el.__h !== h) { el.innerHTML = h; el.__h = h; }
     }
 
-    // ---- the logo, drawn like a drawing: guides, a dimension line, each letter outlined, then filled cream ----
+    // ---- the logo, drawn like a drawing: each letter outlined, then filled cream (the guides and the size label around it are gone: Rimbo, 5 Nov) ----
     var logo = (function () {
       var cv = qs('canvas', logoCell), ctx = cv.getContext('2d');
-      var VB = { w: 72, h: 25.1 }, M = 30, T = { guide: 0.3, outline: 0.44, fill: 0.6 };
-      var letters = [], rows = [], dpr = 1, S = 1, W = 0, H = 0, ready = false, pNow = 0;
-      // the size label (Rimbo, 5 Nov: "it flashes in"): once the dimension line has completed it fades in, stays whatever
-      // the scroll does and fades out again, the guides with it; scrolled back before that, it fades out from where it is
-      var LABEL_IN = 700, LABEL_HOLD = 1500, LABEL_OUT = 1000, labelAt = 0, labelK = 0, labelT = 0, holdRaf = 0;
+      var VB = { w: 72, h: 25.1 }, M = 30, T = { outline: 0.44, fill: 0.6 };
+      var letters = [], dpr = 1, S = 1, W = 0, H = 0, ready = false, pNow = 0;
       fetch(logoSrc).then(function (r) { return r.text(); }).then(function (txt) {
         var doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
         var NS = 'http://www.w3.org/2000/svg';
@@ -5722,11 +5719,6 @@
         });
         probe.remove();
         letters.sort(function (a, b) { return (a.y > 12) - (b.y > 12) || a.x - b.x; }); // RIMBO first, left to right
-        [letters.filter(function (l) { return l.y <= 12; }), letters.filter(function (l) { return l.y > 12; })].forEach(function (row) {
-          if (!row.length) return;
-          rows.push(Math.min.apply(null, row.map(function (l) { return l.y; })));
-          rows.push(Math.max.apply(null, row.map(function (l) { return l.y + l.h; })));
-        });
         ready = true; layout();
       }).catch(function (err) { console.error('[rimbo-designs] footer logo:', err); });
 
@@ -5744,51 +5736,7 @@
         pNow = p;
         if (!ready || !W) return;
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
-        var settle = smooth(0.74, 0.88, p), lw = 72 * S, lh = 25.1 * S;
-        // the dimension line completes at p = .58 (it was .7, which left the label four scroll-percent before the fade)
-        var kdNow = smooth(T.guide + 0.12, T.guide + 0.28, p), now = performance.now();
-        if (kdNow > 0.98) { if (!labelAt) labelAt = now; } else if (kdNow < 0.6) labelAt = 0;
-        var labelOn = !!labelAt && now - labelAt < LABEL_IN + LABEL_HOLD, dt = Math.min(now - labelT, 50);
-        labelT = now;
-        labelK = labelOn ? Math.min(1, labelK + dt / LABEL_IN) : Math.max(0, labelK - dt / LABEL_OUT);
-        var labelA = labelK * labelK * (3 - 2 * labelK);
-        var guideA = Math.max(1 - settle, labelA); // the guide layer settles on scroll, but never before the label has gone
-        cancelAnimationFrame(holdRaf);
-        if (labelOn || labelK > 0) holdRaf = requestAnimationFrame(function () { paint(pNow); });
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.lineWidth = 1;
-        if (guideA > 0) {
-          ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = rgba(ACCENT, 0.9 * guideA);
-          ctx.beginPath();
-          rows.forEach(function (y, i) {
-            var yy = Math.round(M + y * S) + 0.5, k = smooth(T.guide + i * 0.03, T.guide + 0.26 + i * 0.03, p);
-            ctx.moveTo(0, yy); ctx.lineTo(W * k, yy);
-          });
-          [0, lw].forEach(function (x, i) {
-            var xx = Math.round(M + x) + 0.5, k = smooth(T.guide + 0.04 + i * 0.04, T.guide + 0.3 + i * 0.04, p);
-            ctx.moveTo(xx, 0); ctx.lineTo(xx, H * k);
-          });
-          ctx.stroke(); ctx.setLineDash([]);
-          var kd = kdNow;
-          if (kd > 0) {
-            var dy = Math.round(M + lh + M * 0.55) + 0.5, x1 = M + lw * kd;
-            ctx.globalAlpha = guideA;
-            ctx.strokeStyle = rgba(ACCENT, 0.9); ctx.fillStyle = rgba(ACCENT, 1);
-            ctx.beginPath(); ctx.moveTo(M, dy); ctx.lineTo(x1, dy); ctx.moveTo(M, dy - 4); ctx.lineTo(M, dy + 4);
-            ctx.moveTo(x1, dy - 4); ctx.lineTo(x1, dy + 4);
-            ctx.stroke();
-            if (labelA > 0) {
-              ctx.globalAlpha = labelA;
-              var label = Math.round(lw) + ' × ' + Math.round(lh);
-              ctx.font = '9px "Rm Mono", "RM MONO", monospace'; ctx.textBaseline = 'middle';
-              var tw = ctx.measureText(label).width, lx = M + lw / 2 - tw / 2 - 6;
-              ctx.fillRect(lx, dy - 7, tw + 12, 14);
-              ctx.fillStyle = '#0c0c0c'; ctx.fillText(label, lx + 6, dy + 0.5);
-            }
-            ctx.globalAlpha = 1;
-          }
-        }
+        var settle = smooth(0.74, 0.88, p);
         letters.forEach(function (L, i) {
           var ko = smooth(T.outline + i * 0.022, T.outline + 0.26 + i * 0.022, p);
           var kf = smooth(T.fill + i * 0.016, T.fill + 0.16 + i * 0.016, p);
