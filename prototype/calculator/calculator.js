@@ -6,6 +6,7 @@
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
     submitUrl: "",                 // PLACEHOLDER: MailerLite / email endpoint. Empty = log to the console only.
+    replyTo: "hello@rimbodesigns.com", // where a lead's version goes (the address in the site footer)
     underBudgetAutoMessage: true,  // true: "under €3k" sees the kind message instead of a reply promise. false: always the normal confirmation (reply by hand).
     showNewsletterOptIn: false,    // OPEN DECISION: rare-update checkbox, unticked by default. See apply-flow.md §5.3.
     dfsUrl: "https://digitalfengshui.com", // PLACEHOLDER: Digital Feng Shui link
@@ -37,8 +38,11 @@
       clientLede: "This is what I'd build for you. Switch things on or off and the price follows.",
       recommended: "Recommended",
       reset: "Back to my recommendation",
-      clientCta: "Copy my version",
+      clientCta: "Email me your version",
+      clientCopy: "Or copy the link",
       clientDone: "Link copied. Paste it in your reply to me.",
+      emailSubject: "{name}: my version",
+      emailBody: "Hi Rimbo,\n\nHere's my version of the scope:\n{link}\n",
       copyFailed: "Couldn't copy. Copy the link under the button."
     },
 
@@ -486,6 +490,7 @@
       cta.textContent = C.clientCta;
       markRecommended(share.r);
       $("reset").textContent = C.reset;
+      $("copy-link").textContent = C.clientCopy; $("copy-link").hidden = false;
       $("reset").addEventListener("click", function () { applySnap(share.r); render(); });
     }
 
@@ -494,6 +499,15 @@
 
     // Copy a link; the pop-up says whether it worked. Maker: the link stays under the button with Copy
     // and Open it. Lead: the link only shows when copying failed, so they can copy it by hand.
+    // The lead's button: their email app opens with the link in the message. Webmail without a mail
+    // app set up can do nothing here, which is why "Or copy the link" stays right under it.
+    function openMail(link) {
+      var name = share.n || "My project", enc = function (t) { return encodeURIComponent(t.replace(/\n/g, "\r\n")); };
+      var a = el("a");
+      a.href = "mailto:" + CONFIG.replyTo + "?subject=" + enc(C.emailSubject.replace("{name}", name)) + "&body=" + enc(C.emailBody.replace("{link}", link));
+      a.click();
+    }
+
     function copyLink(link) {
       $("made-link").value = link; $("made-open").href = link; $("made-open").hidden = mode !== "make";
       function done(ok) { toast(ok ? (mode === "make" ? C.makeDone : C.clientDone) : C.copyFailed, !ok); $("made").hidden = mode !== "make" && ok; }
@@ -513,7 +527,12 @@
         toast(C.makeNeedName, true);
         return;
       }
-      copyLink(mode === "make" ? clientLink(shareData()) : location.href);
+      if (mode === "make") copyLink(clientLink(shareData()));
+      else openMail(location.href);
+    });
+    $("copy-link").addEventListener("click", function () {
+      if (!picked()) { toast(C.needScope, true); return; }
+      copyLink(location.href);
     });
     $("made-copy").addEventListener("click", function () { copyLink($("made-link").value); });
     $("made-link").addEventListener("focus", function () { this.select(); });
