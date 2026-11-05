@@ -17,10 +17,10 @@ Deep Orange is the brand. Dark and beige carry the pages, and the orange marks w
 | Deep Orange | `#E4441C` | `Color/Brand` | The primary. Dots, bullets, underlines, numbers, accents |
 | Orange Text | `#CC3C18` | `Color/Brand_hover` | Hover states, small orange text on beige |
 | Orange Dark | `#B43414` | `Color/darker_red` | Link hover inside articles |
-| Ink | `#131313` | `Color/Black` | Text on beige, dark sections |
-| Night | `#0C0C0C` | none | Darkest ground: footer and menu |
+| Ink | `#131313` | `Color/Black` | Text on beige, dark sections, the dark footer |
+| Night | `#0C0C0C` | none | Darkest ground: the menu |
 | Beige | `#F8F5EE` | `Color/Rimbobage` | Page background, text on dark |
-| Deep Beige | `#ECE5D6` | none | The balls and beige blocks only. The page background stays Beige |
+| Deep Beige | `#ECE5D6` | none | The balls, beige blocks and the light footer. The page background stays Beige |
 | Steel | `#5B8D9F` | none | Counter colour. Balls and blocks only, never text or buttons |
 | Hot Edge | `#E4566A` | none | Only where orange meets steel inside a ball |
 
@@ -41,6 +41,10 @@ Contrast ratio, 4.5 or more is fine for all text.
 | Ink on Steel | 5.1 | All text |
 | Deep Orange on Beige | 3.8 | Big text and shapes only |
 | Beige on Deep Orange | 3.8 | Big text only |
+
+## Footer
+
+Two grounds: Ink, or Deep Beige for pages that come from a light section. `data-footer="light"` or `"dark"` as a custom attribute on any element of the page picks one (the body is the simplest). Without it, blog posts are beige and everything else is dark. `?ftheme=light` or `?ftheme=dark` tries one out on any page.
 
 ## The balls
 

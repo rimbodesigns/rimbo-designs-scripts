@@ -5322,7 +5322,13 @@
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var logoSrc = brushLogoSrc();
-    var ACCENT = [228, 68, 28], CREAM = [248, 245, 238];
+    // two grounds. Dark is the site's own Ink. Beige is for pages that come from a light section (Rimbo, 5 Nov: black under a
+    // light page is too hard a jump). data-footer="light" or "dark" on any element of the page picks one, ?ftheme= tries it out;
+    // without the attribute posts are beige (their page is light, and they are one template) and the rest dark
+    var themeEl = qs('[data-footer]');
+    var theme = (/[?&]ftheme=(light|dark)/.exec(location.search) || [])[1] || (themeEl && themeEl.getAttribute('data-footer')) || (document.documentElement.classList.contains('rf') ? 'light' : 'dark');
+    var light = theme === 'light';
+    var ACCENT = [228, 68, 28], LOGO_FILL = light ? [19, 19, 19] : [248, 245, 238];
     var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
     var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
     var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
@@ -5330,15 +5336,17 @@
 
     var ease = 'cubic-bezier(.625, .05, 0, 1)';
     var css = [
-      '.rdf { --rdf-black: #0c0c0c; --rdf-cream: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
-      '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; margin-top: -2rem; overflow: hidden; background: var(--rdf-black); color: var(--rdf-cream); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
+      '.rdf { --rdf-bg: #131313; --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
+      '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; margin-top: -2rem; overflow: hidden; background: var(--rdf-bg); color: var(--rdf-fg); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
+      '.rdf.is-light { --rdf-bg: #ece5d6; --rdf-fg: #131313; --rdf-grey: #5e574b; --rdf-hair: rgba(19, 19, 19, .14); --rdf-dash: rgba(19, 19, 19, .26); --rdf-lift: rgba(248, 245, 238, .55); --rdf-key: #3c6473; --rdf-str: #b43414; }',
       '.rdf *, .rdf *::before, .rdf *::after { box-sizing: border-box; }',
       '.rdf a, .rdf a:hover, .rdf a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles (size, coral hover) stay out
       '.rdf i { font-style: normal; }',
       // the section above lifts away from the footer along one straight line (Rimbo: no rounded corners)
       '.rdf-prev { position: relative; z-index: 2 !important; box-shadow: 0 2rem 4rem rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(248, 245, 238, .08); }',
+      '.rdf-prev.rdf-prev-soft { box-shadow: 0 .75rem 2rem rgba(94, 74, 40, .1), inset 0 -1px 0 rgba(94, 74, 40, .1); }',
       '.rdf-in { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 5.5rem var(--rdf-pad) 1.6rem; will-change: transform; }',
-      '.rdf-in::after { content: ""; position: absolute; inset: 0; background: var(--rdf-black); opacity: var(--rdf-shade, 0); pointer-events: none; z-index: 5; }',
+      '.rdf-in::after { content: ""; position: absolute; inset: 0; background: var(--rdf-bg); opacity: var(--rdf-shade, 0); pointer-events: none; z-index: 5; }',
       '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
       '.rdf-v { position: absolute; border-left: 1px dashed var(--rdf-dash); }',
       '.rdf-h { position: absolute; border-top: 1px dashed var(--rdf-dash); }',
@@ -5346,7 +5354,7 @@
       '.rdf-ruler span { position: absolute; left: 50%; top: -.6rem; transform: translateX(-50%); padding: 0 .6rem; font-size: .58rem; letter-spacing: .18em; color: var(--rdf-grey); white-space: nowrap; }',
       '.rdf-grid { flex: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)) auto; }',
       '.rdf-cell { position: relative; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 1.4rem 1.6rem; transition: background-color .4s ' + ease + '; }',
-      '.rdf-cell:hover { background-color: rgba(248, 245, 238, .025); }',
+      '.rdf-cell:hover { background-color: var(--rdf-lift); }',
       '.rdf-logo { grid-column: 1 / 9; grid-row: 1 / 5; justify-content: flex-end; align-items: flex-start; padding: 2.4rem 1.6rem 2.6rem; }',
       '.rdf-logo-art { position: relative; display: block; margin: -30px; }',
       '.rdf-logo-art canvas { display: block; }',
@@ -5355,22 +5363,22 @@
       '.rdf-pt > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
       '.rdf-pt > span + span { transform: translateY(110%); }',
       '.rdf-page > i { font-family: var(--rdf-mono); color: var(--rdf-grey); transform: translateX(-.4em); opacity: 0; transition: transform .45s ' + ease + ', opacity .3s, color .3s; }',
-      '.rdf-page:hover > i { transform: none; opacity: 1; color: var(--rdf-cream); }',
+      '.rdf-page:hover > i { transform: none; opacity: 1; color: var(--rdf-fg); }',
       '.rdf-mail { grid-column: 1 / 9; grid-row: 5; } .rdf-where { grid-column: 9 / 13; grid-row: 5; }',
       '.rdf-label { margin: 0; font-size: .64rem; letter-spacing: .2em; text-transform: uppercase; color: var(--rdf-grey); }',
       '.rdf-swap { position: relative; display: grid; overflow: hidden; font-size: clamp(.78rem, 1.05vw, .95rem); letter-spacing: .16em; text-transform: uppercase; line-height: 1.5; }',
       '.rdf-swap b { font-weight: 400; }',
       '.rdf-swap > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
-      '.rdf-swap > span + span { transform: translateY(110%); color: var(--rdf-cream); }',
+      '.rdf-swap > span + span { transform: translateY(110%); color: var(--rdf-fg); }',
       '@media (hover: hover) { .rdf-cell:hover .rdf-swap > span:first-child, .rdf-page:hover .rdf-pt > span:first-child { transform: translateY(-110%); } .rdf-cell:hover .rdf-swap > span + span, .rdf-page:hover .rdf-pt > span + span { transform: none; } }',
       '.rdf-base { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--rdf-grey); }',
       '.rdf-base-l { grid-column: 1 / 9; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 2rem; padding: 1rem 1.6rem; }',
       '.rdf-socials { grid-column: 9 / 13; display: grid; grid-template-columns: 1fr 1fr; }',
       '.rdf-soc { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.6rem; color: var(--rdf-grey) !important; transition: color .3s, background-color .4s ' + ease + '; }',
       '.rdf-soc i { opacity: 0; transform: translate(-.3em, .3em); transition: opacity .3s, transform .45s ' + ease + '; }',
-      '@media (hover: hover) { .rdf-soc:hover { color: var(--rdf-cream) !important; background-color: rgba(248, 245, 238, .025); } .rdf-soc:hover i { opacity: 1; transform: none; } }',
+      '@media (hover: hover) { .rdf-soc:hover { color: var(--rdf-fg) !important; background-color: var(--rdf-lift); } .rdf-soc:hover i { opacity: 1; transform: none; } }',
       '.rdf-lang { display: inline-flex; gap: .7em; }',
-      '.rdf-lang a { opacity: .6; transition: opacity .3s; } .rdf-lang a.is-on { color: var(--rdf-cream) !important; opacity: 1; } .rdf-lang a:hover { opacity: 1; }',
+      '.rdf-lang a { opacity: .6; transition: opacity .3s; } .rdf-lang a.is-on { color: var(--rdf-fg) !important; opacity: 1; } .rdf-lang a:hover { opacity: 1; }',
       '.rdf-lang a + a::before { content: "/"; margin-right: .7em; color: var(--rdf-grey); opacity: .5; }',
       // the build: an outline per box, the HTML it types, the caret
       '.rdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
@@ -5379,7 +5387,7 @@
       '.rdf-ch { transition: opacity .7s; }',
       '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 3; }',
       '.rdf-code { position: absolute; left: 1.6rem; top: 1.3rem; right: 1rem; z-index: 2; pointer-events: none; font-size: .64rem; line-height: 1.6; letter-spacing: .04em; white-space: pre-wrap; word-break: break-all; text-transform: none; color: var(--rdf-grey); transition: opacity .25s; }',
-      '.rdf-code .t { color: var(--rdf-cream); } .rdf-code .k { color: #8fb3ff; } .rdf-code .s { color: var(--rdf-brand); }',
+      '.rdf-code .t { color: var(--rdf-fg); } .rdf-code .k { color: var(--rdf-key); } .rdf-code .s { color: var(--rdf-str); }',
       '.rdf-code .cur { display: inline-block; width: .55em; height: 1.05em; margin-left: .1em; vertical-align: -.15em; background: var(--rdf-brand); animation: rdf-blink 1s steps(1) infinite; }',
       '@keyframes rdf-blink { 50% { opacity: 0; } }',
       '.rdf-code.is-hover { opacity: 1 !important; transform: none !important; }',
@@ -5448,7 +5456,7 @@
       '</div>';
 
     var foot = document.createElement('footer');
-    foot.className = 'rdf';
+    foot.className = light ? 'rdf is-light' : 'rdf';
     foot.innerHTML = html;
     var main = byId('MainWrap'), wrap = main ? main.parentNode : document.body;
     if (main) main.insertAdjacentElement('afterend', foot); else document.body.appendChild(foot);
@@ -5459,7 +5467,7 @@
     var prev = top;
     while (prev && prev.lastElementChild && getComputedStyle(prev).backgroundColor === 'rgba(0, 0, 0, 0)') prev = prev.lastElementChild;
     if (prev && prev.offsetWidth < foot.offsetWidth * .9) prev = top; // a small element at the end of the page (a language pill) is not a section
-    if (prev) prev.classList.add('rdf-prev');
+    if (prev) { prev.classList.add('rdf-prev'); if (light) prev.classList.add('rdf-prev-soft'); }
     var inner = qs('.rdf-in', foot);
 
     // the clock in Based in
@@ -5581,7 +5589,7 @@
       if (el.__h !== h) { el.innerHTML = h; el.__h = h; }
     }
 
-    // ---- the logo, drawn like a drawing: each letter outlined, then filled cream (the guides and the size label around it are gone: Rimbo, 5 Nov) ----
+    // ---- the logo, drawn like a drawing: each letter outlined, then filled (the guides and the size label around it are gone: Rimbo, 5 Nov) ----
     var logo = (function () {
       var cv = qs('canvas', logoCell), ctx = cv.getContext('2d');
       var VB = { w: 72, h: 25.1 }, M = 30, T = { outline: 0.44, fill: 0.6 };
@@ -5624,7 +5632,7 @@
           var ko = smooth(T.outline + i * 0.022, T.outline + 0.26 + i * 0.022, p);
           var kf = smooth(T.fill + i * 0.016, T.fill + 0.16 + i * 0.016, p);
           ctx.setTransform(dpr * S, 0, 0, dpr * S, dpr * M, dpr * M);
-          if (kf > 0) { ctx.fillStyle = rgba(CREAM, kf); ctx.fill(L.path); }
+          if (kf > 0) { ctx.fillStyle = rgba(LOGO_FILL, kf); ctx.fill(L.path); }
           if (ko > 0 && settle < 1) {
             ctx.lineWidth = 1 / S; ctx.strokeStyle = rgba(ACCENT, 1 - settle);
             ctx.setLineDash([L.len * ko, L.len]); ctx.stroke(L.path); ctx.setLineDash([]);
