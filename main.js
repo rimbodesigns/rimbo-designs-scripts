@@ -5213,7 +5213,7 @@
             if (p && p.catch) p.catch(function () {});
           } else v.pause();
         });
-      }, { threshold: 0.5 }); // the peek in the first screen shows posters only: a clip starts once its card is half on screen
+      }, { rootMargin: '10% 0px' }); // a clip plays as soon as any of its card shows, the peek in the first screen too (Rimbo), and pauses once it's gone
       qsa('video', sec).forEach(function (v) { v.muted = true; v.loop = true; v.setAttribute('playsinline', ''); io.observe(v); });
       return io;
     }
@@ -5238,7 +5238,8 @@
       next.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;overflow:hidden;pointer-events:none';
       slider.appendChild(next);
       initSpatialCardsSlider();
-      clips = watchClips();
+      var watch = function () { clips = watchClips(); }; // after the page has loaded, so the clips don't compete with the hero photo
+      if (document.readyState === 'complete') watch(); else window.addEventListener('load', watch, { once: true });
       var rt = null; // Osmo re-clones the cards after a width change: watch the new clips too
       window.addEventListener('resize', function () {
         clearTimeout(rt);
