@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Colour lab</title>
+<style>
+@font-face { font-family: IntegralNEW; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68b025db738fc57555d5e08f_Integral-Heavy.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: Akkuratllsub; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6603db04efccc89ef43b319b_AkkuratLLSub-Regular.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "RM MONO"; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2) format("woff2"); font-display: swap; }
+
+:root {
+  --o: #e4441c; --o-text: #cd3c18; --b: #5b8d9f; --c: #ece5d6;
+  --ink: #131313; --lab: #0c0c0c; --line: rgba(248,245,238,.14); --dim: rgba(248,245,238,.58);
+  --pad: clamp(1rem, 3vw, 2.5rem);
+  --mono: "RM MONO", ui-monospace, monospace;
+  --display: IntegralNEW, "Arial Black", sans-serif;
+  --body: Akkuratllsub, Arial, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html { background: var(--lab); }
+body { background: var(--lab); color: #f8f5ee; font: 400 1rem/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.mono { font: 400 .72rem/1.35 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+canvas { display: block; }
+
+/* the bar: what's picked, always in view */
+.bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: .75rem 2rem; align-items: center; padding: .7rem var(--pad); background: rgba(12,12,12,.94); border-bottom: 1px solid var(--line); }
+.pick { display: flex; align-items: center; gap: .45rem; }
+.pick > span { color: var(--dim); margin-right: .15rem; }
+.chip { width: 1.6rem; height: 1.6rem; border-radius: 2px; background: var(--s); outline: 1px solid rgba(248,245,238,.16); outline-offset: -1px; }
+.chip[aria-pressed="true"] { outline: 2px solid #f8f5ee; outline-offset: 2px; }
+.hex { width: 5.6em; padding: .42em .5em; font: 400 .72rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #f8f5ee; background: #1b1b1b; border: 1px solid var(--line); border-radius: 2px; }
+.hex:focus { outline: 1px solid #f8f5ee; outline-offset: 0; }
+
+section { padding: clamp(3rem, 7vw, 5.5rem) var(--pad) 0; }
+section:last-of-type { padding-bottom: 6rem; }
+h2 { font: 400 clamp(1.5rem, 3vw, 2.4rem)/1.05 var(--display); text-transform: uppercase; }
+.lead { max-width: 38rem; margin: .7rem 0 1.8rem; color: var(--dim); }
+
+/* orange and blue columns */
+.cols { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+.cols.five { grid-template-columns: repeat(5, 1fr); }
+.col { text-align: left; display: grid; grid-template-rows: 13rem 5.2rem 5.2rem auto; position: relative; }
+.col .fill { background: var(--s); padding: .8rem; display: flex; flex-direction: column; justify-content: space-between; color: var(--t); }
+.col .fill b { font: 400 1.05rem/1 var(--display); }
+.col .on { display: flex; align-items: center; padding: 0 .8rem; font: 400 1.05rem/1 var(--display); color: var(--s); }
+.col .on.light { background: var(--c); }
+.col .on.dark { background: var(--ink); }
+.col .read { padding: .7rem .8rem .8rem; color: var(--dim); background: #161616; min-height: 5.4rem; }
+.col .read i { font-style: normal; color: #f8f5ee; }
+.col[aria-pressed="true"] { outline: 2px solid #f8f5ee; outline-offset: 2px; z-index: 1; }
+
+/* balls */
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.tile { position: relative; overflow: hidden; background: var(--g, var(--ink)); }
+.tile canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tile .tag { position: absolute; left: .8rem; top: .7rem; z-index: 1; padding: .35em .55em; background: rgba(12,12,12,.82); color: #f8f5ee; border-radius: 2px; }
+.pair .tile { aspect-ratio: 3 / 2; }
+.recipes { display: grid; gap: 2px; margin-top: 2rem; }
+.recipe { display: grid; grid-template-columns: 11rem repeat(4, 1fr); gap: 2px; text-align: left; align-items: stretch; }
+.recipe .name { padding: .8rem; background: #161616; color: var(--dim); display: flex; flex-direction: column; gap: .3rem; }
+.recipe .name b { color: #f8f5ee; font-weight: 400; }
+.recipe .tile { aspect-ratio: 4 / 3; }
+.recipe[aria-pressed="true"] .name { background: #f8f5ee; color: rgba(19,19,19,.65); }
+.recipe[aria-pressed="true"] .name b { color: #131313; }
+
+/* blocks */
+.blocks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.block { aspect-ratio: 8 / 5; color: var(--fg); }
+.block p { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); z-index: 1; width: 54%; font: 400 clamp(.9rem, 1.75vw, 1.75rem)/1.08 var(--display); text-transform: uppercase; }
+.block .labels { position: absolute; left: 0; right: 0; bottom: 14%; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; color: var(--ink); }
+
+/* small things */
+.small { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.ground { padding: clamp(1.5rem, 3vw, 2.5rem); display: flex; flex-direction: column; gap: 1.3rem; align-items: flex-start; }
+.ground.light { background: var(--c); color: var(--ink); --link: var(--o-text); }
+.ground.dark { background: var(--ink); color: #f8f5ee; --link: var(--o); }
+.ground h3 { font: 400 clamp(1.3rem, 2.4vw, 2rem)/1.05 var(--display); text-transform: uppercase; }
+.ground a { color: var(--link); text-decoration: underline; text-underline-offset: .18em; transition: color .2s; }
+.ground a:hover { color: var(--o-text); }
+.ground.dark a:hover { color: #f8f5ee; }
+.row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.btn { display: inline-block; padding: 1em 1.4em; border-radius: 2px; background: var(--o); color: var(--ink); font: 400 .78rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; transition: background .2s, color .2s; }
+.btn:hover { background: var(--o-text); }
+.pill { padding: .45em .7em; border-radius: 2px; border: 1px solid currentColor; font: 400 .7rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; transition: background .2s, color .2s, border-color .2s; }
+.pill:hover { background: var(--o); border-color: var(--o); color: var(--ink); }
+
+/* real pages */
+.tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+.tabs button { padding: .6em .85em; border: 1px solid var(--line); border-radius: 2px; color: var(--dim); }
+.tabs button[aria-pressed="true"] { background: #f8f5ee; border-color: #f8f5ee; color: #131313; }
+.frame { position: relative; overflow: hidden; height: min(80vh, 54rem); background: var(--ink); border: 1px solid var(--line); }
+.frame iframe { position: absolute; left: 0; top: 0; width: 1440px; border: 0; transform-origin: 0 0; background: #fff; }
+
+/* tokens */
+.tokens { display: grid; grid-template-columns: 2.6rem minmax(10rem, 16rem) 7rem 7rem 1fr; align-items: stretch; }
+.tokens > * { padding: .65rem 1rem .65rem 0; border-top: 1px solid var(--line); display: flex; align-items: center; }
+.tokens .sw { width: 100%; }
+.tokens .sw i { width: 1.4rem; height: 1.4rem; border-radius: 2px; background: var(--s); outline: 1px solid var(--line); outline-offset: -1px; }
+.tokens .note { color: var(--dim); }
+
+@media (max-width: 900px) {
+  .cols, .cols.five { grid-template-columns: repeat(2, 1fr); }
+  .blocks, .small, .pair { grid-template-columns: 1fr; }
+  .recipe { grid-template-columns: repeat(2, 1fr); }
+  .recipe .name { grid-column: 1 / -1; }
+  .block p { font-size: 1.25rem; }
+  .tokens { grid-template-columns: 2.6rem 1fr 6rem; }
+  .tokens .was, .tokens .note { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="bar mono" id="bar">
+  <div class="pick" id="pickO"><span>Orange</span></div>
+  <div class="pick" id="pickB"><span>Blue</span></div>
+  <div class="pick" id="pickC"><span>Beige</span></div>
+</div>
+
+<section>
+  <h2>The orange</h2>
+  <p class="lead">Today's lobster on the left, the darkest orange from the Webflow cover on the right. Click one and the whole page follows, or type a hex in the bar.</p>
+  <div class="cols" id="oranges"></div>
+</section>
+
+<section>
+  <h2>The counter blue</h2>
+  <p class="lead">Orange and this blue sit at almost the same brightness, which is why they buzz. Great for shapes, never for orange text on blue.</p>
+  <div class="cols five" id="blues"></div>
+</section>
+
+<section>
+  <h2>The balls, without the grey</h2>
+  <p class="lead">Left is the cover as it is. Right has the grey and sage taken out and the page beige put in. Click a row below to use it in the blocks.</p>
+  <div class="pair">
+    <div class="tile"><span class="tag mono">Now</span><canvas data-ball data-recipe="now" data-ground="ink" data-layout="grid" data-n="4" data-seed="3"></canvas></div>
+    <div class="tile"><span class="tag mono">No grey</span><canvas data-ball data-ground="ink" data-layout="grid" data-n="4" data-seed="3"></canvas></div>
+  </div>
+  <div class="recipes" id="recipes"></div>
+</section>
+
+<section>
+  <h2>Blocks</h2>
+  <p class="lead">Your article blocks in the new colours. Hover one: the orange floods the ball.</p>
+  <div class="blocks">
+    <div class="tile block" style="--g:var(--c);--fg:var(--ink)" data-hover><canvas data-ball data-ground="beige" data-layout="row" data-n="4" data-seed="7"></canvas><div class="labels mono"><span>Designer</span><span>CMS</span><span>Hosting</span><span>Editing</span></div></div>
+    <div class="tile block" style="--g:var(--b);--fg:var(--c)" data-hover><canvas data-ball data-ground="blue" data-layout="big" data-cx=".86" data-cy=".52" data-r=".66" data-seed="11" data-dir="-1"></canvas><p>It looks like a design tool. Every box is real code.</p></div>
+    <div class="tile block" style="--g:var(--ink);--fg:var(--c)" data-hover><canvas data-ball data-ground="ink" data-layout="big" data-cx=".9" data-cy=".3" data-r=".62" data-seed="5"></canvas><p>No plugins.<br>No updates.<br>No patches.</p></div>
+    <div class="tile block" style="--g:var(--c);--fg:var(--ink)" data-hover><canvas data-ball data-ground="beige" data-layout="big" data-cx=".99" data-cy=".5" data-r=".68" data-seed="9" data-dir="-1"></canvas><p>You don't need me for that, and you shouldn't.</p></div>
+    <div class="tile block" style="--g:var(--o);--fg:var(--ink)" data-hover><canvas data-ball data-ground="orange" data-layout="big" data-cx=".88" data-cy=".52" data-r=".68" data-seed="14" data-bias=".3"></canvas><p>I'd rather tell you now than after the build.</p></div>
+    <div class="tile block" style="--g:var(--ink)" data-hover><canvas data-ball data-ground="ink" data-layout="grid" data-n="5" data-seed="21" data-bias=".12"></canvas></div>
+  </div>
+</section>
+
+<section>
+  <h2>Small things</h2>
+  <p class="lead">Buttons, links and tags stay plain: the deep orange where the lobster was, a step darker on hover.</p>
+  <div class="small">
+    <div class="ground light">
+      <h3>On the beige</h3>
+      <p>Webflow gives you the hosting, the CMS and <a href="#" onclick="return false">clean code in one place</a>, so there is less to patch later.</p>
+      <div class="row"><span class="btn">Start a project</span><span class="pill">Webflow</span><span class="pill">SEO</span></div>
+    </div>
+    <div class="ground dark">
+      <h3>On the dark</h3>
+      <p>Webflow gives you the hosting, the CMS and <a href="#" onclick="return false">clean code in one place</a>, so there is less to patch later.</p>
+      <div class="row"><span class="btn">Start a project</span><span class="pill">Webflow</span><span class="pill">SEO</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>On the real pages</h2>
+  <p class="lead">The local copies of your pages with the orange and beige swapped in the browser. Scroll inside. Blue isn't on them yet, nothing there uses it.</p>
+  <div class="tabs mono" id="tabs"></div>
+  <div class="frame" id="frame"><iframe id="page" title="Real page in the picked colours"></iframe></div>
+</section>
+
+<section>
+  <h2>What changes in Webflow</h2>
+  <p class="lead">Brand, hover and darker are set in the Designer. The rest of this lab is still exploration: steel stays inside the balls, the page beige is unchanged.</p>
+  <div class="tokens mono" id="tokens"></div>
+</section>
+
+<script>
+/* ---------- colour maths ---------- */
+const toRgb = h => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+const toHex = c => c.map(v => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+const s2l = v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+const l2s = v => 255 * (v <= .0031308 ? v * 12.92 : 1.055 * Math.max(v, 0) ** (1 / 2.4) - .055);
+const lum = h => { const [r, g, b] = toRgb(h).map(s2l); return .2126 * r + .7152 * g + .0722 * b; };
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + .05) / (y + .05); };
+function oklab(h) {
+  const [r, g, b] = toRgb(h).map(s2l);
+  const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b);
+  const m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b);
+  const s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
+  return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
+}
+function unlab([L, a, b]) {
+  const l = (L + .3963377774 * a + .2158037573 * b) ** 3, m = (L - .1055613458 * a - .0638541728 * b) ** 3, s = (L - .0894841775 * a - 1.291485548 * b) ** 3;
+  return toHex([4.0767416621 * l - 3.3077115913 * m + .2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - .3413193965 * s, -.0041960863 * l - .7034186147 * m + 1.707614701 * s].map(l2s));
+}
+// The same orange, darker, until small text reads on the beige.
+function textOrange(o, c) {
+  const [L0, a, b] = oklab(o); let L = L0, h = o;
+  while (contrast(h, c) < 4.5 && L > .2) { L -= .004; h = unlab([L, a * L / L0, b * L / L0]); } // chroma follows, or the blue channel clips and the hue drifts
+  return h;
+}
+const hotOf = o => { const [L, a, b] = oklab(o); return unlab([L + .03, a * 1.02, b * .4]); };
+// Inside a ball the beige sits a step below the page, so the circle keeps its edge on a beige ground;
+// the blue a step below the ground, so a ball doesn't vanish on a blue block.
+const ballLight = c => { const [L, a, b] = oklab(c); return [L - .075, a + .002, b + .022]; };
+const ballBlue = h => { const [L, a, b] = oklab(h); return [L - .07, a * .92, b * .92]; };
+
+/* ---------- choices ---------- */
+const ORANGES = [
+  { h: 'FF7373', n: 'Today', s: 'Lobster' },
+  { h: 'F3562E', n: 'Poster', s: 'Centre ball' },
+  { h: 'E4441C', n: 'Deep', s: 'Reads on dark' },
+  { h: 'DC4424', n: 'Article', s: 'Measured in your blocks' },
+  { h: 'CC3A16', n: 'Brick', s: 'Reads on beige' },
+  { h: 'BC391A', n: 'Cover', s: 'Sampled on the blue' },
+];
+const BLUES = [
+  { h: '146EF5', n: 'Webflow', s: "Webflow's own" },
+  { h: '1B5AEA', n: 'Royal', s: 'A step off Webflow' },
+  { h: '1B4FE0', n: 'Cobalt', s: 'Yours, not theirs' },
+  { h: '2141D9', n: 'Ultra', s: 'Towards violet' },
+  { h: '5B8D9F', n: 'Steel', s: 'Balls only' },
+];
+const BEIGES = [{ h: 'F8F5EE', n: 'Today' }, { h: 'F1EBDF', n: 'Warmer' }, { h: 'ECE5D6', n: 'Cover cream' }];
+const RECIPES = [
+  { id: 'end', n: 'Beige at the end', d: 'Orange, hot edge, blue, beige' },
+  { id: 'mid', n: 'Beige in the middle', d: 'Orange, beige, blue' },
+  { id: 'none', n: 'No beige', d: 'Orange, hot edge, blue, deep blue' },
+];
+
+const q = new URLSearchParams(location.search);
+const clean = (v, d) => /^[0-9a-f]{6}$/i.test(v || '') ? v.toUpperCase() : d;
+const state = { o: clean(q.get('o'), 'E4441C'), b: clean(q.get('b'), '5B8D9F'), c: clean(q.get('c'), 'ECE5D6'), r: RECIPES.some(r => r.id === q.get('r')) ? q.get('r') : 'end' };
+const INK = '131313';
+
+/* ---------- the ball shader (from docs/drafts/covers/webflow-cluster.html) ---------- */
+const FRAG = `#version 300 es
+precision highp float;
+uniform vec2 res; uniform vec2 cell; uniform vec2 origin; uniform float R; uniform float seed; uniform float dir; uniform float bias; uniform float heat; uniform float grainScale;
+uniform vec3 ground; uniform vec3 rimc; uniform float rimAmt; uniform int lab; uniform int n; uniform vec3 stops[6]; uniform vec2 edges[5];
+out vec4 outColor;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }
+float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }
+vec3 fromLab(vec3 c) {
+  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;
+  l = l * l * l; m = m * m * m; s = s * s * s;
+  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));
+}
+vec3 ramp(float v) {
+  vec3 c = stops[0];
+  for (int i = 0; i < 5; i++) { if (i + 1 >= n) break; c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); }
+  return lab == 1 ? fromLab(c) : c;
+}
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);
+  vec2 id = floor((p - origin) / cell);
+  vec2 center = origin + (id + 0.5) * cell;
+  vec2 l = (p - center) / R;
+  float r = length(l);
+  vec2 uv = p / res;
+  float g = 0.62 * dir * (uv.x - uv.y) + 0.55;
+  float h = hash(id + seed);
+  vec2 w = vec2(fbm(l * 0.55 + h * 40.0), fbm(l * 0.55 + h * 70.0 + 5.2));
+  float f = fbm(l * 0.6 + w * 1.1 + h * 90.0);
+  float v = g + (f - 0.5) * 1.1 + (h - 0.5) * 0.22 + bias - heat * 0.75;
+  float ang = h * 6.2831;
+  v += 0.30 * dot(l, vec2(cos(ang), sin(ang)));
+  vec3 c = ramp(clamp(v, 0.0, 1.0));
+  float rim = smoothstep(0.80, 1.0, r) * smoothstep(0.35, 0.75, v);
+  c = mix(c, rimc, rim * rimAmt);
+  float aa = 1.2 / R;
+  float inside = smoothstep(1.0 + aa, 1.0 - aa, r);
+  vec3 col = mix(ground, c, inside);
+  vec2 gp = floor(p / grainScale);
+  float g1 = hash(gp + seed);
+  float g2 = noise(gp * 0.9 + seed * 3.0);
+  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;
+  col += grain * mix(0.4, 1.0, inside);
+  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, inside * 0.35);
+  outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`;
+
+const gl = document.createElement('canvas').getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, `#version 300 es
+in vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog); gl.useProgram(prog);
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+const U = n => gl.getUniformLocation(prog, n);
+const rgb01 = h => toRgb(h).map(v => v / 255);
+
+function recipe(id) {
+  const O = state.o, B = state.b, C = state.c, H = hotOf(O);
+  if (id === 'now') return { lab: 0, rim: [.76, .8, .75], rimAmt: .55,
+    stops: [[1, .3, .14], [.93, .38, .44], [.25, .47, .64], [.44, .405, .39], [.38, .47, .56], [.72, .76, .71]],
+    edges: [[.12, .26], [.22, .40], [.38, .60], [.58, .76], [.72, .98]] };
+  const Lt = ballLight(C), Bd = ballBlue(B);
+  if (id === 'mid') return { lab: 1, rim: [0, 0, 0], rimAmt: 0, stops: [oklab(O), Lt, Bd], edges: [[.2, .5], [.5, .8]] };
+  if (id === 'none') { const [L, a, b] = oklab(B); return { lab: 1, rim: [0, 0, 0], rimAmt: 0, stops: [oklab(O), oklab(H), oklab(B), [L - .14, a * .8, b * .8]], edges: [[.14, .3], [.3, .55], [.6, .95]] }; }
+  return { lab: 1, rim: [0, 0, 0], rimAmt: 0, stops: [oklab(O), oklab(H), Bd, Lt], edges: [[.12, .28], [.26, .46], [.5, .84]] };
+}
+const groundHex = g => ({ beige: state.c, ink: INK, blue: state.b, orange: state.o }[g]);
+
+function draw(cv, heat = 0) {
+  const d = cv.dataset, box = cv.getBoundingClientRect();
+  if (!box.width) return;
+  const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(box.width * dpr), Hh = Math.round(box.height * dpr);
+  if (cv.width !== W || cv.height !== Hh) { cv.width = W; cv.height = Hh; }
+  if (gl.canvas.width !== W || gl.canvas.height !== Hh) { gl.canvas.width = W; gl.canvas.height = Hh; }
+  gl.viewport(0, 0, W, Hh);
+  let cell, origin, R;
+  if (d.layout === 'big') {
+    R = +d.r * Hh; cell = [W * 20, Hh * 20];
+    origin = [+d.cx * W - cell[0] / 2, +d.cy * Hh - cell[1] / 2];
+  } else if (d.layout === 'row') {
+    const s = W / +d.n; R = s * .46; cell = [s, Hh * 2]; origin = [0, Hh * .4 - Hh];
+  } else {
+    const s = W / (+d.n + .3); R = s * .482; cell = [s, s]; origin = [-s * .15, -s * .28];
+  }
+  const rc = recipe(d.recipe || state.r);
+  gl.uniform2f(U('res'), W, Hh); gl.uniform2f(U('cell'), ...cell); gl.uniform2f(U('origin'), ...origin);
+  gl.uniform1f(U('R'), R); gl.uniform1f(U('seed'), +(d.seed || 3)); gl.uniform1f(U('dir'), +(d.dir || 1));
+  gl.uniform1f(U('bias'), +(d.bias || 0)); gl.uniform1f(U('heat'), heat); gl.uniform1f(U('grainScale'), dpr * .75);
+  gl.uniform3f(U('ground'), ...rgb01(groundHex(d.ground))); gl.uniform3f(U('rimc'), ...rc.rim); gl.uniform1f(U('rimAmt'), rc.rimAmt);
+  gl.uniform1i(U('lab'), rc.lab); gl.uniform1i(U('n'), rc.stops.length);
+  const st = new Float32Array(18); rc.stops.forEach((s, i) => st.set(s, i * 3)); gl.uniform3fv(U('stops'), st);
+  const ed = new Float32Array(10); rc.edges.forEach((e, i) => ed.set(e, i * 2)); gl.uniform2fv(U('edges'), ed);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  cv.getContext('2d').drawImage(gl.canvas, 0, 0);
+}
+const drawAll = () => document.querySelectorAll('[data-ball]').forEach(c => draw(c, +(c.dataset.heat || 0)));
+
+/* ---------- build the page ---------- */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+function chips(wrap, list, key) {
+  list.forEach(x => {
+    const b = el('button', 'chip'); b.style.setProperty('--s', '#' + x.h); b.title = x.n + ' #' + x.h; b.setAttribute('aria-label', x.n + ' #' + x.h);
+    b.dataset.key = key; b.dataset.hex = x.h; b.onclick = () => set(key, x.h); wrap.append(b);
+  });
+}
+chips($('#pickO'), ORANGES, 'o'); chips($('#pickB'), BLUES, 'b'); chips($('#pickC'), BEIGES, 'c');
+const hexIn = el('input', 'hex'); hexIn.setAttribute('aria-label', 'Orange hex'); hexIn.spellcheck = false; hexIn.maxLength = 7;
+hexIn.oninput = () => { const v = hexIn.value.replace('#', ''); if (/^[0-9a-f]{6}$/i.test(v)) set('o', v.toUpperCase(), true); };
+$('#pickO').append(hexIn);
+
+function columns(wrap, list, key) {
+  list.forEach(x => {
+    const b = el('button', 'col'); b.style.setProperty('--s', '#' + x.h); b.dataset.key = key; b.dataset.hex = x.h;
+    b.onclick = () => set(key, x.h); wrap.append(b);
+  });
+}
+columns($('#oranges'), ORANGES, 'o'); columns($('#blues'), BLUES, 'b');
+function fillColumns() {
+  document.querySelectorAll('.col').forEach(b => {
+    const h = b.dataset.hex, list = b.dataset.key === 'o' ? ORANGES : BLUES, x = list.find(i => i.h === h);
+    const onC = contrast(h, state.c), onK = contrast(h, INK), ink = onK >= contrast(h, state.c);
+    b.style.setProperty('--t', ink ? '#131313' : '#' + state.c);
+    b.innerHTML = `<span class="fill"><span class="mono">${x.s || '&nbsp;'}</span><b>${x.n}</b></span>
+      <span class="on light">Beige</span><span class="on dark">Dark</span>
+      <span class="read mono"><i>#${h}</i><br>On beige ${onC.toFixed(1)}<br>On dark ${onK.toFixed(1)}</span>`;
+  });
+}
+RECIPES.forEach((r, i) => {
+  const b = el('button', 'recipe'); b.dataset.r = r.id; b.onclick = () => set('r', r.id);
+  b.append(el('span', 'name mono', `<b>${r.n}</b>${r.d}`));
+  ['beige', 'ink', 'blue', 'orange'].forEach((g, j) => {
+    const t = el('span', 'tile'); const c = el('canvas'); Object.assign(c.dataset, { ball: '', recipe: r.id, ground: g, layout: 'grid', n: 3, seed: 3 + j * 4 + i, bias: g === 'orange' ? .22 : 0 });
+    t.append(c); b.append(t);
+  });
+  $('#recipes').append(b);
+});
+
+/* hover: the orange floods the ball */
+document.querySelectorAll('[data-hover]').forEach(t => {
+  const cv = t.querySelector('canvas'); let target = 0, raf = 0;
+  const step = () => {
+    const h = +(cv.dataset.heat || 0), n = h + (target - h) * .09;
+    cv.dataset.heat = Math.abs(target - n) < .004 ? target : n; draw(cv, +cv.dataset.heat);
+    raf = +cv.dataset.heat === target ? 0 : requestAnimationFrame(step);
+  };
+  const go = v => { target = v; if (!raf) raf = requestAnimationFrame(step); };
+  t.onmouseenter = () => go(1); t.onmouseleave = () => go(0);
+});
+
+/* ---------- real pages ---------- */
+const PAGES = [
+  { n: 'Blog post', u: '/post/is-webflow-good-or-bad-for-seo' },
+  { n: 'Blog overview', u: '/resources/' },
+];
+const frame = $('#page'), box = $('#frame');
+let edits = [];
+function fitFrame() { const s = box.clientWidth / 1440; frame.style.transform = `scale(${s})`; frame.style.height = box.clientHeight / s + 'px'; }
+const SWAPS = () => {
+  const O = toRgb(state.o), D = toRgb(textOrange(state.o, state.c)), C = toRgb(state.c);
+  return [
+    [/#ff7373\b/gi, '#' + state.o], [/#f3562e\b/gi, '#' + state.o], [/#ff5454\b/gi, '#' + toHex(D)], [/#ff3b30\b/gi, '#' + toHex(D)], [/#c0362c\b/gi, '#' + toHex(D)], [/#f8f5ee\b/gi, '#' + state.c],
+    [/(rgba?\()255,\s*115,\s*115/gi, `$1${O.join(', ')}`], [/(rgba?\()243,\s*86,\s*46/gi, `$1${O.join(', ')}`], [/(rgba?\()255,\s*84,\s*84/gi, `$1${D.join(', ')}`], [/(rgba?\()255,\s*59,\s*48/gi, `$1${D.join(', ')}`], [/(rgba?\()192,\s*54,\s*44/gi, `$1${D.join(', ')}`], [/(rgba?\()248,\s*245,\s*238/gi, `$1${C.join(', ')}`],
+  ];
+};
+const WATCH = /#ff7373|#f3562e|#ff5454|#ff3b30|#c0362c|#f8f5ee|255,\s*115,\s*115|243,\s*86,\s*46|255,\s*84,\s*84|255,\s*59,\s*48|192,\s*54,\s*44|248,\s*245,\s*238/i;
+function collect(rules) {
+  for (const r of rules) {
+    if (r.style && !r.__seen) {
+      r.__seen = 1;
+      for (const p of r.style) { const v = r.style.getPropertyValue(p); if (WATCH.test(v)) edits.push({ s: r.style, p, v, pr: r.style.getPropertyPriority(p) }); }
+    }
+    if (r.cssRules) collect(r.cssRules);
+  }
+}
+function recolour() {
+  let doc; try { doc = frame.contentDocument; } catch (e) { return; }
+  if (!doc) return;
+  for (const s of doc.styleSheets) { try { collect(s.cssRules); } catch (e) {} }
+  const sw = SWAPS();
+  edits.forEach(e => e.s.setProperty(e.p, sw.reduce((v, [a, b]) => v.replace(a, b), e.v), e.pr));
+}
+function openPage(i) {
+  edits = []; frame.src = PAGES[i].u;
+  document.querySelectorAll('#tabs button').forEach((b, j) => b.setAttribute('aria-pressed', i === j));
+}
+frame.onload = () => { fitFrame(); recolour(); [600, 1500, 3000].forEach(t => setTimeout(recolour, t)); };
+PAGES.forEach((p, i) => { const b = el('button', '', p.n); b.onclick = () => openPage(i); $('#tabs').append(b); });
+new IntersectionObserver((es, ob) => { if (es[0].isIntersecting) { openPage(0); ob.disconnect(); } }, { rootMargin: '600px' }).observe(box);
+
+/* ---------- tokens ---------- */
+function tokens() {
+  const T = textOrange(state.o, state.c);
+  const rows = [
+    ['Color/Brand', 'FF7373', state.o, 'Buttons, fills, accents. 24 uses, plus 8 typed in by hand.'],
+    ['Color/Brand_hover', 'FF5454', 'CC3C18', 'Links and small orange text on beige.'],
+    ['Color/darker_red', 'FF3B30', 'B43414', 'Link hover in articles.'],
+        ['Color/Rimbobage', 'F8F5EE', state.c, state.c === 'F8F5EE' ? 'Stays.' : 'Not changed. 37 uses if it moves.'],
+  ];
+  $('#tokens').innerHTML = rows.map(([n, a, b, t]) => `<span class="sw" style="--s:#${b}"><i></i></span><span>${n}</span><span class="was">${a === 'new' ? 'New' : '#' + a}</span><span>#${b}</span><span class="note">${t}</span>`).join('');
+}
+
+/* ---------- apply ---------- */
+function set(k, v, typed) { state[k] = v; apply(typed); }
+function apply(typed) {
+  const r = document.documentElement.style, T = textOrange(state.o, state.c);
+  r.setProperty('--o', '#' + state.o); r.setProperty('--b', '#' + state.b); r.setProperty('--c', '#' + state.c); r.setProperty('--o-text', '#' + T);
+  document.querySelectorAll('[data-key]').forEach(b => b.setAttribute('aria-pressed', state[b.dataset.key] === b.dataset.hex));
+  document.querySelectorAll('.recipe').forEach(b => b.setAttribute('aria-pressed', b.dataset.r === state.r));
+  if (!typed) hexIn.value = '#' + state.o;
+  fillColumns(); tokens(); drawAll(); recolour();
+  history.replaceState(null, '', `?o=${state.o}&b=${state.b}&c=${state.c}&r=${state.r}`);
+}
+apply();
+if (document.fonts) document.fonts.ready.then(drawAll);
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { drawAll(); fitFrame(); }, 150); });
+</script>
+</body>
+</html>

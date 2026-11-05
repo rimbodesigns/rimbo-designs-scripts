@@ -1,0 +1,505 @@
+<title>Rimbo Designs Brand Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* FONTS */
+
+/* One committed look, the site's own: dark and beige bands, orange only as the accent.
+   Layout: full-bleed colour bands, text on a left-weighted grid, live grain balls as the only ornament. */
+:root {
+  color-scheme: dark;
+  --orange: #e4441c; --orange-text: #cc3c18; --orange-dark: #b43414; --hot: #e4566a;
+  --ink: #131313; --night: #0c0c0c; --beige: #f8f5ee; --deep-beige: #ece5d6; --steel: #5b8d9f;
+  --on-dark-dim: rgba(248, 245, 238, .62); --on-beige-dim: rgba(19, 19, 19, .66);
+  --line-dark: rgba(248, 245, 238, .16); --line-beige: rgba(19, 19, 19, .16);
+  --display: IntegralNEW, "Arial Black", Impact, sans-serif;
+  --body: Akkuratllsub, Arial, Helvetica, sans-serif;
+  --mono: "RM MONO", ui-monospace, Menlo, monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+* { box-sizing: border-box; }
+html { background: var(--night); scroll-behavior: smooth; }
+body { margin: 0; background: var(--night); color: var(--beige); font: 400 1.0625rem/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--night); }
+h1, h2, h3, p, ul, figure { margin: 0; padding: 0; }
+ul { list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+canvas { display: block; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.mono { font: 400 .75rem/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.wrap { padding-left: var(--gutter-l); padding-right: var(--gutter-r); }
+@media (min-width: 700px) { .wrap { padding-left: max(2.5rem, env(safe-area-inset-left, 0px)); padding-right: max(2.5rem, env(safe-area-inset-right, 0px)); } }
+
+/* top bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: .8rem; background: var(--night); border-bottom: 1px solid var(--line-dark); }
+.bar svg { width: 72px; height: 26px; color: var(--beige); display: block; }
+.bar ul { display: flex; gap: 1.4rem; }
+.bar a { text-decoration: none; color: var(--on-dark-dim); transition: color .2s; }
+.bar a:hover { color: var(--beige); }
+@media (max-width: 760px) { .bar ul { display: none; } }
+
+/* hero */
+.hero { background: var(--night); }
+.hero-text { display: grid; gap: 1.2rem; padding-block: clamp(2.5rem, 7vw, 5rem) clamp(1.5rem, 3vw, 2.5rem); }
+.hero h1 { font: 400 clamp(3rem, 12.4vw, 13rem)/.92 var(--display); text-transform: uppercase; letter-spacing: -.01em; }
+.hero-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .6rem 2rem; color: var(--on-dark-dim); }
+.hero-live { position: relative; height: clamp(20rem, 58vh, 40rem); background: var(--ink); touch-action: pan-y; }
+.hero-live canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* bands */
+.band { padding-block: clamp(3.5rem, 8vw, 6.5rem); }
+.band.dark { background: var(--ink); color: var(--beige); --dim: var(--on-dark-dim); --line: var(--line-dark); }
+.band.night { background: var(--night); color: var(--beige); --dim: var(--on-dark-dim); --line: var(--line-dark); }
+.band.light { background: var(--beige); color: var(--ink); --dim: var(--on-beige-dim); --line: var(--line-beige); }
+.band-head { display: grid; gap: .9rem; margin-bottom: clamp(2rem, 4vw, 3.2rem); max-width: 44rem; }
+h2 { font: 400 clamp(2.2rem, 6vw, 5rem)/1 var(--display); text-transform: uppercase; }
+h3 { font: 400 clamp(1.1rem, 1.7vw, 1.4rem)/1.1 var(--display); text-transform: uppercase; }
+.lead { color: var(--dim); max-width: 36rem; font-size: 1.125rem; }
+
+/* colour */
+.hex { font: 400 .8125rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: .45em 0; border-bottom: 1px solid currentColor; }
+.primary { display: grid; align-content: space-between; gap: 3rem; min-height: clamp(18rem, 42vh, 26rem); padding: clamp(1.2rem, 3vw, 2.2rem); background: var(--orange); color: var(--ink); }
+.primary b { display: block; font: 400 clamp(2.4rem, 8.4vw, 8.5rem)/.95 var(--display); text-transform: uppercase; }
+.primary-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: .8rem 2rem; }
+.swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; margin-top: 2px; }
+.sw { display: grid; align-content: space-between; gap: 2.4rem; min-height: 15rem; padding: 1rem; background: var(--s); color: var(--t); }
+.sw h3 { font-size: clamp(1rem, 1.5vw, 1.25rem); }
+.sw p { font-size: .9375rem; line-height: 1.4; margin-top: .5rem; }
+.sw .var { display: block; margin-top: .6rem; opacity: .75; }
+.sw.ring { box-shadow: inset 0 0 0 1px var(--line-dark); }
+.pairs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; margin-top: 2.5rem; }
+.pair { display: grid; align-content: space-between; gap: 1.6rem; min-height: 9.5rem; padding: 1rem; background: var(--bgc); color: var(--fgc); }
+.pair b { font: 400 1.9rem/1 var(--display); }
+.pair small { display: block; color: var(--capc); }
+.pair.ring { box-shadow: inset 0 0 0 1px var(--line-dark); }
+.sub { margin: 3rem 0 .9rem; color: var(--dim); }
+
+/* balls */
+.tile { position: relative; overflow: hidden; background: var(--g, var(--ink)); }
+.tile canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tag { position: absolute; left: .7rem; top: .7rem; z-index: 1; padding: .4em .6em; background: rgba(12, 12, 12, .86); color: var(--beige); }
+.twins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
+.twins .tile { aspect-ratio: 3 / 2; }
+.ramp { position: relative; height: 7rem; margin-top: 2px; background: var(--ink); }
+.ramp canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stops { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.stops li { display: grid; gap: .35rem; justify-items: start; }
+.stops span { color: var(--dim); }
+.grounds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
+.grounds .tile { aspect-ratio: 1; }
+.tools { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 3rem 0 .9rem; color: var(--dim); }
+.ghost { padding: .7em 1em; border: 1px solid var(--line); color: inherit; transition: border-color .2s; }
+.ghost:hover { border-color: currentColor; }
+.rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2rem 1.5rem; margin-top: 2.5rem; }
+.rules li { display: grid; gap: .5rem; align-content: start; padding-top: .9rem; border-top: 1px solid var(--line); }
+.rules p { color: var(--dim); font-size: 1rem; line-height: 1.45; }
+
+/* blocks */
+.blocks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.block { aspect-ratio: 8 / 5; color: var(--fg); }
+.block p { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); z-index: 1; width: 54%; font: 400 clamp(.85rem, 1.7vw, 1.75rem)/1.08 var(--display); text-transform: uppercase; }
+.block .labels { position: absolute; left: 0; right: 0; bottom: 13%; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); text-align: center; color: var(--ink); font-size: .6875rem; }
+
+/* type */
+.specimen { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1rem 2rem; padding-block: 1.8rem; border-top: 1px solid var(--line); align-items: start; }
+.specimen > div:first-child { display: grid; gap: .3rem; color: var(--dim); }
+.specimen > div:first-child b { color: var(--ink); font-weight: 400; }
+.band.dark .specimen > div:first-child b { color: var(--beige); }
+.s-display { font: 400 clamp(2.2rem, 7vw, 6.5rem)/.98 var(--display); text-transform: uppercase; }
+.s-body { max-width: 34rem; font-size: 1.25rem; line-height: 1.5; }
+.s-mono { font: 400 1rem/1.5 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+/* logo */
+.logos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.logo { display: grid; place-items: center; aspect-ratio: 4 / 3; background: var(--s); color: var(--t); }
+.logo svg { width: 46%; height: auto; display: block; }
+.logo.ring { box-shadow: inset 0 0 0 1px var(--line-dark); }
+
+/* interface */
+.ui { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
+.ground { display: grid; gap: 1.5rem; align-content: start; justify-items: start; padding: clamp(1.4rem, 3vw, 2.5rem); background: var(--gb); color: var(--gf); }
+.ground.ring { box-shadow: inset 0 0 0 1px var(--line-dark); }
+.eyebrow { display: flex; align-items: center; gap: .6em; }
+.eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }
+.ground ul.bul { display: grid; gap: .4rem; }
+.ground ul.bul li { display: flex; gap: .7em; }
+.ground ul.bul li::before { content: ""; flex: none; width: 6px; height: 6px; margin-top: .62em; border-radius: 50%; background: var(--orange); }
+.link { text-decoration: underline; text-decoration-color: var(--orange); text-decoration-thickness: 1.5px; text-underline-offset: .2em; }
+.num { color: var(--numc); }
+.row { display: flex; flex-wrap: wrap; gap: .6rem; }
+.btn { display: inline-flex; padding: .95em 1.4em; border-radius: .3em; font: 400 .72rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--gf); background: var(--gf); color: var(--gb); }
+.btn.alt { background: transparent; color: var(--gf); border-color: var(--line-g); }
+
+/* voice */
+.say { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem 1.5rem; }
+.say li { display: grid; gap: .8rem; align-content: start; padding-top: .9rem; border-top: 1px solid var(--line); }
+.say q { quotes: none; font: 400 clamp(1.2rem, 2.1vw, 1.8rem)/1.08 var(--display); text-transform: uppercase; }
+.say p { color: var(--dim); font-size: 1rem; }
+
+.end { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .6rem 2rem; padding-block: 1.6rem; background: var(--night); color: var(--on-dark-dim); border-top: 1px solid var(--line-dark); }
+
+@media (max-width: 900px) {
+  .swatches, .pairs, .rules, .stops, .grounds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .blocks, .ui, .say { grid-template-columns: minmax(0, 1fr); }
+  .block p { font-size: clamp(1rem, 5vw, 1.5rem); }
+  .block .labels { font-size: .625rem; }
+  .specimen { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .logos { grid-template-columns: minmax(0, 1fr); }
+  .twins { grid-template-columns: minmax(0, 1fr); }
+  .sw { min-height: 13rem; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<!-- LOGO -->
+
+<nav class="bar wrap mono" aria-label="Sections">
+  <a href="#top" aria-label="Top"><svg aria-hidden="true"><use href="#logo"></use></svg></a>
+  <ul>
+    <li><a href="#colour">Colour</a></li>
+    <li><a href="#balls">Balls</a></li>
+    <li><a href="#blocks">Blocks</a></li>
+    <li><a href="#type">Type</a></li>
+    <li><a href="#logo-use">Logo</a></li>
+    <li><a href="#interface">Interface</a></li>
+    <li><a href="#voice">Voice</a></li>
+  </ul>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-text wrap">
+    <h1>Brand guide</h1>
+    <div class="hero-meta mono"><span>Rimbo Designs</span><span>Version 1, November 2026</span><span>Move over the balls</span></div>
+  </div>
+  <div class="hero-live" id="heroLive"><canvas id="hero" data-ball data-ground="ink" data-layout="grid" data-n="7" data-seed="3" aria-label="Grain balls in orange, steel and beige that heat up under the pointer" role="img"></canvas></div>
+</header>
+
+<section class="band night wrap" id="colour">
+  <div class="band-head">
+    <h2>Colour</h2>
+    <p class="lead">Deep Orange is the brand. Dark and beige carry the pages, and the orange marks what matters. Keep it subtle.</p>
+  </div>
+  <div class="primary">
+    <div class="mono">Primary. Replaces the lobster, #FF7373</div>
+    <div>
+      <b>Deep Orange</b>
+      <div class="primary-row mono" style="margin-top:1rem">
+        <button class="hex" data-copy="#E4441C">#E4441C</button>
+        <span>Webflow: Color/Brand</span>
+      </div>
+    </div>
+  </div>
+  <div class="swatches">
+    <div class="sw" style="--s:var(--orange-text);--t:var(--beige)"><div><h3>Orange Text</h3><p>Hover states and small orange text on beige.</p><span class="var mono">Color/Brand_hover</span></div><div><button class="hex" data-copy="#CC3C18">#CC3C18</button></div></div>
+    <div class="sw" style="--s:var(--orange-dark);--t:var(--beige)"><div><h3>Orange Dark</h3><p>Link hover inside articles.</p><span class="var mono">Color/darker_red</span></div><div><button class="hex" data-copy="#B43414">#B43414</button></div></div>
+    <div class="sw ring" style="--s:var(--ink);--t:var(--beige)"><div><h3>Ink</h3><p>Text on beige, and dark sections.</p><span class="var mono">Color/Black</span></div><div><button class="hex" data-copy="#131313">#131313</button></div></div>
+    <div class="sw ring" style="--s:var(--night);--t:var(--beige)"><div><h3>Night</h3><p>The darkest ground: footer and menu.</p></div><div><button class="hex" data-copy="#0C0C0C">#0C0C0C</button></div></div>
+    <div class="sw" style="--s:var(--beige);--t:var(--ink)"><div><h3>Beige</h3><p>Page background, and text on dark.</p><span class="var mono">Color/Rimbobage</span></div><div><button class="hex" data-copy="#F8F5EE">#F8F5EE</button></div></div>
+    <div class="sw" style="--s:var(--deep-beige);--t:var(--ink)"><div><h3>Deep Beige</h3><p>The warm light in the balls and on beige blocks.</p></div><div><button class="hex" data-copy="#ECE5D6">#ECE5D6</button></div></div>
+    <div class="sw" style="--s:var(--steel);--t:var(--ink)"><div><h3>Steel</h3><p>The counter colour. Balls and blocks only, not for text or buttons.</p></div><div><button class="hex" data-copy="#5B8D9F">#5B8D9F</button></div></div>
+    <div class="sw" style="--s:var(--hot);--t:var(--ink)"><div><h3>Hot Edge</h3><p>Only where orange meets steel inside a ball.</p></div><div><button class="hex" data-copy="#E4566A">#E4566A</button></div></div>
+  </div>
+
+  <p class="sub mono">What reads on what</p>
+  <div class="pairs">
+    <div class="pair" style="--bgc:var(--beige);--fgc:var(--ink);--capc:var(--ink)"><b>Aa</b><small class="mono">Ink on Beige<br>17.1, all text</small></div>
+    <div class="pair ring" style="--bgc:var(--ink);--fgc:var(--beige);--capc:var(--beige)"><b>Aa</b><small class="mono">Beige on Ink<br>17.1, all text</small></div>
+    <div class="pair ring" style="--bgc:var(--ink);--fgc:var(--orange);--capc:var(--beige)"><b>Aa</b><small class="mono">Deep Orange on Ink<br>4.6, all text</small></div>
+    <div class="pair" style="--bgc:var(--orange);--fgc:var(--ink);--capc:var(--ink)"><b>Aa</b><small class="mono">Ink on Deep Orange<br>4.6, all text</small></div>
+    <div class="pair" style="--bgc:var(--beige);--fgc:var(--orange-text);--capc:var(--ink)"><b>Aa</b><small class="mono">Orange Text on Beige<br>4.6, all text</small></div>
+    <div class="pair" style="--bgc:var(--beige);--fgc:var(--orange);--capc:var(--ink)"><b>Aa</b><small class="mono">Deep Orange on Beige<br>3.8, big text and shapes</small></div>
+    <div class="pair" style="--bgc:var(--orange);--fgc:var(--beige);--capc:var(--ink)"><b>Aa</b><small class="mono">Beige on Deep Orange<br>3.8, big text only</small></div>
+    <div class="pair" style="--bgc:var(--steel);--fgc:var(--ink);--capc:var(--ink)"><b>Aa</b><small class="mono">Ink on Steel<br>5.1, all text</small></div>
+  </div>
+</section>
+
+<section class="band dark wrap" id="balls">
+  <div class="band-head">
+    <h2>The balls</h2>
+    <p class="lead">Our pattern. Grainy circles where the orange fades through steel into beige. They used to go grey in the middle. Now they don't.</p>
+  </div>
+  <div class="twins">
+    <div class="tile"><span class="tag mono">Before</span><canvas data-ball data-recipe="old" data-ground="ink" data-layout="grid" data-n="4" data-seed="3"></canvas></div>
+    <div class="tile"><span class="tag mono">Now</span><canvas data-ball data-ground="ink" data-layout="grid" data-n="4" data-seed="3"></canvas></div>
+  </div>
+
+  <p class="sub mono">The fade, always in this order</p>
+  <div class="ramp"><canvas data-ball data-layout="ramp" data-ground="ink" data-seed="4"></canvas></div>
+  <ol class="stops" style="margin-block:1rem 0;padding:0;list-style:none">
+    <li><h3>Deep Orange</h3><button class="hex" data-copy="#E4441C">#E4441C</button></li>
+    <li><h3>Hot Edge</h3><button class="hex" data-copy="#E4566A">#E4566A</button></li>
+    <li><h3>Steel, in the ball</h3><button class="hex" data-copy="#4B7888">#4B7888</button></li>
+    <li><h3>Beige, in the ball</h3><button class="hex" data-copy="#DACCAE">#DACCAE</button></li>
+  </ol>
+
+  <div class="tools"><span class="mono">On every ground</span><button class="ghost mono" id="shuffle">Shuffle</button></div>
+  <div class="grounds">
+    <div class="tile" style="--g:var(--beige)"><canvas data-ball data-shuffle data-ground="beige" data-layout="grid" data-n="3" data-seed="3"></canvas></div>
+    <div class="tile" style="--g:var(--ink)"><canvas data-ball data-shuffle data-ground="ink" data-layout="grid" data-n="3" data-seed="8"></canvas></div>
+    <div class="tile" style="--g:var(--steel)"><canvas data-ball data-shuffle data-ground="steel" data-layout="grid" data-n="3" data-seed="13"></canvas></div>
+    <div class="tile" style="--g:var(--orange)"><canvas data-ball data-shuffle data-ground="orange" data-layout="grid" data-n="3" data-seed="18" data-bias=".22"></canvas></div>
+  </div>
+
+  <ul class="rules">
+    <li><h3>No grey</h3><p>Nothing grey between the colours. If a fade turns muddy, it's wrong.</p></li>
+    <li><h3>Keep the edge</h3><p>Inside a ball the beige sits a step below the page, so the circle never melts into a beige ground.</p></li>
+    <li><h3>Always grain</h3><p>A fine stipple over everything, like a riso print. Flat balls aren't ours.</p></li>
+    <li><h3>They react</h3><p>On hover the orange floods the ball and fades back. Slow, one ball at a time.</p></li>
+  </ul>
+</section>
+
+<section class="band light wrap" id="blocks">
+  <div class="band-head">
+    <h2>Blocks</h2>
+    <p class="lead">Use them to break up articles: a short line and a ball. Hover one.</p>
+  </div>
+  <div class="blocks">
+    <div class="tile block" style="--g:var(--deep-beige);--fg:var(--ink)" data-hover><canvas data-ball data-ground="deep" data-layout="row" data-n="4" data-seed="7"></canvas><div class="labels mono"><span>Designer</span><span>CMS</span><span>Hosting</span><span>Editing</span></div></div>
+    <div class="tile block" style="--g:var(--steel);--fg:var(--ink)" data-hover><canvas data-ball data-ground="steel" data-layout="big" data-cx=".86" data-cy=".52" data-r=".66" data-seed="11" data-dir="-1"></canvas><p>It looks like a design tool. Every box is real code.</p></div>
+    <div class="tile block" style="--g:var(--ink);--fg:var(--beige)" data-hover><canvas data-ball data-ground="ink" data-layout="big" data-cx=".9" data-cy=".3" data-r=".62" data-seed="5"></canvas><p>No plugins.<br>No updates.<br>No patches.</p></div>
+    <div class="tile block" style="--g:var(--deep-beige);--fg:var(--ink)" data-hover><canvas data-ball data-ground="deep" data-layout="big" data-cx="1.06" data-cy=".5" data-r=".68" data-seed="9" data-dir="-1"></canvas><p>You don't need me for that, and you shouldn't.</p></div>
+    <div class="tile block" style="--g:var(--orange);--fg:var(--ink)" data-hover><canvas data-ball data-ground="orange" data-layout="big" data-cx=".99" data-cy=".52" data-r=".62" data-seed="14" data-bias=".3"></canvas><p>I'd rather tell you now than after the build.</p></div>
+    <div class="tile block" style="--g:var(--ink)" data-hover><canvas data-ball data-ground="ink" data-layout="grid" data-n="5" data-seed="21" data-bias=".12"></canvas></div>
+  </div>
+</section>
+
+<section class="band light wrap" id="type" style="padding-top:0">
+  <div class="band-head">
+    <h2>Type</h2>
+    <p class="lead">Three faces, three jobs. Keep headings short: a long title in Integral wraps badly.</p>
+  </div>
+  <div class="specimen"><div class="mono"><b>Integral</b>Headings, capitals</div><div class="s-display">Unlock your next level</div></div>
+  <div class="specimen"><div class="mono"><b>Akkurat</b>Reading text</div><p class="s-body">Webflow gives you the hosting, the CMS and clean code in one place, so there is less to patch later.</p></div>
+  <div class="specimen" style="border-bottom:1px solid var(--line)"><div class="mono"><b>RM Mono</b>Labels, buttons, numbers</div><div class="s-mono">Article · Online marketing · 11 min</div></div>
+</section>
+
+<section class="band night wrap" id="logo-use">
+  <div class="band-head">
+    <h2>Logo</h2>
+    <p class="lead">F Brush, on every page. Beige on dark, ink on beige and on orange.</p>
+  </div>
+  <div class="logos">
+    <div class="logo ring" style="--s:var(--ink);--t:var(--beige)"><svg viewBox="0 0 72 26" role="img" aria-label="Rimbo Designs logo on ink"><use href="#logo"></use></svg></div>
+    <div class="logo" style="--s:var(--beige);--t:var(--ink)"><svg viewBox="0 0 72 26" role="img" aria-label="Rimbo Designs logo on beige"><use href="#logo"></use></svg></div>
+    <div class="logo" style="--s:var(--orange);--t:var(--ink)"><svg viewBox="0 0 72 26" role="img" aria-label="Rimbo Designs logo on orange"><use href="#logo"></use></svg></div>
+  </div>
+</section>
+
+<section class="band dark wrap" id="interface">
+  <div class="band-head">
+    <h2>Interface</h2>
+    <p class="lead">Orange stays small here: dots, bullets, underlines, numbers. Buttons stay neutral and never go orange.</p>
+  </div>
+  <div class="ui">
+    <div class="ground" style="--gb:var(--beige);--gf:var(--ink);--line-g:var(--line-beige);--numc:var(--orange-text)">
+      <span class="eyebrow mono">Article · Online marketing</span>
+      <p>Webflow gives you the hosting, the CMS and <span class="link">clean code in one place</span>, so there is less to patch later.</p>
+      <ul class="bul"><li>No plugins to keep up to date</li><li>Editing without a developer</li></ul>
+      <span class="mono"><span class="num">01</span>&ensp;The short answer</span>
+      <div class="row"><span class="btn">Start a project</span><span class="btn alt">See the work</span></div>
+    </div>
+    <div class="ground ring" style="--gb:var(--ink);--gf:var(--beige);--line-g:var(--line-dark);--numc:var(--orange)">
+      <span class="eyebrow mono">Article · Online marketing</span>
+      <p>Webflow gives you the hosting, the CMS and <span class="link">clean code in one place</span>, so there is less to patch later.</p>
+      <ul class="bul"><li>No plugins to keep up to date</li><li>Editing without a developer</li></ul>
+      <span class="mono"><span class="num">01</span>&ensp;The short answer</span>
+      <div class="row"><span class="btn">Start a project</span><span class="btn alt">See the work</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band night wrap" id="voice">
+  <div class="band-head">
+    <h2>Voice</h2>
+    <p class="lead">Short, plain, first person. Say it the way you'd say it across a table.</p>
+  </div>
+  <ul class="say">
+    <li><q>I'd rather tell you now than after the build.</q><p>Honest before it gets expensive.</p></li>
+    <li><q>No plugins. No updates. No patches.</q><p>Short lines beat long explanations.</p></li>
+    <li><q>You don't need me for that, and you shouldn't.</q><p>Rimbo in English, Rimbout in Dutch.</p></li>
+  </ul>
+</section>
+
+<footer class="end wrap mono"><span>Rimbo Designs brand guide</span><span>Version 1, November 2026</span></footer>
+
+<script>
+/* ---------- colour maths ---------- */
+const toRgb = h => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+const s2l = v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+function oklab(h) {
+  const [r, g, b] = toRgb(h).map(s2l);
+  const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b);
+  const m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b);
+  const s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
+  return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
+}
+const rgb01 = h => toRgb(h).map(v => v / 255);
+
+/* The brand fade: Deep Orange, Hot Edge, steel and beige a step down, mixed in OKLab so nothing goes grey. */
+const RECIPES = {
+  now: { lab: 1, rimAmt: 0, stops: ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab), edges: [[.12, .28], [.26, .46], [.5, .84]] },
+  old: { lab: 0, rimAmt: .55, stops: [[1, .3, .14], [.93, .38, .44], [.25, .47, .64], [.44, .405, .39], [.38, .47, .56], [.72, .76, .71]], edges: [[.12, .26], [.22, .40], [.38, .60], [.58, .76], [.72, .98]] },
+};
+const GROUND = { beige: 'F8F5EE', deep: 'ECE5D6', ink: '131313', steel: '5B8D9F', orange: 'E4441C' };
+
+/* ---------- the ball shader ---------- */
+const FRAG = `#version 300 es
+precision highp float;
+uniform vec2 res; uniform vec2 cell; uniform vec2 origin; uniform float R; uniform float seed; uniform float dir; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;
+uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform int mode;
+uniform vec3 ground; uniform vec3 rimc; uniform float rimAmt; uniform int lab; uniform int n; uniform vec3 stops[6]; uniform vec2 edges[5];
+out vec4 outColor;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }
+float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }
+vec3 fromLab(vec3 c) {
+  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;
+  l = l * l * l; m = m * m * m; s = s * s * s;
+  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));
+}
+vec3 ramp(float v) {
+  vec3 c = stops[0];
+  for (int i = 0; i < 5; i++) { if (i + 1 >= n) break; c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); }
+  return lab == 1 ? fromLab(c) : c;
+}
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);
+  vec2 gp = floor(p / grainScale);
+  float g1 = hash(gp + seed);
+  float g2 = noise(gp * 0.9 + seed * 3.0);
+  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;
+  if (mode == 1) {
+    float v = p.x / res.x * 0.86 + 0.04;
+    vec3 c = mix(ramp(v), ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)), 0.35) + grain;
+    outColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    return;
+  }
+  vec2 id = floor((p - origin) / cell);
+  vec2 center = origin + (id + 0.5) * cell;
+  vec2 l = (p - center) / R;
+  float r = length(l);
+  vec2 uv = p / res;
+  float g = 0.62 * dir * (uv.x - uv.y) + 0.55;
+  float h = hash(id + seed);
+  vec2 drift = vec2(sin(t * 0.21 + h * 6.2831), cos(t * 0.17 + h * 12.566)) * 0.32;
+  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));
+  float f = fbm(l * 0.6 + w * 1.1 + h * 90.0);
+  float v = g + (f - 0.5) * 1.1 + (h - 0.5) * 0.22 + bias - heat * 0.75;
+  float ang = h * 6.2831 + t * 0.05;
+  v += 0.30 * dot(l, vec2(cos(ang), sin(ang)));
+  float dp = length(p - ptr) / max(ptrR, 1.0);
+  v -= ptrAmt * 0.95 * exp(-dp * dp);
+  vec3 c = ramp(clamp(v, 0.0, 1.0));
+  float rim = smoothstep(0.80, 1.0, r) * smoothstep(0.35, 0.75, v);
+  c = mix(c, rimc, rim * rimAmt);
+  float aa = 1.2 / R;
+  float inside = smoothstep(1.0 + aa, 1.0 - aa, r);
+  vec3 col = mix(ground, c, inside);
+  col += grain * mix(0.4, 1.0, inside);
+  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, inside * 0.35);
+  outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`;
+
+const gl = document.createElement('canvas').getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+const U = {};
+if (gl) {
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, `#version 300 es
+in vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+  gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog); gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  ['res', 'cell', 'origin', 'R', 'seed', 'dir', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'mode', 'ground', 'rimc', 'rimAmt', 'lab', 'n', 'stops', 'edges'].forEach(k => { U[k] = gl.getUniformLocation(prog, k); });
+}
+
+function draw(cv, o = {}) {
+  if (!gl) return;
+  const d = cv.dataset, box = cv.getBoundingClientRect();
+  if (!box.width) return;
+  const dpr = Math.min(devicePixelRatio || 1, o.live ? 1.25 : 2), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
+  gl.viewport(0, 0, W, H);
+  let cell = [W, H], origin = [0, 0], R = 1;
+  if (d.layout === 'big') {
+    R = +d.r * H; cell = [W * 20, H * 20];
+    origin = [+d.cx * W - cell[0] / 2, +d.cy * H - cell[1] / 2];
+  } else if (d.layout === 'row') {
+    const s = W / +d.n; R = s * .46; cell = [s, H * 2]; origin = [0, H * .4 - H];
+  } else if (d.layout === 'grid') {
+    const n = o.n || +d.n, s = W / (n + .3); R = s * .482; cell = [s, s]; origin = [-s * .15, -s * .28];
+  }
+  const rc = RECIPES[d.recipe || 'now'];
+  gl.uniform2f(U.res, W, H); gl.uniform2f(U.cell, ...cell); gl.uniform2f(U.origin, ...origin);
+  gl.uniform1f(U.R, R); gl.uniform1f(U.seed, +(d.seed || 3)); gl.uniform1f(U.dir, +(d.dir || 1));
+  gl.uniform1f(U.bias, +(d.bias || 0)); gl.uniform1f(U.heat, o.heat || 0); gl.uniform1f(U.grainScale, dpr * .75);
+  gl.uniform1f(U.t, o.t || 0); gl.uniform2f(U.ptr, (o.px || 0) * dpr, (o.py || 0) * dpr);
+  gl.uniform1f(U.ptrR, (o.pr || 1) * dpr); gl.uniform1f(U.ptrAmt, o.amt || 0);
+  gl.uniform1i(U.mode, d.layout === 'ramp' ? 1 : 0);
+  gl.uniform3f(U.ground, ...rgb01(GROUND[d.ground])); gl.uniform3f(U.rimc, .76, .8, .75); gl.uniform1f(U.rimAmt, rc.rimAmt);
+  gl.uniform1i(U.lab, rc.lab); gl.uniform1i(U.n, rc.stops.length);
+  const st = new Float32Array(18); rc.stops.forEach((s, i) => st.set(s, i * 3)); gl.uniform3fv(U.stops, st);
+  const ed = new Float32Array(10); rc.edges.forEach((e, i) => ed.set(e, i * 2)); gl.uniform2fv(U.edges, ed);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  cv.getContext('2d').drawImage(gl.canvas, 0, 0);
+}
+
+const hero = document.getElementById('hero'), heroBox = document.getElementById('heroLive');
+const still = () => document.querySelectorAll('[data-ball]').forEach(c => { if (c !== hero) draw(c, { heat: +(c.dataset.heat || 0) }); });
+const heroN = () => (innerWidth < 700 ? 4 : 7);
+
+/* hero: the balls drift, and warm up under the pointer */
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const P = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
+let time = 0, last = 0, seen = true;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!seen || document.hidden) { last = now; return; }
+  time += Math.min((now - last) / 1000, .05); last = now;
+  P.x += (P.tx - P.x) * .12; P.y += (P.ty - P.y) * .12; P.amt += (P.target - P.amt) * .06;
+  draw(hero, { live: true, n: heroN(), t: time, px: P.x, py: P.y, pr: Math.max(heroBox.clientHeight * .42, 150), amt: P.amt });
+}
+heroBox.addEventListener('pointermove', e => {
+  const b = heroBox.getBoundingClientRect(); P.tx = e.clientX - b.left; P.ty = e.clientY - b.top;
+  if (!P.target) { P.x = P.tx; P.y = P.ty; } P.target = 1;
+});
+heroBox.addEventListener('pointerleave', () => { P.target = 0; });
+new IntersectionObserver(es => { seen = es[0].isIntersecting; }).observe(heroBox);
+
+/* blocks: on hover the orange floods the ball */
+document.querySelectorAll('[data-hover]').forEach(tile => {
+  const cv = tile.querySelector('canvas'); let target = 0, raf = 0;
+  const step = () => {
+    const h = +(cv.dataset.heat || 0), n = h + (target - h) * .09, v = Math.abs(target - n) < .004 ? target : n;
+    cv.dataset.heat = v; draw(cv, { heat: v }); raf = v === target ? 0 : requestAnimationFrame(step);
+  };
+  const go = v => { target = v; if (!raf) raf = requestAnimationFrame(step); };
+  tile.addEventListener('pointerenter', () => go(1)); tile.addEventListener('pointerleave', () => go(0));
+});
+
+/* shuffle */
+document.getElementById('shuffle').addEventListener('click', () => {
+  document.querySelectorAll('[data-shuffle]').forEach(c => { c.dataset.seed = Math.floor(Math.random() * 900) + 1; draw(c); });
+});
+
+/* copy a hex */
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {
+  const v = b.dataset.copy, done = () => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = v; }, 1100); };
+  const pick = () => { const r = document.createRange(); r.selectNodeContents(b); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+  try { navigator.clipboard.writeText(v).then(done, pick); } catch (e) { pick(); }
+}));
+
+/* first paint, then live */
+draw(hero, { live: true, n: heroN() }); still();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { draw(hero, { live: true, n: heroN() }); still(); });
+if (!calm && gl) requestAnimationFrame(t => { last = t; frame(t); });
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { still(); draw(hero, { live: true, n: heroN(), t: time }); }, 150); });
+</script>
