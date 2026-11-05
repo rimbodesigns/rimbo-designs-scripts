@@ -5050,12 +5050,16 @@
     var bg = document.createElement('div');
     bg.className = 'loc_bg'; bg.setAttribute('aria-hidden', 'true');
     document.body.appendChild(bg);
-    if (window.ScrollTrigger) {
-      gsap.timeline({ scrollTrigger: { trigger: sec, start: 'top 85%', end: 'bottom 15%', scrub: true } })
-        .fromTo(bg, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'none' })
-        .to(bg, { opacity: 1, duration: 0.5 })
-        .to(bg, { opacity: 0, duration: 0.25, ease: 'none' });
+    // Black comes in quickly as the drum rises and is gone again before the next heading is halfway up: dark text
+    // never sits on black for long. Read straight from where the section is, so scrolling either way can't disagree
+    function paintBg() {
+      var r = sec.getBoundingClientRect(), vh = window.innerHeight;
+      var fadeIn = (vh * 0.85 - r.top) / (vh * 0.4), fadeOut = (r.bottom - vh * 0.5) / (vh * 0.4);
+      bg.style.opacity = Math.max(0, Math.min(1, fadeIn, fadeOut));
     }
+    window.addEventListener('scroll', paintBg, { passive: true });
+    window.addEventListener('resize', paintBg);
+    paintBg();
 
     function watchClips() {
       var io = new IntersectionObserver(function (entries) {
