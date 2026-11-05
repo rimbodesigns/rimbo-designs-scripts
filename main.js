@@ -4914,304 +4914,6 @@
   var STAGING_HOST = /(\.webflow\.io|localhost|127\.0\.0\.1)$/;
 
   // =========================================================
-  // BLUEPRINT MENU — ?nav=blueprint (staging and localhost): the full screen menu built like the Blueprint footer.
-  // The black sheet comes up from below, where the footer lives, and drops back down. On it the dashed guides and
-  // the ruler draw, every cell types its own HTML in orange, then its word types in; the small text writes itself.
-  // Hover (mouse only): the HTML types back, an orange outline draws, the word swaps to its second line, as in the footer.
-  // One number p drives the build, like the footer's scroll: 0 = empty sheet, 1 = done. rdNavFull keeps the bar,
-  // the burger, Escape and the clock; this only fills the tile and opens and closes it.
-  // =========================================================
-  function navBlueprint(tile, items, locales, nl, prefix) {
-    var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
-    var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-    var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
-    var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
-    var ease = 'cubic-bezier(.625, .05, 0, 1)';
-    var css = [
-      '.bold-nav-full { --nf-bg: #0c0c0c; --nf-ink: #f8f5ee; }',
-      '.bold-nav-full__tile { -webkit-backdrop-filter: none; backdrop-filter: none; display: block; overflow: hidden; }',
-      '.bnv { --bnv-cream: #f8f5ee; --bnv-grey: #a4a4a4; --bnv-brand: #f3562e; --bnv-hair: rgba(248, 245, 238, .12); --bnv-dash: rgba(248, 245, 238, .22); --bnv-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace);',
-      '  position: absolute; inset: 0; display: flex; flex-direction: column; padding: 3.6rem 5% 1.6rem; color: var(--bnv-cream); font-family: var(--bnv-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
-      '.bnv *, .bnv *::before, .bnv *::after { box-sizing: border-box; }',
-      '.bnv a, .bnv a:hover, .bnv a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; outline: none; }', // the site's own link styles (size, coral hover) stay out
-      '.bnv i { font-style: normal; }',
-      // the guides: the two outer verticals sit on the logo's and the burger's edge, every row has its line, all full bleed
-      '.bnv-v { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--bnv-dash); pointer-events: none; }',
-      '.bnv-h { position: absolute; left: -10%; right: -10%; top: 0; border-top: 1px dashed var(--bnv-dash); pointer-events: none; }',
-      '.bnv-ruler { position: relative; flex: none; height: 1.4rem; background: repeating-linear-gradient(90deg, var(--bnv-hair) 0 1px, transparent 1px 10px) bottom / 100% 6px no-repeat, repeating-linear-gradient(90deg, var(--bnv-dash) 0 1px, transparent 1px 100px) bottom / 100% 12px no-repeat; }',
-      '.bnv-ruler span { position: absolute; left: 50%; top: -.6rem; transform: translateX(-50%); font-size: .58rem; letter-spacing: .18em; color: var(--bnv-grey); white-space: nowrap; }',
-      '.bnv-rows { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }',
-      '.bnv-rows li { position: relative; flex: 1 1 0; min-height: 0; display: flex; margin: 0; padding: 0; }',
-      '.bnv-cell { position: relative; display: flex; transition: background-color .4s ' + ease + '; }',
-      '.bnv-cell.is-on { background-color: rgba(248, 245, 238, .025); }',
-      '.bnv-page { flex: 1; min-width: 0; align-items: center; justify-content: center; }',
-      '.bnv-pt { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; width: 100%; overflow: hidden; font: 400 min(11vh, 7.4vw, 9.5rem)/1.05 IntegralNEW, "Arial Black", sans-serif; text-transform: uppercase; white-space: nowrap; }',
-      '.bnv-pt > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
-      '.bnv-pt > span + span { transform: translateY(110%); }',
-      '.bnv-page > i { position: absolute; right: 1.6rem; top: 50%; margin-top: -.75rem; font-size: 1.5rem; line-height: 1; color: var(--bnv-cream); transform: translateX(-.4em); opacity: 0; transition: transform .45s ' + ease + ', opacity .3s; }',
-      '.bnv-cell.is-on .bnv-pt > span:first-child, .bnv-cell.is-on .bnv-swap > span:first-child { transform: translateY(-110%); }',
-      '.bnv-cell.is-on .bnv-pt > span + span, .bnv-cell.is-on .bnv-swap > span + span { transform: none; }',
-      '.bnv-cell.is-on > i { transform: none; opacity: 1; }',
-      '.bnv-foot { position: relative; flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }',
-      '.bnv-foot > .bnv-h:last-of-type { top: auto; bottom: 0; }',
-      '.bnv-foot .bnv-cell { flex-direction: column; justify-content: center; gap: .7rem; padding: 1.4rem 1.6rem; min-height: 6.5rem; }',
-      '.bnv-label { font-size: .64rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bnv-grey); }',
-      '.bnv-swap { position: relative; display: grid; overflow: hidden; font-size: clamp(.78rem, 1.05vw, .95rem); letter-spacing: .16em; text-transform: uppercase; line-height: 1.5; white-space: nowrap; }',
-      '.bnv-swap b { font-weight: 400; font-variant-numeric: tabular-nums; }',
-      '.bnv-swap > span { grid-area: 1 / 1; transition: transform .55s ' + ease + '; }',
-      '.bnv-swap > span + span { transform: translateY(110%); }',
-      '.bnv-swap.bnv-langs { display: flex; }',
-      '.bnv-langs a { color: var(--bnv-grey); transition: color .3s; } .bnv-langs a.is-on, .bnv-langs a:hover { color: var(--bnv-cream); }',
-      '.bnv-langs a:focus-visible { color: var(--bnv-cream); text-decoration: underline; }',
-      '.bnv-langs a + a::before { content: "/"; margin: 0 .7em; color: var(--bnv-grey); opacity: .5; }',
-      // the build: an outline per cell, the HTML it types, the caret
-      '.bnv-frame, .bnv-draw { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
-      '.bnv-frame rect { fill: none; stroke: rgba(243, 86, 46, .8); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 1 1; }',
-      '.bnv-caret { position: absolute; width: 2px; background: var(--bnv-brand); pointer-events: none; opacity: 0; z-index: 3; }',
-      '.bnv-code { position: absolute; left: 1.6rem; top: 1.1rem; right: 1rem; z-index: 2; pointer-events: none; font-size: .64rem; line-height: 1.6; letter-spacing: .04em; white-space: pre-wrap; word-break: break-all; text-transform: none; color: var(--bnv-grey); transition: opacity .25s; }',
-      '.bnv-code .t { color: var(--bnv-cream); } .bnv-code .k { color: #8fb3ff; } .bnv-code .s { color: var(--bnv-brand); }',
-      '.bnv-code .cur { display: inline-block; width: .55em; height: 1.05em; margin-left: .1em; vertical-align: -.15em; background: var(--bnv-brand); animation: bnv-blink 1s steps(1) infinite; }',
-      '@keyframes bnv-blink { 50% { opacity: 0; } }',
-      '.bnv-code.is-hover { opacity: 1 !important; transform: none !important; }',
-      // hover: two strokes from the top-left corner, meeting bottom right
-      '.bnv-draw { z-index: 2; }',
-      '.bnv-draw path { fill: none; stroke: var(--bnv-brand); stroke-width: 1; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .45s cubic-bezier(.4, 0, .6, 1); }',
-      '.bnv-cell.is-on .bnv-draw path { stroke-dashoffset: 0; transition: stroke-dashoffset .8s cubic-bezier(.45, 0, .25, 1); }',
-      '@media (max-width: 767px) {',
-      '  .bnv-pt { font-size: min(12vw, 8vh); }',
-      '  .bnv-page > i { display: none; }',
-      '  .bnv-code { left: 1rem; top: .8rem; font-size: .58rem; }',
-      '  .bnv-foot { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }',
-      '  .bnv-foot .bnv-mail { grid-column: 1 / -1; }',
-      '  .bnv-foot .bnv-cell { min-height: 0; gap: .5rem; padding: 1rem; }',
-      '  .bnv-swap { font-size: .72rem; letter-spacing: .12em; }',
-      '}',
-      '@media (prefers-reduced-motion: reduce) { .bnv-code .cur { animation: none; } }'
-    ].join('\n');
-    var style = document.createElement('style');
-    style.textContent = css;
-    document.head.appendChild(style);
-
-    // ---- the markup. The words come from the menu; the second lines are the footer's ----
-    var second = nl
-      ? { work: 'Live sites', service: 'Wat ik doe', resources: 'Blog + gidsen', contact: 'Zeg hallo' }
-      : { work: 'Live sites', service: 'What I do', resources: 'Blog + guides', contact: 'Say hello' };
-    var slug = function (href) { return href.split('/').pop(); };
-    var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&body=' +
-      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n");
-    var bare = location.pathname.replace(/^\/nl(?=\/|$)/, '') || '/';
-    function localeHref(lang) {
-      var a = locales.filter(function (l) { return l.getAttribute('hreflang') === lang; })[0];
-      return a ? a.getAttribute('href') : lang === 'nl' ? '/nl' + (bare === '/' ? '' : bare) : bare;
-    }
-    tile.innerHTML =
-      '<div class="bnv">' +
-        '<i class="bnv-v" style="left:5%"></i><i class="bnv-v" style="right:5%"></i>' +
-        '<div class="bnv-ruler" aria-hidden="true"><span data-bnv-width></span></div>' +
-        '<ul class="bnv-rows">' + items.map(function (it) {
-          return '<li><i class="bnv-h"></i><a class="bnv-cell bnv-page" href="' + it.href + '" data-code="' + esc('<a class="nav_link" href="/' + slug(it.href) + '">') + '">' +
-            '<span class="bnv-pt"><span>' + it.text + '</span><span aria-hidden="true">' + (second[slug(it.href)] || it.text) + '</span></span><i aria-hidden="true">→</i></a></li>';
-        }).join('') + '</ul>' +
-        '<div class="bnv-foot"><i class="bnv-h"></i>' +
-          '<a class="bnv-cell bnv-mail" href="' + esc(mail) + '" data-code="' + esc('<a class="nav_mail" href="mailto:hello@rimbodesigns.com">') + '">' +
-            '<span class="bnv-label" data-write>' + (nl ? 'Een project?' : 'Got a project?') + '</span>' +
-            '<span class="bnv-swap"><span data-write>hello@rimbodesigns.com →</span><span aria-hidden="true">' + (nl ? 'Opent je mailapp' : 'Opens your mail app') + ' →</span></span></a>' +
-          '<a class="bnv-cell bnv-where" href="' + prefix + '/locations" data-code="' + esc('<a class="nav_locations" href="/locations">') + '">' +
-            '<span class="bnv-label" data-write>' + (nl ? 'Gevestigd in' : 'Based in') + '</span>' +
-            '<span class="bnv-swap"><span><span data-write>' + (nl ? 'Nederland' : 'Netherlands') + ' · </span><b data-nav-clock>--:--</b></span><span aria-hidden="true">' + (nl ? 'Waar ik werk' : 'Where I work') + ' →</span></span></a>' +
-          '<div class="bnv-cell bnv-lang" data-code="' + esc('<div class="nav_lang">') + '">' +
-            '<span class="bnv-label" data-write>' + (nl ? 'Taal' : 'Language') + '</span>' +
-            '<span class="bnv-swap bnv-langs"><a href="' + localeHref('en') + '" hreflang="en"' + (nl ? '' : ' class="is-on"') + '>EN</a><a href="' + localeHref('nl') + '" hreflang="nl"' + (nl ? ' class="is-on"' : '') + '>NL</a></span></div>' +
-          '<i class="bnv-v bnv-v-a"></i><i class="bnv-v bnv-v-b"></i><i class="bnv-h"></i>' +
-        '</div>' +
-      '</div>';
-    var root = qs('.bnv', tile);
-    qsa('[data-write]', root).forEach(function (el) { el.__t = el.textContent; });
-
-    // ---- the typed HTML, with the footer's tiny highlighter ----
-    function classify(src) {
-      var out = [], inTag = false, inName = false, inStr = false, q = '';
-      Array.from(src).forEach(function (ch) {
-        var c = '';
-        if (inStr) { c = 's'; if (ch === q) inStr = false; }
-        else if (ch === '<') { inTag = true; inName = true; c = 't'; }
-        else if (inTag && (ch === '"' || ch === "'")) { inStr = true; q = ch; c = 's'; }
-        else if (inTag && ch === '>') { inTag = false; inName = false; c = 't'; }
-        else if (inTag && ch === ' ') { inName = false; }
-        else if (inTag && (inName || ch === '=' || ch === '/')) { c = 't'; }
-        else if (inTag) { c = 'k'; }
-        out.push({ ch: ch, c: c });
-      });
-      return out;
-    }
-    function renderCode(el, chars, n, cursor) {
-      var h = '', run = '', cls = null;
-      var flush = function () { if (run) h += cls ? '<span class="' + cls + '">' + esc(run) + '</span>' : esc(run); run = ''; };
-      for (var i = 0; i < n; i++) { if (chars[i].c !== cls) { flush(); cls = chars[i].c; } run += chars[i].ch; }
-      flush();
-      if (cursor) h += '<span class="cur"></span>';
-      if (el.__h !== h) { el.innerHTML = h; el.__h = h; }
-    }
-    // the small text writes itself left to right, a few loose glyphs running ahead of it
-    var GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', AHEAD = 4;
-    function write(el, k) {
-      var t = el.__t;
-      if (k >= 1 || k <= 0) { var whole = k >= 1 ? t : ''; if (el.textContent !== whole) el.textContent = whole; return; }
-      var n = Math.floor(k * (t.length + AHEAD)), from = Math.max(0, n - AHEAD), s = t.slice(0, from);
-      for (var i = from; i < Math.min(n, t.length); i++) s += /[a-z0-9]/i.test(t[i]) ? GLYPHS[Math.floor(Math.random() * GLYPHS.length)] : t[i];
-      el.textContent = s;
-    }
-
-    // ---- the cells: an orange outline, the HTML it types, a caret; on the links a second outline for the hover ----
-    var NS = 'http://www.w3.org/2000/svg';
-    var cells = qsa('[data-code]', root).map(function (cell) {
-      var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'bnv-frame'); svg.setAttribute('aria-hidden', 'true');
-      var rect = document.createElementNS(NS, 'rect');
-      rect.setAttribute('width', '100%'); rect.setAttribute('height', '100%'); rect.setAttribute('pathLength', '1');
-      svg.appendChild(rect); cell.appendChild(svg);
-      var add = function (cls) { var e = document.createElement('span'); e.className = cls; e.setAttribute('aria-hidden', 'true'); cell.appendChild(e); return e; };
-      return {
-        el: cell, rect: rect, code: add('bnv-code'), caret: add('bnv-caret'), chars: classify(cell.getAttribute('data-code')),
-        word: qs('.bnv-pt > span', cell), arrow: qs('.bnv-page > i', cell), small: qsa('.bnv-label, .bnv-swap', cell),
-        writes: qsa('[data-write]', cell), clock: qs('[data-nav-clock]', cell)
-      };
-    });
-    var rowLines = qsa('.bnv-h', root), upLines = qsa('.bnv-v', root);
-    var ruler = qs('.bnv-ruler', root), rulerLabel = qs('[data-bnv-width]', root);
-    var vA = qs('.bnv-v-a', root), vB = qs('.bnv-v-b', root), foot = qs('.bnv-foot', root);
-    function placeFootLines() { // the footer row's own verticals sit on its cell edges
-      var kids = qsa('.bnv-cell', foot), fr = foot.getBoundingClientRect();
-      [vA, vB].forEach(function (l, i) {
-        var c = kids[i + 1], r = c.getBoundingClientRect(), wraps = r.top > kids[0].getBoundingClientRect().top + 4;
-        var on = i === 0 ? !wraps : true; // on phones the mail cell has the full width: no line beside it
-        l.style.display = on ? '' : 'none';
-        l.style.left = (r.left - fr.left) + 'px'; l.style.top = (r.top - fr.top) + 'px'; l.style.bottom = (fr.bottom - r.bottom) + 'px';
-      });
-    }
-
-    // ---- hover (mouse) and keyboard focus ----
-    var done = false;
-    function hoverOn(c) {
-      if (!done || !c.draw) return;
-      var w = c.el.offsetWidth, h = c.el.offsetHeight;
-      c.draw.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
-      c.p1.setAttribute('d', 'M.5 .5H' + (w - 0.5) + 'V' + (h - 0.5));
-      c.p2.setAttribute('d', 'M.5 .5V' + (h - 0.5) + 'H' + (w - 0.5));
-      c.el.classList.add('is-on');
-      if (!c.word) return; // the email and Based in only swap
-      var t0 = performance.now();
-      cancelAnimationFrame(c.raf); c.code.classList.add('is-hover');
-      (function step() {
-        var k = Math.min(1, (performance.now() - t0) / 420);
-        renderCode(c.code, c.chars, Math.round(c.chars.length * k), true);
-        if (k < 1) c.raf = requestAnimationFrame(step);
-      })();
-    }
-    function hoverOff(c) {
-      if (!c.draw) return;
-      cancelAnimationFrame(c.raf); c.el.classList.remove('is-on'); c.code.classList.remove('is-hover');
-    }
-    cells.forEach(function (c) {
-      if (c.el.tagName !== 'A') return;
-      var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'bnv-draw'); svg.setAttribute('aria-hidden', 'true');
-      c.p1 = document.createElementNS(NS, 'path'); c.p2 = document.createElementNS(NS, 'path');
-      [c.p1, c.p2].forEach(function (pth) { pth.setAttribute('pathLength', '1'); svg.appendChild(pth); });
-      c.el.appendChild(svg); c.draw = svg;
-      if (canHover) {
-        c.el.addEventListener('mouseenter', function () { hoverOn(c); });
-        c.el.addEventListener('mouseleave', function () { if (document.activeElement !== c.el) hoverOff(c); });
-      }
-      c.el.addEventListener('focus', function () { if (c.el.matches(':focus-visible')) hoverOn(c); });
-      c.el.addEventListener('blur', function () { if (!c.el.matches(':hover')) hoverOff(c); });
-    });
-
-    // ---- the build: p from 0 to 1 ----
-    var st = { p: 0, edge: 0, dir: 1 };
-    var labelDone = false;
-    function paint() {
-      var p = st.p;
-      upLines.forEach(function (l, i) { l.style.clipPath = 'inset(0 0 ' + cut(smooth(i * 0.04, 0.34 + i * 0.04, p)) + ' 0)'; });
-      rowLines.forEach(function (l, i) { l.style.clipPath = 'inset(0 ' + cut(smooth(0.02 + i * 0.035, 0.34 + i * 0.035, p)) + ' 0 0)'; });
-      ruler.style.clipPath = 'inset(-1.5rem ' + cut(smooth(0.02, 0.28, p)) + ' 0 0)';
-      var kl = smooth(0.12, 0.42, p), width = window.innerWidth + ' PX';
-      rulerLabel.style.opacity = kl > 0 ? 1 : 0;
-      if (kl >= 1) { if (!labelDone) { rulerLabel.textContent = width; labelDone = true; } }
-      else { labelDone = false; rulerLabel.textContent = width.replace(/\d/g, function () { return Math.floor(Math.random() * 10); }); }
-      var settle = smooth(0.76, 0.96, p);
-      cells.forEach(function (c, i) {
-        var o = i * 0.06;
-        c.rect.style.strokeDashoffset = (1 - smooth(o, 0.26 + o, p)).toFixed(4);
-        c.rect.style.stroke = 'rgba(243, 86, 46, ' + ((1 - settle) * 0.8).toFixed(3) + ')';
-        var kc = smooth(0.02 + o, 0.24 + o, p), kf = smooth(0.3 + o, 0.42 + o, p);
-        if (!c.code.classList.contains('is-hover')) {
-          renderCode(c.code, c.chars, Math.round(c.chars.length * kc), kc > 0 && kf < 1);
-          c.code.style.opacity = (1 - kf).toFixed(3);
-          c.code.style.transform = 'translate3d(0,' + (-kf * 8).toFixed(1) + 'px,0)';
-        }
-        if (c.word) {
-          var kw = smooth(0.26 + o, 0.42 + o, p);
-          c.word.style.clipPath = kw >= 1 ? 'none' : 'inset(-20% ' + cut(kw) + ' -20% 0)';
-          if (kw > 0 && kw < 1) {
-            var wr = c.word.getBoundingClientRect(), cr = c.el.getBoundingClientRect();
-            c.caret.style.opacity = 1;
-            c.caret.style.left = (wr.left - cr.left + wr.width * kw) + 'px';
-            c.caret.style.top = (wr.top - cr.top) + 'px'; c.caret.style.height = wr.height + 'px';
-          } else c.caret.style.opacity = 0;
-        } else {
-          var kw2 = smooth(0.3 + o, 0.5 + o, p);
-          c.writes.forEach(function (el) { write(el, kw2); });
-          if (c.clock) c.clock.style.opacity = kw2 >= 1 ? 1 : 0;
-          if (!c.writes.length || c.el.classList.contains('bnv-lang')) c.small.forEach(function (el) { if (!el.hasAttribute('data-write')) el.style.opacity = kw2; });
-        }
-      });
-    }
-    // the sheet's edge: it comes up from below with its middle ahead of the sides, and is straight again when it stops
-    function drawEdge() {
-      var w = window.innerWidth, h = window.innerHeight, y = (1 - st.edge) * h;
-      var bow = Math.sin(st.edge * Math.PI) * h * 0.22 * st.dir;
-      tile.style.clipPath = 'path("M0 ' + h + ' H' + w + ' V' + y.toFixed(1) + ' Q' + (w / 2) + ' ' + (y - bow * 2).toFixed(1) + ' 0 ' + y.toFixed(1) + ' Z")';
-    }
-
-    var tl;
-    function settled() {
-      tile.style.clipPath = 'none'; // open: no clip, so a resize can't cut it
-      done = true;
-      cells.forEach(function (c) { if (c.draw && c.el.matches(':hover')) hoverOn(c); }); // the pointer got there while it was building
-    }
-    function set(active, reduce) {
-      if (tl) tl.kill();
-      done = false;
-      cells.forEach(hoverOff);
-      if (reduce) {
-        gsap.set(tile, { visibility: active ? 'visible' : 'hidden', clipPath: 'none' });
-        st.p = st.edge = active ? 1 : 0;
-        gsap.set(root, { opacity: 1 });
-        placeFootLines(); paint();
-        done = active;
-        return;
-      }
-      if (active) {
-        placeFootLines();
-        tl = gsap.timeline({ onComplete: settled });
-        tl.set(tile, { visibility: 'visible' }).set(root, { opacity: 1 });
-        st.dir = 1;
-        tl.to(st, { edge: 1, duration: 0.95, ease: 'power3.inOut', onUpdate: drawEdge }, 0)
-          .to(st, { p: 1, duration: 1.4 * (1 - st.p), ease: 'none', onUpdate: paint }, 0.25);
-      } else {
-        st.dir = -1;
-        tl = gsap.timeline({ onComplete: function () { gsap.set(tile, { visibility: 'hidden' }); st.p = 0; paint(); } });
-        tl.to(root, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0)
-          .add(drawEdge, 0.12) // the clip is back on before the sheet moves
-          .to(st, { edge: 0, duration: 0.8, ease: 'power3.inOut', onUpdate: drawEdge }, 0.12);
-      }
-    }
-    paint();
-    window.addEventListener('resize', function () { if (!done) return; placeFootLines(); rulerLabel.textContent = window.innerWidth + ' PX'; });
-    return { set: set };
-  }
-
-  // =========================================================
   // FULL SCREEN NAV — /home-copy and /resources: after Osmo Supply's "Bold Full Screen Navigation"
   // (markup, class names and toggle logic). Ours:
   // - the bar is the site's logo + burger in their own fixed difference-blend layer, visible the whole time
@@ -5246,9 +4948,11 @@
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
     if (/^\/home-v4(-landing)?$/.test(here.replace(prefix, ''))) logoSrc = brushLogoSrc(); // home V4 (and its landing exploration) tries the F Brush logo first, like its footer (Rimbo, 5 Nov)
     var mode = (location.search.match(/[?&]menu=(flat|blur)/) || [])[1] || 'curve';
-    // the look of the open menu. 'cream' is the approved one and stays the default; ?nav=dark and ?nav=blueprint try the
-    // others on staging and localhost (Rimbo, 5 Nov). Picking one for good = changing this word; dropping one = deleting its branch
-    var look = (STAGING_HOST.test(location.hostname) && (location.search.match(/[?&]nav=(dark|blueprint)/) || [])[1]) || 'cream';
+    // the open menu is dark since 5 Nov (Rimbo: "dark is better"); ?nav=cream on staging and localhost brings the earlier cream one back
+    var dark = !(STAGING_HOST.test(location.hostname) && /[?&]nav=cream/.test(location.search));
+    if (dark) items = items.filter(function (it) { return !/\/contact$/.test(it.href); }); // the email is in the menu, so no Contact link (Rimbo, 5 Nov)
+    var mailHref = !dark ? 'mailto:hello@rimbodesigns.com' : 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&amp;body=' +
+      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n").replace(/'/g, '%27'); // the footer's email
     // hover extras to try, alone or combined: ?hover=magnet,blur,stretch,lean (default: only the fade)
     var hover = ((location.search.match(/[?&]hover=([a-z,]+)/) || [])[1] || '').split(',');
     function hoverHas(name) { return hover.indexOf(name) > -1; }
@@ -5279,7 +4983,7 @@
       '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(.5, 1) rotate(0.001deg); }',
       '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(.5, 1) rotate(0.001deg); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(1, 1); }',
-      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(2) { transform: translate(-150%, 0) rotate(0.001deg) scale(1, 1); }',
+      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(2) { transform: translate(-200%, 0) rotate(0.001deg) scale(1, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(1, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(.7, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(.7, 1); }',
@@ -5325,15 +5029,16 @@
         ' .bold-nav__bottom { position: relative; flex: none; grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; }' +
         ' .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; }' +
       ' }',
-      // ?nav=dark: the same menu in the footer's black. On a light page the glass is nearly solid, or the cream behind it turns it grey
-      look !== 'dark' ? '' : [
+      // the dark menu, in the footer's black, its bottom row small and quiet. On a light page the glass is nearly solid, or the cream behind it turns it grey
+      !dark ? '' : [
         '.bold-nav-full { --nf-bg: rgba(12, 12, 12, .9); --nf-ink: #f8f5ee; }',
         '.bold-nav-full__tile { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }',
+        '.bold-nav__bottom .bold-nav__word, .bold-nav__bottom .bold-nav__word:hover { font-size: .68rem; line-height: 1.4; letter-spacing: .1em; }', // on the words themselves: the site's p and a styles beat the row's size (it was 18px)
         '.bold-nav__time, .bold-nav__mail { color: rgba(248, 245, 238, .6); }',
         '.bold-nav__mail:hover { color: #f8f5ee; }',
         '.bold-nav__lang { background-color: rgba(248, 245, 238, .1); }',
         '.bold-nav__lang .rs-lang__pill { background-color: #f8f5ee; box-shadow: none; }',
-        '.bold-nav__lang a { color: rgba(248, 245, 238, .5); }',
+        '.bold-nav__lang a { padding: .28rem .55rem .24rem; font-size: .62rem; color: rgba(248, 245, 238, .5); }',
         '.bold-nav__lang a:hover { color: rgba(248, 245, 238, .85); }',
         '.bold-nav__lang a[data-toggle-active] { color: #131313; }',
         '.bold-nav__lang a:focus-visible { outline-color: #f8f5ee; }'
@@ -5346,7 +5051,7 @@
     var lis = items.map(function (it) {
       return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link"><span class="bold-nav-full__link-text">' + it.text + '</span></a></li>';
     }).join('');
-    var lang = look !== 'blueprint' && locales.length > 1 ? '<div class="bold-nav__lang" data-lang-toggle>' + locales.map(function (a) {
+    var lang = locales.length > 1 ? '<div class="bold-nav__lang" data-lang-toggle>' + locales.map(function (a) {
       return '<a hreflang="' + a.getAttribute('hreflang') + '" href="' + a.getAttribute('href') + '"' +
         (a.classList.contains('w--current') ? ' class="w--current" aria-current="page"' : '') + '>' + a.textContent.trim() + '</a>';
     }).join('') + '</div>' : '';
@@ -5356,7 +5061,7 @@
     nav.setAttribute('aria-label', 'Main');
     nav.innerHTML =
       '<div class="bold-nav-full__tile" aria-hidden="true"><ul class="bold-nav-full__ul">' + lis + '</ul><div class="bold-nav__mid"></div>' +
-        '<div class="bold-nav__bottom">' + lang + '<p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="mailto:hello@rimbodesigns.com">hello@rimbodesigns.com</a></div></div>';
+        '<div class="bold-nav__bottom">' + lang + '<p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="' + mailHref + '">hello@rimbodesigns.com</a></div></div>';
     var bar = document.createElement('div');
     bar.className = 'bold-nav-full__bar';
     bar.setAttribute('data-navigation-status', 'not-active');
@@ -5376,11 +5081,10 @@
     }
 
     var tile = qs('.bold-nav-full__tile', nav);
-    var blueprint = look === 'blueprint' ? navBlueprint(tile, items, locales, nl, prefix) : null; // swaps the tile's content and runs its own open and close
     var links = qsa('.bold-nav-full__link', nav);
     var bottom = qsa('.bold-nav__mid > *, .bold-nav__bottom > *', nav); // the pill (in the middle slot on phones), time, email
     var btn = qs('[data-navigation-toggle="toggle"]', bar);
-    if (!blueprint) gsap.set(links, { yPercent: 110, rotate: 4 });
+    gsap.set(links, { yPercent: 110, rotate: 4 });
 
     // The tile's edge. p = how far down it has come (0 to 1). The rounded swipe bows its middle ahead of the
     // sides while it moves (down when opening, up when closing) and is straight again when it settles.
@@ -5401,8 +5105,7 @@
       tile.setAttribute('aria-hidden', active ? 'false' : 'true');
       if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
       if (tl) tl.kill();
-      if (blueprint) { blueprint.set(active, reduce); return; }
-      if (look === 'dark' && active) nav.style.setProperty('--nf-bg', 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')');
+      if (dark && active) nav.style.setProperty('--nf-bg', 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')');
 
       if (reduce) {
         gsap.set(tile, { visibility: active ? 'visible' : 'hidden', clipPath: 'none', opacity: 1 });
@@ -6003,7 +5706,7 @@
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
   var navFull = path === '/home-copy' || path === '/home-v4' || path === '/home-v4-landing' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go (home-v4 + its landing exploration: Rimbo, 5 Nov)
-  if (navFull || (/[?&]nav=(dark|blueprint)/.test(location.search) && STAGING_HOST.test(location.hostname))) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
+  if (navFull || (/[?&]nav=(dark|cream)/.test(location.search) && STAGING_HOST.test(location.hostname))) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
   if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
