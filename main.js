@@ -5042,8 +5042,9 @@
   }
 
   // =========================================================
-  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past, on
-  // the light page (the fade to black was rejected). Not rdBand: that one belongs to a hero at the top of the page.
+  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past. The
+  // light hero fills the first screen and everything from here down sits on Ink (.loc_dark, a hard edge: both scroll
+  // fades were rejected), so the Night footer still lands darker. Not rdBand: that one belongs to a hero at the top.
   // Here Osmo's slider starts when the section comes near, posters load then too, each clip only loads and plays
   // once its card is on screen, and a hidden Next button steps the drum every 5 s while it is in view.
   // =========================================================
@@ -5054,10 +5055,194 @@
     var a = line && line.tagName === 'P' && line.children.length === 1 && line.firstElementChild;
     if (!a || a.tagName !== 'A' || line.textContent.trim() !== a.textContent.trim()) return;
     var label = a.textContent.trim();
-    a.className = 'btn is-ink w-inline-block';
+    a.className = 'btn w-inline-block';
     a.setAttribute('data-btn-alt', 'Home');
     a.innerHTML = '<div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t"></div></div></div></div>';
     qs('.btn_t', a).textContent = label;
+  }
+
+  // A button's swap line is an attribute, which Webflow doesn't translate: on /nl the Dutch line comes from data-btn-alt-nl
+  function rdLocBtnAlt() {
+    if (!/^\/nl(\/|$)/.test(location.pathname)) return;
+    qsa('[data-btn-alt-nl]').forEach(function (b) { b.setAttribute('data-btn-alt', b.getAttribute('data-btn-alt-nl')); });
+  }
+
+  // City pages, How we work: one brand ball per card on the blocks' grounds (docs/brand.md: Deep Beige, Steel, Deep
+  // Orange), growing from step to step and running off the edge. FRAG is the shader from prototype/brand/src.html as it
+  // stands: change it there and copy it again. One shared WebGL2 context, copied to a 2D canvas per card. A card draws
+  // once when it comes near, and only moves while the pointer is on it: the orange floods the ball and fades back.
+  function rdLocBalls() {
+    var cards = qsa('.loc_steps .loc_step');
+    if (!cards.length) return;
+    var gl = document.createElement('canvas').getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+    if (!gl) return;
+    var FRAG = '#version 300 es\n' +
+      'precision highp float;\n' +
+      'uniform vec2 res; uniform vec2 cell; uniform vec2 origin; uniform float R; uniform float seed; uniform float dir; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n' +
+      'uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform int mode;\n' +
+      'uniform vec3 ground; uniform vec3 rimc; uniform float rimAmt; uniform int lab; uniform int n; uniform vec3 stops[6]; uniform vec2 edges[5];\n' +
+      'out vec4 outColor;\n' +
+      'float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n' +
+      'float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n' +
+      '  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n' +
+      'float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n' +
+      'float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n' +
+      'vec3 fromLab(vec3 c) {\n' +
+      '  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n' +
+      '  l = l * l * l; m = m * m * m; s = s * s * s;\n' +
+      '  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n' +
+      '}\n' +
+      'vec3 ramp(float v) {\n' +
+      '  vec3 c = stops[0];\n' +
+      '  for (int i = 0; i < 5; i++) { if (i + 1 >= n) break; c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); }\n' +
+      '  return lab == 1 ? fromLab(c) : c;\n' +
+      '}\n' +
+      'void main() {\n' +
+      '  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n' +
+      '  vec2 gp = floor(p / grainScale);\n' +
+      '  float g1 = hash(gp + seed);\n' +
+      '  float g2 = noise(gp * 0.9 + seed * 3.0);\n' +
+      '  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n' +
+      '  if (mode == 1) {\n' +
+      '    float v = p.x / res.x * 0.86 + 0.04;\n' +
+      '    vec3 c = mix(ramp(v), ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)), 0.35) + grain;\n' +
+      '    outColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n' +
+      '    return;\n' +
+      '  }\n' +
+      '  vec2 id = floor((p - origin) / cell);\n' +
+      '  vec2 center = origin + (id + 0.5) * cell;\n' +
+      '  vec2 l = (p - center) / R;\n' +
+      '  float r = length(l);\n' +
+      '  vec2 uv = p / res;\n' +
+      '  float g = 0.62 * dir * (uv.x - uv.y) + 0.55;\n' +
+      '  float h = hash(id + seed);\n' +
+      '  vec2 drift = vec2(sin(t * 0.21 + h * 6.2831), cos(t * 0.17 + h * 12.566)) * 0.32;\n' +
+      '  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n' +
+      '  float f = fbm(l * 0.6 + w * 1.1 + h * 90.0);\n' +
+      '  float v = g + (f - 0.5) * 1.1 + (h - 0.5) * 0.22 + bias - heat * 0.75;\n' +
+      '  float ang = h * 6.2831 + t * 0.05;\n' +
+      '  v += 0.30 * dot(l, vec2(cos(ang), sin(ang)));\n' +
+      '  float dp = length(p - ptr) / max(ptrR, 1.0);\n' +
+      '  v -= ptrAmt * 0.95 * exp(-dp * dp);\n' +
+      '  vec3 c = ramp(clamp(v, 0.0, 1.0));\n' +
+      '  float rim = smoothstep(0.80, 1.0, r) * smoothstep(0.35, 0.75, v);\n' +
+      '  c = mix(c, rimc, rim * rimAmt);\n' +
+      '  float aa = 1.2 / R;\n' +
+      '  float inside = smoothstep(1.0 + aa, 1.0 - aa, r);\n' +
+      '  vec3 col = mix(ground, c, inside);\n' +
+      '  col += grain * mix(0.4, 1.0, inside);\n' +
+      '  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, inside * 0.35);\n' +
+      '  outColor = vec4(clamp(col, 0.0, 1.0), 1.0);\n' +
+      '}';
+    function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; }
+    var prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+    gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    var U = {};
+    ['res', 'cell', 'origin', 'R', 'seed', 'dir', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'mode', 'ground', 'rimc', 'rimAmt', 'lab', 'n', 'stops', 'edges'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+
+    function toRgb(h) { return [0, 2, 4].map(function (i) { return parseInt(h.slice(i, i + 2), 16); }); }
+    function lin(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    function oklab(h) {
+      var c = toRgb(h).map(lin), r = c[0], g = c[1], b = c[2];
+      var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+      var m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+      var s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+      return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+    }
+    var stops = new Float32Array(18), edges = new Float32Array(10);
+    ['E4441C', 'E4566A', '4B7888', 'DACCAE'].forEach(function (h, i) { stops.set(oklab(h), i * 3); });
+    [[0.12, 0.28], [0.26, 0.46], [0.5, 0.84]].forEach(function (e, i) { edges.set(e, i * 2); });
+    gl.uniform1i(U.mode, 0); gl.uniform1i(U.lab, 1); gl.uniform1i(U.n, 4);
+    gl.uniform3f(U.rimc, 0.76, 0.8, 0.75); gl.uniform1f(U.rimAmt, 0);
+    gl.uniform3fv(U.stops, stops); gl.uniform2fv(U.edges, edges);
+
+    var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var touch = window.matchMedia('(hover: none)').matches;
+    var SPEC = [
+      { ground: 'ECE5D6', r: 0.34, cy: 0.22, seed: 9, dir: -1, bias: 0, flood: 1 },
+      { ground: '5B8D9F', r: 0.42, cy: 0.24, seed: 11, dir: -1, bias: 0, flood: 1 },
+      { ground: 'E4441C', r: 0.5, cy: 0.26, seed: 14, dir: 1, bias: 0.3, flood: 0.45 } // on orange the ball leans to steel and beige, a full flood would melt it into the card
+    ];
+    function draw(b) {
+      var box = b.card.getBoundingClientRect();
+      if (!box.width) return;
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
+      if (b.cv.width !== W || b.cv.height !== H) { b.cv.width = W; b.cv.height = H; }
+      if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
+      gl.viewport(0, 0, W, H);
+      var cw = W * 20, ch = H * 20, g = toRgb(b.s.ground);
+      gl.uniform2f(U.res, W, H); gl.uniform2f(U.cell, cw, ch); gl.uniform2f(U.origin, W - cw / 2, b.s.cy * H - ch / 2);
+      gl.uniform1f(U.R, b.s.r * H); gl.uniform1f(U.seed, b.s.seed); gl.uniform1f(U.dir, b.s.dir);
+      gl.uniform1f(U.bias, b.s.bias); gl.uniform1f(U.heat, b.heat * b.s.flood); gl.uniform1f(U.grainScale, dpr * 0.75);
+      gl.uniform1f(U.t, b.t); gl.uniform2f(U.ptr, b.x * dpr, b.y * dpr);
+      gl.uniform1f(U.ptrR, Math.max(box.height * 0.42, 150) * dpr); gl.uniform1f(U.ptrAmt, b.amt * b.s.flood);
+      gl.uniform3f(U.ground, g[0] / 255, g[1] / 255, g[2] / 255);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      b.cv.getContext('2d').drawImage(gl.canvas, 0, 0);
+    }
+    function loop(b) {
+      if (b.raf) return;
+      var last = 0;
+      function frame(now) {
+        var dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now;
+        b.t += dt;
+        b.heat += (b.target - b.heat) * 0.05; b.amt += (b.target - b.amt) * 0.08;
+        b.px += (b.tx - b.px) * 0.12; b.py += (b.ty - b.py) * 0.12; b.x = b.px; b.y = b.py;
+        draw(b);
+        if (b.target || b.heat > 0.004 || b.amt > 0.004) b.raf = requestAnimationFrame(frame);
+        else { b.heat = 0; b.amt = 0; b.raf = 0; draw(b); }
+      }
+      b.raf = requestAnimationFrame(frame);
+    }
+    var balls = cards.slice(0, SPEC.length).map(function (card, i) {
+      var cv = document.createElement('canvas');
+      cv.className = 'loc_step-ball'; cv.setAttribute('aria-hidden', 'true');
+      card.insertBefore(cv, card.firstChild);
+      var b = { card: card, cv: cv, s: SPEC[i], heat: 0, amt: 0, target: 0, t: i * 3, x: 0, y: 0, px: 0, py: 0, tx: 0, ty: 0, raf: 0, drawn: false };
+      if (!calm) {
+        card.addEventListener('pointermove', function (e) {
+          var r = card.getBoundingClientRect(); b.tx = e.clientX - r.left; b.ty = e.clientY - r.top;
+          if (!b.target) { b.px = b.tx; b.py = b.ty; }
+          b.target = 1; loop(b);
+        });
+        card.addEventListener('pointerleave', function () { b.target = 0; });
+      }
+      return b;
+    });
+    var near = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        var b = balls.filter(function (x) { return x.card === en.target; })[0];
+        if (b && !b.drawn) { b.drawn = true; draw(b); }
+      });
+    }, { rootMargin: '50% 0px' });
+    balls.forEach(function (b) { near.observe(b.card); });
+    if (touch && !calm) { // no pointer on a phone: each ball floods once as its card reaches the middle of the screen
+      var mid = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          mid.unobserve(en.target);
+          var b = balls.filter(function (x) { return x.card === en.target; })[0];
+          if (!b) return;
+          var r = en.target.getBoundingClientRect();
+          b.tx = b.px = r.width * 0.75; b.ty = b.py = r.height * 0.25; b.target = 1; loop(b);
+          setTimeout(function () { b.target = 0; }, 1600);
+        });
+      }, { threshold: 0.6 });
+      balls.forEach(function (b) { mid.observe(b.card); });
+    }
+    var rt = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () { balls.forEach(function (b) { if (b.drawn) draw(b); }); }, 150);
+    });
   }
 
   function rdLocShow() {
@@ -5650,12 +5835,14 @@
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
   run('location faq button', rdLocFaqBtn);
+  run('location button lines', rdLocBtnAlt);
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('post cards', rdPostCards);
   // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
   if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
   run('location showcase', rdLocShow);
+  run('location balls', rdLocBalls);
 
   if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
   else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
