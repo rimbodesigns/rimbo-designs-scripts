@@ -1,10 +1,10 @@
 /* The ball: the brand's grainy circle (docs/brand.md), standing for the project.
    Fade and shader come from prototype/brand/src.html: Deep Orange through Hot Edge and steel into beige,
    mixed in OKLab so nothing goes grey. What's new here is what it does:
-   - its area follows the price, so it starts small at €0 and grows with every pick
-   - under the minimum it's cool (steel and beige), the orange comes in on the way to the minimum
-   - every pick floods it with orange and it fades back, reaching the minimum floods it all the way
-   - the pointer warms it up. Idle it drifts at 15 frames a second, like a print; moving, it runs smooth
+   - its area follows the price: that's its link to the project, so it starts small and grows with every pick
+   - it lives on its own: the colours flow and turn around inside it, and the ball floats and breathes.
+     Orange is one colour among the others at any size, it never takes over
+   - a pick stirs the colours and warms them a little, the pointer warms the spot under it
    Also makes the page's grain. Without WebGL2 there's no ball and nothing else changes. */
 (function () {
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -42,7 +42,7 @@
   var FRAG = "#version 300 es\n" +
     "precision highp float;\n" +
     "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
-    "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec2 tilt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
+    "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
     "out vec4 outColor;\n" +
     "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
     "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
@@ -64,13 +64,14 @@
     "  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
     "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n" +
     "  float h = hash(vec2(seed));\n" +
-    "  float g = 0.31 * dot(l, tilt) + 0.6;\n" + // the ball sits in a corner: orange on the edge you see, beige towards the middle
-    "  vec2 drift = vec2(sin(t * 0.21 + h * 6.2831), cos(t * 0.17 + h * 12.566)) * 0.32;\n" +
+    "  float ang = h * 6.2831 + t * 0.16;\n" + // the colours turn around inside the ball, wherever it's cropped
+    "  float g = 0.53 + 0.14 * dot(l, vec2(cos(ang), sin(ang)));\n" +
+    "  vec2 drift = vec2(sin(t * 0.34 + h * 6.2831), cos(t * 0.27 + h * 12.566)) * 0.62;\n" +
     "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
-    "  float f = fbm(l * 0.6 + w * 1.1 + h * 90.0);\n" +
-    "  float v = g + (f - 0.5) * 1.1 + bias - heat * 0.75;\n" +
+    "  float f = fbm(l * 1.0 + w * 1.3 + h * 90.0);\n" +
+    "  float v = g + (f - 0.5) * 1.5 + bias - heat * 0.45;\n" +
     "  float dp = length(p - ptr) / max(ptrR, 1.0);\n" +
-    "  v -= ptrAmt * 0.95 * exp(-dp * dp);\n" +
+    "  v -= ptrAmt * 0.6 * exp(-dp * dp);\n" +
     "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n" +
     "  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
     "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
@@ -87,19 +88,20 @@
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   var U = {};
-  ["res", "center", "R", "seed", "bias", "heat", "grainScale", "t", "ptr", "ptrR", "ptrAmt", "tilt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+  ["res", "center", "R", "seed", "bias", "heat", "grainScale", "t", "ptr", "ptrR", "ptrAmt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
   gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ["E4441C", "E4566A", "4B7888", "DACCAE"].map(oklab))));
   gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
   gl.uniform1f(U.seed, 14);
 
   var MAX = 30000; // the price at which the ball is full size
-  var B = { R: 0, tR: 0, bias: .42, tBias: .42, heat: 0, kick: 0, cx: 0, cy: 0, min: 0, max: 0, value: 0, minimum: 1, seen: false };
+  var FLOW = +new URLSearchParams(location.search).get("flow") || 1; // ?flow=2: the colours move twice as fast
+  var B = { R: 0, tR: 0, bias: .12, tBias: .12, heat: 0, kick: 0, stir: 0, cx: 0, cy: 0, min: 0, max: 0, value: 0, minimum: 1, seen: false };
   var P = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
-  var dpr = 1, time = 0, last = 0, lastDraw = 0, onScreen = true;
+  var dpr = 1, time = 0, float = 0, last = 0, lastDraw = 0, onScreen = true;
 
   function targets() {
     B.tR = B.min + (B.max - B.min) * Math.sqrt(Math.min(B.value, MAX) / MAX); // area follows the price
-    B.tBias = .42 - .44 * Math.min(1, B.value / B.minimum);
+    B.tBias = .12 - .06 * Math.min(1, B.value / B.minimum); // a touch cooler while it's small
   }
 
   // Wide: fixed, in the empty corner under the price card. Phone: at the top of the page, behind the title.
@@ -116,16 +118,18 @@
     } else {
       B.cx = w * .98; B.cy = 30; B.min = 62; B.max = 165;
     }
-    gl.uniform2f(U.tilt, 1, wide ? 1 : -1); // wide: the ball is in the bottom corner, phone: the top one
     targets();
     if (reduce) { B.R = B.tR; B.bias = B.tBias; }
   }
 
   function draw() {
-    gl.uniform2f(U.res, cv.width, cv.height); gl.uniform2f(U.center, B.cx * dpr, B.cy * dpr);
-    gl.uniform1f(U.R, Math.max(B.R, 1) * dpr); gl.uniform1f(U.bias, B.bias); gl.uniform1f(U.heat, B.heat);
+    // It floats and breathes on its own (still with reduced motion)
+    var fx = reduce ? 0 : Math.sin(float * .31) * 16 + Math.sin(float * .13) * 10, fy = reduce ? 0 : Math.cos(float * .23) * 14;
+    var breath = reduce ? 1 : 1 + Math.sin(float * .37) * .022;
+    gl.uniform2f(U.res, cv.width, cv.height); gl.uniform2f(U.center, (B.cx + fx) * dpr, (B.cy + fy) * dpr);
+    gl.uniform1f(U.R, Math.max(B.R * breath, 1) * dpr); gl.uniform1f(U.bias, B.bias); gl.uniform1f(U.heat, B.heat);
     gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, time);
-    gl.uniform2f(U.ptr, P.x * dpr, P.y * dpr); gl.uniform1f(U.ptrR, Math.max(B.R * .55, 90) * dpr); gl.uniform1f(U.ptrAmt, P.amt);
+    gl.uniform2f(U.ptr, P.x * dpr, P.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(B.R * .4, 80), 200) * dpr); gl.uniform1f(U.ptrAmt, P.amt);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
@@ -136,14 +140,16 @@
     requestAnimationFrame(frame);
     if (document.hidden || !onScreen) { last = now; return; }
     var dt = Math.min((now - last) / 1000, .05); last = now;
-    time += dt;
+    time += dt * FLOW * (1 + B.stir * 7); // a pick stirs the colours, then they settle back to their own pace
+    float += dt;
+    B.stir *= Math.pow(.955, dt * 60);
     B.R = ease(B.R, B.tR, .07, dt);
     B.bias = ease(B.bias, B.tBias, .05, dt);
     B.heat = ease(B.heat, B.kick, .16, dt);
     B.kick *= Math.pow(.962, dt * 60);
     P.x = ease(P.x, P.tx, .12, dt); P.y = ease(P.y, P.ty, .12, dt); P.amt = ease(P.amt, P.target, .06, dt);
-    var moving = Math.abs(B.tR - B.R) > .4 || Math.abs(B.tBias - B.bias) > .003 || B.heat > .004 || B.kick > .004 || Math.abs(P.target - P.amt) > .004 || P.target;
-    if (!moving && now - lastDraw < 66) return;
+    var moving = Math.abs(B.tR - B.R) > .4 || B.heat > .004 || B.kick > .004 || B.stir > .01 || Math.abs(P.target - P.amt) > .004 || P.target;
+    if (!moving && now - lastDraw < 33) return; // on its own: 30 frames a second is plenty for slow colours
     lastDraw = now;
     draw();
   }
@@ -170,10 +176,11 @@
       B.value = value; B.minimum = minimum; B.seen = true;
       targets();
       if (reduce) { B.R = B.tR; B.bias = B.tBias; draw(); return; }
-      if (first) B.kick = .55;
-      else if (crossed) B.kick = 1;
-      else if (d > 0) B.kick = Math.max(B.kick, .3 + .45 * Math.min(1, d / 2000));
-      else if (d < 0) B.kick = Math.max(B.kick, .12);
+      if (first) return;
+      var size = Math.min(1, Math.abs(d) / 2000);
+      if (d) B.stir = Math.min(1, B.stir + .35 + .4 * size);
+      if (crossed) B.kick = .4;
+      else if (d > 0) B.kick = Math.max(B.kick, .12 + .14 * size);
     }
   };
 })();
