@@ -164,6 +164,7 @@
   var onceFunctionsInitialized = false;
   var pageStyles = [];         // the <style> tags from that page's head and footer code, which live outside .page-wrapper
   var scrollMemory = {};       // where you were on each address, for the back button
+  var linkHash = '';           // the #anchor of the link being followed
 
   var hasScrollTrigger = typeof window.ScrollTrigger !== 'undefined';
   var rmMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -250,6 +251,7 @@
   function swapPage(data) {
     var next = data.next.container;
     var doc = barba.dom.toDocument(data.next.html);
+    if (linkHash && !location.hash) history.replaceState(history.state, '', location.href + linkHash); // Barba drops the anchor from the address
     if (data.current.container) data.current.container.remove();
     closePage();
     syncHead(doc);
@@ -313,6 +315,7 @@
         return Promise.resolve();
       }
       navigating = true;
+      linkHash = new URL(href, location.href).hash;
       return Promise.resolve(go.call(barba, href, trigger, e)).finally(function () { navigating = false; });
     };
 
