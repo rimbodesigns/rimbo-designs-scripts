@@ -79,9 +79,12 @@ body { font: 13px/1.6 "RM MONO", ui-monospace, Menlo, monospace; }
 .calc_subs .calc_toggle { padding: 10px 0; }
 
 /* Item sold by amount (content migration): three choices under its switch */
-.calc_hours { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 4px 0 16px; }
+.calc_hours { padding: 2px 0 20px; border-bottom: 1px solid var(--line); }
+.calc_hours[hidden] { display: none; }
+.calc_step > div > .calc_hours:last-child { border-bottom: 0; }
+.calc_step > div > .calc_item:has(+ .calc_hours:not([hidden])) { border-bottom: 0; } /* the question belongs to its switch */
 .calc_step > div > .calc_item:has(+ .calc_hours[hidden]:last-child) { border-bottom: 0; }
-.calc_hours_rec { flex-basis: 100%; font-size: 12px; }
+.calc_hours_q { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .calc_seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .calc_seg_opt { position: relative; cursor: pointer; }
 .calc_seg_opt input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }

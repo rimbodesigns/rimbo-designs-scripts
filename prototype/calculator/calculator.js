@@ -1,7 +1,7 @@
 /* Project calculator. Plain JS, no build.
    Every price and every info text lives in CONFIG. Prices are the draft numbers from docs/offer.md.
-   Prices, not hours. Content migration is priced by amount (a little / quite a bit / a lot); the hours
-   behind those three live in CONFIG only. */
+   Prices, not hours. The one rate on show is content migration's €97 an hour; the client picks how much
+   content they have and the price follows (the hours behind each amount live in CONFIG). */
 (function () {
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
@@ -102,7 +102,8 @@
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
       // Three amounts, not an hours field (Rimbo, 2026-11-05): €97 an hour behind the scenes
       { id: "migration",  group: "search", label: "Content migration",                         hourly: 97,
-        levels: [{ label: "A little", hours: 2 }, { label: "Quite a bit", hours: 4 }, { label: "A lot", hours: 8 }], start: 0,
+        question: "How much content do you have?",
+        levels: [{ label: "Very little", hours: 2 }, { label: "Quite a bit", hours: 4 }, { label: "A lot", hours: 8 }], start: 0,
         info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Pick roughly how much you have; the proposal confirms it." },
       { id: "loader",     group: "motion", label: "Custom page loader",                        price: 800,  info: "A branded intro animation while the site loads." },
       { id: "transition", group: "motion", label: "Custom page transitions",                   price: 900,  info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
@@ -349,7 +350,7 @@
       box.appendChild(el("legend", "", String(gi + 3).padStart(2, "0") + " " + g.legend));
       box.appendChild(list);
       CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
-        var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? "from " + eur(t.hourly * t.levels[0].hours) : "+" + eur(t.price);
+        var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
         list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
         if (t.hourly) list.appendChild(makeHours(t));
       });
@@ -357,10 +358,12 @@
     });
   }
 
-  // Item sold by amount: switched on, three choices open under it (real radio buttons, so arrow keys work)
+  // Hourly item: switched on, a question with three choices opens under it (real radio buttons, so arrow keys work)
   function makeHours(t) {
-    var wrap = el("div", "calc_subs calc_hours"); wrap.id = "hours-" + t.id; wrap.hidden = true;
-    var group = el("div", "calc_seg"); group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", "How much is there to move?");
+    var wrap = el("div", "calc_hours"); wrap.id = "hours-" + t.id; wrap.hidden = true;
+    var q = el("p", "calc_hours_q", t.question); q.id = "hours-q-" + t.id;
+    var group = el("div", "calc_seg"); group.setAttribute("role", "radiogroup"); group.setAttribute("aria-labelledby", q.id);
+    wrap.appendChild(q);
     t.levels.forEach(function (l) {
       var opt = el("label", "calc_seg_opt"), input = el("input");
       input.type = "radio"; input.name = "level-" + t.id; input.value = l.hours;
@@ -404,7 +407,7 @@
       var on = !!state.toggles[t.id];
       $("hours-" + t.id).hidden = !on;
       $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
-      $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : "from " + eur(t.hourly * t.levels[0].hours);
+      $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
     });
 
     var r = calc(), reached = r.scope >= CONFIG.minimum;
@@ -507,8 +510,6 @@
       var price = $("price-" + id); if (!price) return;
       var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", C.recommended));
       price.parentNode.insertBefore(tag, price);
-      var t = byId[id];
-      if (t && t.hourly) $("hours-" + id).appendChild(el("span", "calc_rec_hint calc_hours_rec", C.recommended.toLowerCase() + ": " + levelOf(t, clampHours(t, r.h && r.h[id])).label.toLowerCase()));
     });
   }
 
