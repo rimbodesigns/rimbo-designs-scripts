@@ -5042,36 +5042,36 @@
   }
 
   // =========================================================
-  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past,
-  // and the light page goes black while it is on screen. Not rdBand: that one belongs to a hero at the top of the
-  // page. Here Osmo's slider starts when the section comes near, the clips only load and play on screen, and a
-  // hidden Next button steps the drum every 5 s. .loc_bg is the black layer behind the page (CSS in the template head).
+  // CITY PAGES — the showcase under the hero (Rimbo, 6 Nov): the home V4 drum as a plain section you scroll past, on
+  // the light page (the fade to black was rejected). Not rdBand: that one belongs to a hero at the top of the page.
+  // Here Osmo's slider starts when the section comes near, posters load then too, each clip only loads and plays
+  // once its card is on screen, and a hidden Next button steps the drum every 5 s while it is in view.
   // =========================================================
+  // City pages: the FAQ's closing line in the CMS is a plain link. It becomes the site's button here, before rdButtons
+  // runs, so it gets the same hover as every other .btn (the FAQ script in the template then moves the line under the list)
+  function rdLocFaqBtn() {
+    var rich = qs('.loc_faq .w-richtext'), line = rich && rich.lastElementChild;
+    var a = line && line.tagName === 'P' && line.children.length === 1 && line.firstElementChild;
+    if (!a || a.tagName !== 'A' || line.textContent.trim() !== a.textContent.trim()) return;
+    var label = a.textContent.trim();
+    a.className = 'btn is-ink w-inline-block';
+    a.setAttribute('data-btn-alt', 'Home');
+    a.innerHTML = '<div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t"></div></div></div></div>';
+    qs('.btn_t', a).textContent = label;
+  }
+
   function rdLocShow() {
     var sec = qs('.loc_show'), slider = sec && qs('[data-spatial-slider-init]', sec);
     if (!slider) return;
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    var bg = document.createElement('div');
-    bg.className = 'loc_bg'; bg.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(bg);
-    // Black comes in quickly as the drum rises and is gone again before the next heading is halfway up: dark text
-    // never sits on black for long. Read straight from where the section is, so scrolling either way can't disagree
-    function paintBg() {
-      var r = sec.getBoundingClientRect(), vh = window.innerHeight;
-      var fadeIn = (vh * 0.85 - r.top) / (vh * 0.4), fadeOut = (r.bottom - vh * 0.55) / (vh * 0.45);
-      var atTop = window.scrollY / (vh * 0.1); // the page opens light, however high the section sits
-      bg.style.opacity = Math.max(0, Math.min(1, fadeIn, fadeOut, atTop));
-    }
-    window.addEventListener('scroll', paintBg, { passive: true });
-    window.addEventListener('resize', paintBg);
-    paintBg();
 
     function watchClips() {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           var v = en.target;
           if (en.isIntersecting && !reduced) {
+            var src = v.getAttribute('data-src'); // a clip only downloads once its card is on screen
+            if (src && v.getAttribute('src') !== src) v.setAttribute('src', src);
             v.playbackRate = parseFloat(v.getAttribute('data-rate')) || 1;
             var p = v.play();
             if (p && p.catch) p.catch(function () {});
@@ -5082,10 +5082,20 @@
       return io;
     }
 
-    var started = false, onScreen = false, clips = null, next = null;
+    // The drum stands still with its first card in the middle until it is really in view; only then the clock runs,
+    // so the first step comes a full 5 s after the visitor arrives. Leaving stops the clock
+    var started = false, onScreen = false, clips = null, next = null, clock = null;
+    function step() {
+      if (!document.hidden && slider.getAttribute('data-spatial-slider-drag-status') !== 'grabbing') next.click();
+    }
+    function setClock() {
+      if (onScreen && started && !reduced && !clock) clock = setInterval(step, 5000);
+      else if (!onScreen && clock) { clearInterval(clock); clock = null; }
+    }
     function start() {
       if (started || !window.Draggable || !window.InertiaPlugin || !window.CustomEase) return;
       started = true;
+      qsa('video[data-poster]', sec).forEach(function (v) { v.setAttribute('poster', v.getAttribute('data-poster')); });
       next = document.createElement('button'); // Osmo wires every control it finds, so a timer can press Next like a visitor
       next.type = 'button'; next.tabIndex = -1;
       next.setAttribute('data-spatial-slider-control', 'next'); next.setAttribute('aria-hidden', 'true');
@@ -5098,12 +5108,10 @@
         clearTimeout(rt);
         rt = setTimeout(function () { if (clips) clips.disconnect(); clips = watchClips(); }, 450);
       });
-      if (!reduced) setInterval(function () {
-        if (onScreen && !document.hidden && slider.getAttribute('data-spatial-slider-drag-status') !== 'grabbing') next.click();
-      }, 5000);
+      setClock();
     }
     new IntersectionObserver(function (entries) { if (entries[0].isIntersecting) start(); }, { rootMargin: '60% 0px' }).observe(sec);
-    new IntersectionObserver(function (entries) { onScreen = entries[0].isIntersecting; }, { threshold: 0.3 }).observe(sec);
+    new IntersectionObserver(function (entries) { onScreen = entries[0].isIntersecting; setClock(); }, { threshold: 0.6 }).observe(sec);
 
     sec.addEventListener('mouseover', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p) { var l = qs('.band_panel-label', p); if (l) l.classList.add('is-on'); } });
     sec.addEventListener('mouseout', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p && !p.contains(e.relatedTarget)) { var l = qs('.band_panel-label', p); if (l) l.classList.remove('is-on'); } });
@@ -5641,6 +5649,7 @@
   if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
+  run('location faq button', rdLocFaqBtn);
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
   run('post cards', rdPostCards);
