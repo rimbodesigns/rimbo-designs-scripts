@@ -87,7 +87,7 @@
       update: function (s, p) { s.d.turn = 2 * p; var W = s.d.W; s.d.cards.forEach(function (c, i) { var q = win(p, Math.abs(c.k) * 0.1, 0.9), ang = c.k * 0.55 - 1.5; c.fx = Math.cos(ang) * W * 0.8 * q; c.fy = Math.sin(ang) * W * 0.7 * q - W * 0.2 * q; c.frot = c.k * 14 * q; }); s.leave(p * 0.35); } },
     { id: 'roulette', name: 'Roulette', cost: 'big', next: 'Work', sub: 'the next section rises in the middle',
       note: 'Your idea: the scroll lifts the camera until you look down on the drum, each card turning face-up, so it becomes a ring of tiles with the next section rising in its middle. The ring keeps turning like a wheel.',
-      update: function (s, p, t) { var e = ease(p / 0.7); s.d.tipAxis = 90 * e; s.d.scale = 1 - 0.42 * e; s.d.dy = s.d.H * 0.06 * e; s.d.turn = 2 * p + (p > 0.7 ? (p - 0.7) * 6 : 0); s.nextShow(win(p, 0.55, 0.35)); } },
+      update: function (s, p, t) { var e = ease(p / 0.7); s.d.tipAxis = 90 * e; s.d.scale = 1 - 0.42 * e; s.d.turn = 2 * p + (p > 0.7 ? (p - 0.7) * 6 : 0); s.nextShow(win(p, 0.55, 0.35)); } },
     { id: 'fly', name: 'Fly-through', cost: 'medium', next: 'Work', sub: 'you came in through the drum',
       note: 'Instead of scrolling up, the camera pushes forward through the gap beside the middle card, the cards pass by the edges, and the next section is already there behind them.',
       update: function (s, p) { var e = ease(p / 0.85), gapX = s.d.W * 0.1325; s.d.zoom = 1 + 4.5 * e; s.d.dx = -gapX * s.d.zoom * e; s.d.dy = s.d.H * 0.04 * e; s.d.turn = 0.3 * p; s.nextShow(win(p, 0.55, 0.35)); } }, // the gap right of the middle card drifts to the centre as the camera comes in
