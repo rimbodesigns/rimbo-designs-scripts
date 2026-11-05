@@ -5054,8 +5054,9 @@
     // never sits on black for long. Read straight from where the section is, so scrolling either way can't disagree
     function paintBg() {
       var r = sec.getBoundingClientRect(), vh = window.innerHeight;
-      var fadeIn = (vh * 0.85 - r.top) / (vh * 0.4), fadeOut = (r.bottom - vh * 0.5) / (vh * 0.4);
-      bg.style.opacity = Math.max(0, Math.min(1, fadeIn, fadeOut));
+      var fadeIn = (vh * 0.85 - r.top) / (vh * 0.4), fadeOut = (r.bottom - vh * 0.55) / (vh * 0.45);
+      var atTop = window.scrollY / (vh * 0.1); // the page opens light, however high the section sits
+      bg.style.opacity = Math.max(0, Math.min(1, fadeIn, fadeOut, atTop));
     }
     window.addEventListener('scroll', paintBg, { passive: true });
     window.addEventListener('resize', paintBg);
