@@ -4753,6 +4753,7 @@
     ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
+    if (/^\/home-v4$/.test(here.replace(prefix, ''))) logoSrc = brushLogoSrc(); // home V4 tries the F Brush logo first, like its footer (Rimbo, 5 Nov)
     var mode = (location.search.match(/[?&]menu=(flat|blur)/) || [])[1] || 'curve';
     // hover extras to try, alone or combined: ?hover=magnet,blur,stretch,lean (default: only the fade)
     var hover = ((location.search.match(/[?&]hover=([a-z,]+)/) || [])[1] || '').split(',');
@@ -4968,14 +4969,17 @@
   // 1 when it fills the screen; scrolling back plays it in reverse. Page by page until Rimbo's go.
   // =========================================================
   var FOOTER_SCRIPT = (document.currentScript && document.currentScript.src) || '';
+  // F Brush, Rimbo's refined logo (5 Nov): it ships next to main.min.js (same tag); on localhost it comes from /media/
+  function brushLogoSrc() {
+    return /\/main(\.min)?\.js/.test(FOOTER_SCRIPT) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(FOOTER_SCRIPT)
+      ? FOOTER_SCRIPT.replace(/\/main(\.min)?\.js.*$/, '/media/logo-f-brush.svg') : '/media/logo-f-brush.svg';
+  }
   function rdFooter() {
     if (qs('.rdf')) return;
     var nl = /^\/nl(\/|$)/.test(location.pathname), prefix = nl ? '/nl' : '';
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    // the logo file ships next to main.min.js (same tag); on localhost it comes from /media/
-    var logoSrc = /\/main(\.min)?\.js/.test(FOOTER_SCRIPT) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(FOOTER_SCRIPT)
-      ? FOOTER_SCRIPT.replace(/\/main(\.min)?\.js.*$/, '/media/logo-f-brush.svg') : '/media/logo-f-brush.svg';
+    var logoSrc = brushLogoSrc();
     var ACCENT = [243, 86, 46], CREAM = [248, 245, 238];
     var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
     var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -5439,17 +5443,20 @@
     }
     if (reduce) { curtain(1); draw(1); return; }
     curtain(0); draw(0);
-    var on = false;
-    new IntersectionObserver(function (es) { on = es[0].isIntersecting; }, { rootMargin: '0px 0px 10% 0px' }).observe(foot);
-    window.addEventListener('resize', function () { last = -1; });
-    (function tick() {
-      if (on) {
-        var r = foot.getBoundingClientRect();
-        var p = clamp((window.innerHeight - r.top) / r.height);
-        if (Math.abs(p - last) > 0.0005) { last = p; curtain(p); draw(p); }
-      }
-      requestAnimationFrame(tick);
-    })();
+    // the loop only runs while the footer is (nearly) on screen, so the rest of the page pays nothing for it
+    var on = false, raf = 0;
+    function tick() {
+      var r = foot.getBoundingClientRect();
+      var p = clamp((window.innerHeight - r.top) / r.height);
+      if (Math.abs(p - last) > 0.0005) { last = p; curtain(p); draw(p); }
+      raf = on ? requestAnimationFrame(tick) : 0;
+    }
+    new IntersectionObserver(function (es) {
+      on = es[0].isIntersecting;
+      if (on && !raf) raf = requestAnimationFrame(tick);
+      if (!on) { last = -1; tick(); } // one last frame, so it rests in its scrolled-away state
+    }, { rootMargin: '0px 0px 10% 0px' }).observe(foot);
+    window.addEventListener('resize', function () { last = -1; if (!raf) tick(); });
   }
 
   // =========================================================
