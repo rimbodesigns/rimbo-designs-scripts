@@ -1,16 +1,82 @@
 /* =========================================================
    Rimbo Designs — site JavaScript (rimbodesigns.com)
    Loaded once, site-wide, from Site settings → Footer, below GSAP,
-   ScrollTrigger, SplitText and Lenis (no defer):
+   ScrollTrigger, SplitText, Lenis, CustomEase and Barba (no defer):
    <script src="https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@vX.Y.Z/main.min.js"></script>
    (jsDelivr builds main.min.js from this file automatically)
 
+   Built on Osmo's page transition boilerplate (Barba): see PAGE TRANSITIONS below for what runs when.
    One section per page or feature, each in its own function so names
-   can't clash. The router at the bottom decides what runs where.
+   can't clash. initPageFunctions() at the bottom decides what runs where.
    ========================================================= */
 
 (function () {
   'use strict';
+
+  // =========================================================
+  // PAGE SCOPE
+  // With Barba the page swaps without a reload, so nothing clears the old page's listeners, clocks and loops any more.
+  // Everything a page starts is written down here and stopped when it leaves. In this file that is automatic for
+  // setTimeout, setInterval, requestAnimationFrame and the observers (the names below replace the browser's, inside
+  // this file only). For the rest use: rdOn(window, 'resize', fn) instead of rdOn(window, 'resize', fn),
+  // rdTick(fn) instead of rdTick(fn), rdHead(style) instead of rdHead(style).
+  // Code that runs later without a known page (an animation's onComplete, a click) belongs to the page on screen. What has
+  // to stay for the whole visit (the menu, Lenis) is started outside a page or inside stay(). Without Barba all of this
+  // passes straight through.
+  // =========================================================
+  var zone = null;
+  var pageScope = null;   // the page on screen
+  var staying = false;
+  function scopeNow() { return zone || (staying ? null : pageScope); }
+  function stay(fn) {
+    staying = true;
+    try { fn(); } finally { staying = false; }
+  }
+  function inZone(fn) {
+    var scope = scopeNow();
+    if (!scope) return fn;
+    return function () {
+      if (scope.dead) return;
+      var before = zone;
+      zone = scope;
+      try { return fn.apply(this, arguments); } finally { zone = before; }
+    };
+  }
+  function rdUndo(fn) {
+    var scope = scopeNow();
+    if (scope) scope.undo.push(fn);
+  }
+  function rdOn(target, type, fn, options) {
+    target.addEventListener(type, fn, options);
+    rdUndo(function () { target.removeEventListener(type, fn, options); });
+  }
+  function addEventListener(type, fn, options) { rdOn(window, type, fn, options); } // the short way of writing window.addEventListener
+  function rdTick(fn) {
+    gsap.ticker.add(fn);
+    rdUndo(function () { gsap.ticker.remove(fn); });
+  }
+  function rdHead(el) {
+    document.head.appendChild(el);
+    rdUndo(function () { el.remove(); });
+  }
+  function scopedObserver(Native) {
+    return function (fn, options) {
+      var observer = new Native(inZone(fn), options);
+      rdUndo(function () { observer.disconnect(); });
+      return observer;
+    };
+  }
+  var browserTimeout = window.setTimeout.bind(window), browserInterval = window.setInterval.bind(window);
+  var setTimeout = function (fn, ms) { return browserTimeout(inZone(fn), ms); };
+  var requestAnimationFrame = function (fn) { return window.requestAnimationFrame(inZone(fn)); };
+  var setInterval = function (fn, ms) {
+    var id = browserInterval(inZone(fn), ms);
+    rdUndo(function () { clearInterval(id); });
+    return id;
+  };
+  var IntersectionObserver = scopedObserver(window.IntersectionObserver);
+  var ResizeObserver = scopedObserver(window.ResizeObserver);
+  var MutationObserver = scopedObserver(window.MutationObserver);
 
   // =========================================================
   // SETTINGS
@@ -78,6 +144,400 @@
       el.appendChild(span);
     });
   }
+
+  // =========================================================
+  // OSMO PAGE TRANSITION BOILERPLATE
+  // Barba swaps .page-wrapper without a reload. On the live site (or with ?barba=0 on staging) none of this starts:
+  // every page simply loads and runs initOnceFunctions(), as before.
+  // Differences from Osmo's file, on purpose:
+  // - no gsap.defaults(): it would change the ease and duration of every animation on the site. Use ease: 'osmo' by hand
+  // - Lenis keeps our settings and GSAP's lag smoothing stays on
+  // - page code runs in swapPage(), at the moment the old page is gone, not in Barba's beforeEnter. A transition must call
+  //   swapPage() while the screen is covered or empty: the page functions look in the whole document and do heavy work
+  // =========================================================
+  var barbaOn = typeof barba !== 'undefined' && typeof CustomEase !== 'undefined' &&
+    /\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname) &&
+    !/[?&]barba=0/.test(location.search) &&
+    !(window.Webflow && Webflow.env('editor') !== undefined);
+
+  var nextPage = document;
+  var onceFunctionsInitialized = false;
+  var pageStyles = [];         // the <style> tags from that page's head and footer code, which live outside .page-wrapper
+  var scrollMemory = {};       // where you were on each address, for the back button
+
+  var hasScrollTrigger = typeof window.ScrollTrigger !== 'undefined';
+  var rmMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reducedMotion = rmMQ.matches;
+  if (rmMQ.addEventListener) rmMQ.addEventListener('change', function (e) { reducedMotion = e.matches; });
+
+  function has(selector) { return !!nextPage.querySelector(selector); }
+
+  // -----------------------------------------
+  // FUNCTION REGISTRY
+  // -----------------------------------------
+
+  // First load only. What runs here stays for the whole visit
+  function initOnceFunctions() {
+    if (onceFunctionsInitialized) return;
+    onceFunctionsInitialized = true;
+    pageStyles = qsa('head style');
+    run('full screen nav', rdNavFull); // before the band, so its opening can fade the logo + burger in last
+    openPage();
+    inPage(initPageFunctions);
+    // These wait for the whole page, like the old code they replaced
+    onReady(function () {
+      pageStyles = pageStyles.concat(qsa('body > style')); // a page's footer code comes after this file, so only now
+      stay(function () { run('lenis', rdLenis); });
+      inPage(initLateFunctions);
+    });
+  }
+
+  // Every new page after the first, while the screen is covered: the old page is gone, the new one is in place
+  function initBeforeEnterFunctions(next, doc) {
+    nextPage = next || document;
+    inPage(function () {
+      runPageScripts(doc.head);   // the order of a real page load: head code, this file, footer code, then Webflow
+      initPageFunctions();
+      run('lenis buttons', rdLenisButtons);
+      runPageScripts(doc.body);
+      restartWebflow();
+      initLateFunctions();
+    });
+  }
+
+  // After the enter animation is done
+  function initAfterEnterFunctions(next) {
+    nextPage = next || document;
+    if (window.lenis) window.lenis.resize();
+    if (hasScrollTrigger) ScrollTrigger.refresh();
+  }
+
+  // -----------------------------------------
+  // PAGE TRANSITIONS
+  // -----------------------------------------
+
+  function runPageOnceAnimation(next) {
+    var tl = gsap.timeline();
+    tl.call(function () { resetPage(next); }, null, 0);
+    return tl;
+  }
+
+  function runPageLeaveAnimation(current) {
+    var tl = gsap.timeline({ onComplete: function () { current.remove(); } });
+    if (reducedMotion) return tl.set(current, { autoAlpha: 0 }); // immediate swap
+    tl.to(current, { autoAlpha: 0, duration: 0.4, ease: 'osmo' });
+    return tl;
+  }
+
+  function runPageEnterAnimation(next, data) {
+    var tl = gsap.timeline();
+
+    if (reducedMotion) { // immediate swap
+      tl.call(swapPage, [data], 0.05);
+      tl.set(next, { autoAlpha: 1 });
+      return new Promise(function (resolve) { tl.call(resolve); });
+    }
+
+    tl.add('startEnter', 0.6);
+    tl.call(swapPage, [data], 'startEnter');
+    tl.fromTo(next, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: 'osmo' }, 'startEnter');
+    tl.add('pageReady');
+
+    return new Promise(function (resolve) { tl.call(resolve, null, 'pageReady'); });
+  }
+
+  // The moment between two pages: old page out, new page in place and running. Happens once per navigation
+  function swapPage(data) {
+    var next = data.next.container;
+    var doc = barba.dom.toDocument(data.next.html);
+    if (data.current.container) data.current.container.remove();
+    closePage();
+    syncHead(doc);
+    resetPage(next);
+    openPage();
+    initBeforeEnterFunctions(next, doc);
+    restoreScroll(data);
+    if (window.lenis) window.lenis.resize();
+    if (hasScrollTrigger) ScrollTrigger.refresh();
+  }
+
+  // -----------------------------------------
+  // BARBA HOOKS + INIT
+  // -----------------------------------------
+
+  function startBarba() {
+    gsap.registerPlugin(CustomEase);
+    CustomEase.create('osmo', '0.625, 0.05, 0, 1');
+    history.scrollRestoration = 'manual';
+
+    // Barba finds a page by attributes. Our pages don't carry them (40 pages to edit by hand, and every new one to
+    // remember), so they are set here: on the page on screen now, and on every page Barba fetches
+    document.body.setAttribute('data-barba', 'wrapper');
+    pageContainer(document.body).setAttribute('data-barba', 'container');
+    var toElement = barba.dom.toElement;
+    barba.dom.toElement = function (html) {
+      var root = toElement.call(barba.dom, html);
+      pageContainer(root).setAttribute('data-barba', 'container');
+      return root;
+    };
+
+    barba.hooks.beforeLeave(function (data) {
+      scrollMemory[data.current.url.href] = window.scrollY;
+      if (rdNavFull.close) rdNavFull.close();
+    });
+
+    // beforeEnter and afterEnter also fire on the first load, where there is nothing to swap: that is the check on current
+    barba.hooks.beforeEnter(function (data) {
+      if (!data.current.container) return;
+      // The new page waits on top, out of the flow, until swapPage() puts it in place
+      gsap.set(data.next.container, { position: 'fixed', top: 0, left: 0, right: 0 });
+      if (window.lenis) window.lenis.stop();
+      if (window.Webflow) Webflow.destroy(); // stopped here, started again in swapPage(): see restartWebflow()
+      applyThemeFrom(data.next.container);
+      return loadPageLibraries(barba.dom.toDocument(data.next.html)); // a page's own plugins (Draggable on the drum pages)
+    });
+
+    barba.hooks.enter(function (data) { initBarbaNavUpdate(data); });
+
+    barba.hooks.afterEnter(function (data) {
+      if (!data.current.container) return;
+      initAfterEnterFunctions(data.next.container);
+      if (window.lenis) window.lenis.start();
+    });
+
+    // One navigation at a time. preventRunning only starts once the page has been fetched, which leaves a gap for a second click
+    var navigating = false, go = barba.go;
+    barba.go = function (href, trigger, e) {
+      if (navigating && trigger && trigger.nodeType) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        return Promise.resolve();
+      }
+      navigating = true;
+      return Promise.resolve(go.call(barba, href, trigger, e)).finally(function () { navigating = false; });
+    };
+
+    barba.init({
+      debug: false,
+      timeout: 7000,
+      preventRunning: true,
+      prevent: barbaSkips,
+      transitions: [{
+        name: 'default',
+        sync: true,
+        once: function (data) {
+          initOnceFunctions();
+          return runPageOnceAnimation(data.next.container);
+        },
+        leave: function (data) { return runPageLeaveAnimation(data.current.container); },
+        enter: function (data) { return runPageEnterAnimation(data.next.container, data); }
+      }]
+    });
+  }
+
+  // Links Barba leaves to the browser
+  function barbaSkips(link) {
+    var el = link.el, url = new URL(link.href, location.href);
+    var isNl = function (p) { return /^\/nl(\/|$)/.test(p); };
+    if (el.hasAttribute('hreflang')) return true;                                    // the language switch has its own leave
+    if (isNl(url.pathname) !== isNl(location.pathname)) return true;                 // so does every other way into the other language
+    if (url.pathname === location.pathname && url.hash) return true;                 // an anchor on this page
+    if (/\.(pdf|zip|png|jpe?g|webp|svg|mp4)$/i.test(url.pathname)) return true;      // files
+    return false;
+  }
+
+  // -----------------------------------------
+  // GENERIC + HELPERS
+  // -----------------------------------------
+
+  // The one element that holds a whole page: .page-wrapper, or .main-wrapper on the oldest case studies. Some pages keep
+  // their footer next to it (Contact, the newsletter), and those get a plain wrapper around the two, so it all swaps as one
+  function pageContainer(root) {
+    var kids = Array.prototype.filter.call(root.children, function (el) {
+      return !/^(SCRIPT|STYLE|NOSCRIPT|LINK|META|TITLE|BASE)$/.test(el.tagName) && !/bold-nav|w-webflow-badge|scroll-ruler/.test(el.className);
+    });
+    if (kids.length === 1) return kids[0];
+    var wrapper = document.createElement('div');
+    root.insertBefore(wrapper, kids[0]);
+    kids.forEach(function (el) { wrapper.appendChild(el); });
+    return wrapper;
+  }
+
+  function openPage() {
+    if (!barbaOn) return;
+    pageScope = { dead: false, undo: [], gsap: gsap.context(function () {}) };
+  }
+
+  // Runs code as part of the page on screen, so it can be cleaned up when the page leaves
+  function inPage(fn) {
+    if (!pageScope) return fn();
+    var before = zone;
+    zone = pageScope;
+    try { return pageScope.gsap.add(fn); } finally { zone = before; }
+  }
+
+  // Stops everything the old page started. Its elements are gone by now; what is left is what would keep running without them
+  function closePage() {
+    var scope = pageScope;
+    if (!scope) return;
+    pageScope = null;
+    scope.dead = true;
+    scope.undo.forEach(function (fn) { try { fn(); } catch (err) { console.error('[rimbo-designs] cleanup:', err); } });
+    scope.gsap.revert(); // also lets go of SplitText: its autoSplit would otherwise rebuild the old page's reveals on the next resize
+    if (hasScrollTrigger) ScrollTrigger.getAll().forEach(function (trigger) { trigger.kill(); });
+    // what pages leave outside themselves
+    document.documentElement.classList.remove('rf', 'loc-in');
+    qsa('[data-scroll-ruler-init]').forEach(function (el) { el.remove(); });
+    qsa('.bold-nav-full__bar').forEach(function (el) { gsap.killTweensOf(el); gsap.set(el, { clearProps: 'opacity' }); }); // the band hides it during its opening
+    // animations started later, from a click or a timer: gsap.context only knows the first round. Whatever only moves
+    // elements that are gone goes too, timelines with their callbacks included
+    gsap.globalTimeline.getChildren(false, true, true).forEach(function (animation) {
+      var tweens = animation.getChildren ? animation.getChildren(true, true, false) : [animation];
+      var nodes = [].concat.apply([], tweens.map(function (t) { return t.targets(); })).filter(function (t) { return t.nodeType; });
+      if (nodes.length && nodes.every(function (t) { return !t.isConnected; })) animation.kill();
+    });
+  }
+
+  // Everything of the new page outside .page-wrapper: address details, language, the CSS from its head and footer code
+  function syncHead(doc) {
+    var root = document.documentElement;
+    ['lang', 'data-wf-page', 'data-wf-collection', 'data-wf-item-slug'].forEach(function (name) {
+      var value = doc.documentElement.getAttribute(name);
+      if (value === null) root.removeAttribute(name); else root.setAttribute(name, value);
+    });
+    var details = 'meta[name="description"], meta[property^="og:"], meta[name^="twitter:"], link[rel="canonical"], link[rel="alternate"]';
+    qsa(details, document.head).forEach(function (el) { el.remove(); });
+    qsa(details, doc.head).forEach(function (el) { document.head.appendChild(document.importNode(el, true)); });
+
+    var wanted = qsa('head style, body > style', doc).map(function (el) { return el.textContent; });
+    pageStyles = pageStyles.filter(function (el) {
+      var i = wanted.indexOf(el.textContent);
+      if (i < 0) { el.remove(); return false; }
+      wanted.splice(i, 1);
+      return true;
+    });
+    wanted.forEach(function (css) {
+      var style = document.createElement('style');
+      style.textContent = css;
+      rdHead(style);
+      pageStyles.push(style);
+    });
+  }
+
+  // Plugins a page loads for itself. Webflow's own files stay out: one copy runs the whole site
+  function loadPageLibraries(doc) {
+    var loaded = qsa('script[src]').map(function (el) { return el.getAttribute('src'); });
+    var missing = qsa('script[src]', doc).map(function (el) { return el.getAttribute('src'); }).filter(function (src) {
+      return loaded.indexOf(src) < 0 && !/\/js\/webflow\.|\/main\.(min\.)?js|__main/.test(src);
+    });
+    return Promise.all(missing.map(function (src) {
+      return new Promise(function (done) {
+        var script = document.createElement('script');
+        script.src = src;
+        script.async = false;
+        script.onload = script.onerror = done;
+        document.head.appendChild(script);
+      });
+    }));
+  }
+
+  // Code typed into a page's settings in Webflow. A swapped page never runs its scripts, so they run here. The site-wide
+  // ones are skipped. For the length of the run, listeners and clocks are caught so they can leave with the page, and
+  // "wait for the page" (DOMContentLoaded, load) means now: the page is there
+  var SITE_SCRIPTS = /gtm\.start|w-mod-|gtag\(|google_tags_first_party|registerPlugin\(ScrollTrigger,SplitText\)/;
+  function runPageScripts(root) {
+    var code = qsa('script:not([src])', root).filter(function (el) {
+      return (!el.type || el.type === 'text/javascript') && !SITE_SCRIPTS.test(el.textContent);
+    }).map(function (el) { return el.textContent; });
+    if (!code.length) return;
+
+    var waiting = [], pageInterval = window.setInterval, pageTimeout = window.setTimeout;
+    [window, document].forEach(function (target) {
+      target.addEventListener = function (type, fn, options) {
+        if (type === 'DOMContentLoaded' || type === 'load') { waiting.push(fn); return; }
+        EventTarget.prototype.addEventListener.call(target, type, fn, options);
+        rdUndo(function () { EventTarget.prototype.removeEventListener.call(target, type, fn, options); });
+      };
+    });
+    window.setInterval = setInterval;
+    window.setTimeout = setTimeout;
+    try {
+      code.forEach(function (text) {
+        var script = document.createElement('script');
+        script.textContent = '(function () {' + text + '\n})();'; // a function around it: a second visit may not declare the same const twice
+        document.body.appendChild(script).remove();
+      });
+      waiting.forEach(function (fn) { run('page script', fn, new Event('DOMContentLoaded')); });
+    } finally {
+      delete window.addEventListener;
+      delete document.addEventListener;
+      window.setInterval = pageInterval;
+      window.setTimeout = pageTimeout;
+    }
+  }
+
+  // Webflow's forms, sliders and interactions only know the page they started on. Webflow.destroy() runs earlier, in
+  // beforeEnter: its interaction engine checks once per frame whether it was stopped, so stopping and starting in the
+  // same frame leaves the old loop running next to the new one, one more for every page visited
+  function restartWebflow() {
+    if (!window.Webflow) return;
+    run('webflow', function () {
+      Webflow.ready();
+      var ix2 = Webflow.require('ix2');
+      if (ix2) ix2.init();
+      document.dispatchEvent(new Event('readystatechange')); // Webflow's "page load" interactions wait for this one
+    });
+    // Finsweet's slider dots build once, on load
+    if (window.fsAttributes && fsAttributes.sliderdots && fsAttributes.sliderdots.init) run('slider dots', function () { fsAttributes.sliderdots.init(); });
+  }
+
+  function resetPage(container) {
+    if (!location.hash) window.scrollTo(0, 0);
+    gsap.set(container, { clearProps: 'position,top,left,right' });
+    if (window.lenis) window.lenis.resize();
+  }
+
+  // Back and forward return to where you were; a link with an anchor goes to the anchor
+  function restoreScroll(data) {
+    var back = data.trigger === 'back' || data.trigger === 'forward' || data.trigger === 'popstate';
+    var target = location.hash.length > 1 ? byId(decodeURIComponent(location.hash.slice(1))) : null;
+    var y = back ? scrollMemory[data.next.url.href] || 0 : target ? target.getBoundingClientRect().top + window.scrollY : 0;
+    if (!y) return;
+    if (hasScrollTrigger) ScrollTrigger.refresh();
+    if (window.lenis) window.lenis.scrollTo(y, { immediate: true, force: true }); else window.scrollTo(0, y);
+  }
+
+  var themeConfig = {
+    light: { nav: 'dark', transition: 'light' },
+    dark: { nav: 'light', transition: 'dark' }
+  };
+
+  function applyThemeFrom(container) {
+    var pageTheme = (container && container.dataset && container.dataset.pageTheme) || 'light';
+    var config = themeConfig[pageTheme] || themeConfig.light;
+    document.body.dataset.pageTheme = pageTheme;
+    var transitionEl = qs('[data-theme-transition]');
+    if (transitionEl) transitionEl.dataset.themeTransition = config.transition;
+    var nav = qs('[data-theme-nav]');
+    if (nav) nav.dataset.themeNav = config.nav;
+  }
+
+  function initBarbaNavUpdate(data) {
+    var tpl = document.createElement('template');
+    tpl.innerHTML = data.next.html.trim();
+    var nextNodes = tpl.content.querySelectorAll('[data-barba-update]');
+    qsa('nav [data-barba-update]').forEach(function (curr, index) {
+      var next = nextNodes[index];
+      if (!next) return;
+      var newStatus = next.getAttribute('aria-current');
+      if (newStatus !== null) curr.setAttribute('aria-current', newStatus);
+      else curr.removeAttribute('aria-current');
+      curr.setAttribute('class', next.getAttribute('class') || '');
+    });
+  }
+
+  // -----------------------------------------
+  // YOUR FUNCTIONS GO BELOW HERE
+  // -----------------------------------------
 
   // =========================================================
   // GLOBAL — every page (was Slater 35206 GLOBAL.js)
@@ -199,7 +659,7 @@
     var xTo = gsap.quickTo(cursor, 'x', { ease: 'power3' });
     var yTo = gsap.quickTo(cursor, 'y', { ease: 'power3' });
 
-    window.addEventListener('mousemove', function (e) {
+    rdOn(window, 'mousemove', function (e) {
       // Flip to the left near the right edge, and above the pointer near the bottom
       var edge = cursor.offsetWidth + 16;
       var xPercent = e.clientX > window.innerWidth - edge ? -100 : xOffset;
@@ -409,12 +869,16 @@
       // Drive Lenis from GSAP's ticker so scrolling and animations share one frame
       // (GSAP's lag smoothing stays on: after a stall, animations continue instead of jumping)
       instance.on('scroll', ScrollTrigger.update);
-      gsap.ticker.add(function (time) { instance.raf(time * 1000); });
+      rdTick(function (time) { instance.raf(time * 1000); });
     }
     window.lenis = instance;
-    if (!ownInstance) return;
+    if (ownInstance) rdLenisButtons();
+  }
 
-    // Buttons that stop and start the page scroll (menus, popups)
+  // Buttons that stop and start the page scroll (menus, popups). They sit on the page, so every new page wires its own.
+  function rdLenisButtons() {
+    var instance = window.lenis;
+    if (!instance) return;
     qsa('[data-lenis-start]').forEach(function (el) {
       el.addEventListener('click', function () { instance.start(); });
     });
@@ -708,7 +1172,7 @@
       btn.addEventListener('pointerenter', function (e) {
         if (e.pointerType !== 'mouse' || running) return;
         running = true; last = -1; t0 = gsap.ticker.time;
-        gsap.ticker.add(tick);
+        rdTick(tick);
       });
       btn.addEventListener('pointerleave', function () {
         if (!running) return;
@@ -765,7 +1229,7 @@
       });
 
       // back/forward cache: coming back must show the pill as it was (the leave below restores the page)
-      window.addEventListener('pageshow', function (e) { if (e.persisted) setActive(current); });
+      rdOn(window, 'pageshow', function (e) { if (e.persisted) setActive(current); });
     });
   }
 
@@ -794,7 +1258,7 @@
     }, delay || 0);
   }
   // back/forward cache: a page we left by fading must come back visible
-  window.addEventListener('pageshow', function (e) {
+  rdOn(window, 'pageshow', function (e) {
     if (!e.persisted) return;
     leaving = false;
     faded.forEach(function (f) { Object.keys(f[1]).forEach(function (k) { f[0].style[k] = f[1][k]; }); });
@@ -840,7 +1304,7 @@
 
     // Ours: the filter moved cards around (rdMultiFilter sends rd:filtered). ScrollTrigger re-measures, and any
     // card that is now on screen joins the queue, since refresh() doesn't fire onEnter for those.
-    document.addEventListener('rd:filtered', function () {
+    rdOn(document, 'rd:filtered', function () {
       ScrollTrigger.refresh();
       waiting.slice().forEach(function (entry) {
         var r = entry.item.getBoundingClientRect();
@@ -1485,7 +1949,7 @@
       var introEvent = wrapper.getAttribute('data-glass-carousel-intro-event');
       var introEventFired = !introEvent;
       if (introEvent) {
-        window.addEventListener(introEvent, function () { introEventFired = true; queueIntro(); }, { once: true });
+        rdOn(window, introEvent, function () { introEventFired = true; queueIntro(); }, { once: true });
       }
 
       var renderer;
@@ -2701,7 +3165,7 @@
       window.removeEventListener('resize', initRadialCardsSlider._resize);
     }
     initRadialCardsSlider._resize = debounceOnWidthChange(initRadialCardsSlider, 200);
-    window.addEventListener('resize', initRadialCardsSlider._resize);
+    rdOn(window, 'resize', initRadialCardsSlider._resize);
   }
 
   function initSpatialCardsSlider() {
@@ -2989,7 +3453,7 @@
 
     if (initSpatialCardsSlider._resize) window.removeEventListener('resize', initSpatialCardsSlider._resize);
     initSpatialCardsSlider._resize = debounceOnWidthChange(initSpatialCardsSlider, 200);
-    window.addEventListener('resize', initSpatialCardsSlider._resize);
+    rdOn(window, 'resize', initSpatialCardsSlider._resize);
   }
 
   function debounceOnWidthChange(fn, ms) {
@@ -3220,7 +3684,7 @@
       if (wheelRunning || (!drift && !roll)) return;
       wheelRunning = true;
       var v = roll ? drift : 0; // degrees a second right now (the drift's share), easing towards drift or 0; the roll-in sets off at full drift speed
-      gsap.ticker.add(function (t, dt) {
+      rdTick(function (t, dt) {
         var proxy = wheel._radialSliderProxy, s = dt / 1000;
         if (rollWait > 0) { rollWait -= s; return; }
         var want = (hidden || document.hidden || wheelHeld() || (proxy && gsap.isTweening(proxy))) ? 0 : drift;
@@ -3290,7 +3754,7 @@
         label.style.top = (ring.offsetTop + (st.y + 0) * persp / (persp + R)).toFixed(1) + 'px';
       };
       measure(); render();
-      var rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
+      var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
       // ---- motion blur (Rimbo: "some effects have motion blur on movement… on the spinning it could be nice"): one SVG
       // filter, a horizontal blur in each card's own frame, which on the ring is the tangent of its travel; its width
       // follows the drum's speed in cards a second, smoothed, and the filter only sits on the cards while there is
@@ -3301,7 +3765,7 @@
         svg.innerHTML = '<filter id="band-mblur" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0 0" edgeMode="duplicate"/></filter>';
         hero.appendChild(svg);
         var feBlur = svg.querySelector('feGaussianBlur'), lastTurn = st.steps + st.scroll, blurNow = 0;
-        gsap.ticker.add(function (t, dt) {
+        rdTick(function (t, dt) {
           if (hidden) return;
           var turn = st.steps + st.scroll, speed = Math.abs(turn - lastTurn) / Math.max(1, dt) * 1000; lastTurn = turn; // cards a second
           var want = Math.min(ringBlur, speed * ringBlur / 6); // the full width at six cards a second
@@ -3428,12 +3892,12 @@
       if (rafOnes.length) (function paint() { if (!hidden) rafOnes.forEach(paintClones); requestAnimationFrame(paint); })();
     }
     setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
-    if (!band) { var rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { tune(); dedupeClips(); }, 450); }); } // the Osmo sliders re-clone on a width change (200 ms debounce); the clones become canvases again after
+    if (!band) { var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { tune(); dedupeClips(); }, 450); }); } // the Osmo sliders re-clone on a width change (200 ms debounce); the clones become canvases again after
 
     // ---- a hidden tab costs nothing: every clip pauses the moment the page is hidden (a background tab,
     // a minimised window) and the on-screen ones resume when it is shown again. Animation frames already
     // sleep in a hidden tab, so the marquee, the clone canvases and the tilt stop by themselves.
-    document.addEventListener('visibilitychange', function () {
+    rdOn(document, 'visibilitychange', function () {
       if (document.hidden) qsa('video', hero).forEach(function (v) { v.pause(); });
       else if (!hidden) qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
     });
@@ -3472,7 +3936,7 @@
         if (!raf) raf = requestAnimationFrame(settle);
       });
       hero.addEventListener('mouseleave', function () { gx = 0; gz = 0; if (!raf) raf = requestAnimationFrame(settle); });
-      window.addEventListener('resize', function () { base = null; band.style.transform = ''; });
+      rdOn(window, 'resize', function () { base = null; band.style.transform = ''; });
     }
 
     // ---- drag the band: a grab hand, the rows follow the pointer along the band, a flick keeps going
@@ -3880,7 +4344,7 @@
         if (f !== last) { last = f; fn(f); }
       }
       return {
-        start: function () { if (running || reduce) return; running = true; last = -1; t0 = gsap.ticker.time; gsap.ticker.add(tick); },
+        start: function () { if (running || reduce) return; running = true; last = -1; t0 = gsap.ticker.time; rdTick(tick); },
         stop: function () { if (!running) return false; running = false; gsap.ticker.remove(tick); return true; }
       };
     }
@@ -4013,7 +4477,7 @@
     if (!finePointer) return; // touch: the press only; the magnet needs a pointer that hovers
 
     // One listener for the page: the nearest button within reach takes the pointer, the rest let go
-    document.addEventListener('pointermove', function (e) {
+    rdOn(document, 'pointermove', function (e) {
       var nearest = null, best = Infinity;
       magnets.forEach(function (m) {
         m.d = m.visible ? m.measure(e) : null;
@@ -4021,7 +4485,7 @@
       });
       magnets.forEach(function (m) { m === nearest ? m.pull(m.d) : m.release(); });
     }, { passive: true });
-    document.documentElement.addEventListener('pointerleave', function () {
+    rdOn(document.documentElement, 'pointerleave', function () {
       magnets.forEach(function (m) { m.release(); });
     });
 
@@ -4194,7 +4658,7 @@
       var style = document.createElement('style');
       style.id = 'rd-scroll-ruler-css';
       style.textContent = SCROLL_RULER_CSS;
-      document.head.appendChild(style);
+      rdHead(style);
     }
     var root = qs('[data-scroll-ruler-init]');
     if (!root) {
@@ -4220,7 +4684,7 @@
     }
     fitLabels();
     var fitTimer;
-    window.addEventListener('resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(fitLabels, 150); });
+    rdOn(window, 'resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(fitLabels, 150); });
 
     // Osmo leaves out a label that would touch the one above it and never places it. Those get
     // their place here (same sums as Osmo's measure()), so the section you're in always has its label.
@@ -4291,7 +4755,7 @@
     function settleOn(heading, corrections) {
       var last = -1, still = 0, frames = 0, cancelled = false;
       function cancel() { cancelled = true; }
-      ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (t) { window.addEventListener(t, cancel, { once: true, passive: true }); });
+      ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (t) { rdOn(window, t, cancel, { once: true, passive: true }); });
       requestAnimationFrame(function check() {
         if (cancelled) return;
         var y = window.scrollY;
@@ -4428,15 +4892,15 @@
           const nextStatus = time - lastActive < idleDelay ? "active" : "idle";
           if (nextStatus !== rootStatus) { rootStatus = nextStatus; root.setAttribute("data-scroll-ruler-status", rootStatus); }
         }
-        window.addEventListener("pointermove", (event) => { if (event.pointerType !== "mouse") return; const rect = list.getBoundingClientRect(); const reach = rect.height * 0.25; const distance = Math.max(event.clientX - rect.left - root.offsetWidth * 0.5, 0); cursorTarget = gsap.utils.clamp(0, 1, 1 - distance / reach); pointerPosition = (event.clientY - rect.top) / rect.height; });
-        document.documentElement.addEventListener("pointerleave", () => { cursorTarget = 0; });
+        rdOn(window, "pointermove", (event) => { if (event.pointerType !== "mouse") return; const rect = list.getBoundingClientRect(); const reach = rect.height * 0.25; const distance = Math.max(event.clientX - rect.left - root.offsetWidth * 0.5, 0); cursorTarget = gsap.utils.clamp(0, 1, 1 - distance / reach); pointerPosition = (event.clientY - rect.top) / rect.height; });
+        rdOn(document.documentElement, "pointerleave", () => { cursorTarget = 0; });
         root.addEventListener("click", (event) => { const rect = list.getBoundingClientRect(); const position = gsap.utils.clamp(0, 1, (event.clientY - rect.top) / rect.height); if (usingParts) scrollToPart(findPart(position)); else scrollToPosition(position * rangeLength); });
         gsap.matchMedia().add("(prefers-reduced-motion: reduce)", () => { reduceMotion = true; return () => { reduceMotion = false; }; });
         let resizeTimer;
         const resizeObserver = new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(measure, 100); });
         resizeObserver.observe(document.body); resizeObserver.observe(root);
         measure();
-        gsap.ticker.add(update);
+        rdTick(update);
       });
     }
   }
@@ -4621,7 +5085,7 @@
     var style = document.createElement('style');
     style.id = 'rd-post-refresh-css';
     style.textContent = POST_REFRESH_CSS;
-    document.head.appendChild(style);
+    rdHead(style);
 
     var grain = document.createElement('div');
     grain.className = 'grain rf-grain';
@@ -4707,7 +5171,7 @@
       // arriving with a section address (#what-is-webflow): go there once the page has settled
       if (location.hash.length > 1) {
         var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-        if (target && article.contains(target)) window.addEventListener('load', function () { setTimeout(function () { postJumpTo(target); }, 300); });
+        if (target && article.contains(target)) rdOn(window, 'load', function () { setTimeout(function () { postJumpTo(target); }, 300); });
       }
     }
     hero.appendChild(main); hero.appendChild(side);
@@ -4784,7 +5248,7 @@
       var style = document.createElement('style');
       style.id = 'rd-post-cards-css';
       style.textContent = POST_CARDS_CSS;
-      document.head.appendChild(style);
+      rdHead(style);
     }
     // Per card: the subtext starts 8px under its own title (--rd-sub-top), and on hover the panel slides up
     // just far enough to leave 20px under the subtext (--rd-sub). Measured, because a card next to a longer
@@ -4800,7 +5264,7 @@
     }
     measure();
     var timer;
-    window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(measure, 150); });
+    rdOn(window, 'resize', function () { clearTimeout(timer); timer = setTimeout(measure, 150); });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); // the subtext rewraps once the font is in
   }
 
@@ -4826,7 +5290,7 @@
         '@keyframes rdHueDrift { 0%, 100% { filter: hue-rotate(0deg); } 25% { filter: hue-rotate(45deg); } 75% { filter: hue-rotate(-45deg); } }\n' +
         '.cover_image.is-hue-drift { animation: rdHueDrift 8s ease-in-out infinite; }\n' +
         '@media (prefers-reduced-motion: reduce) { .cover_image.is-hue-drift { animation: none; } }';
-      document.head.appendChild(style);
+      rdHead(style);
     }
     cover.classList.add('is-hue-drift');
   }
@@ -4849,19 +5313,21 @@
     function clean(href) {
       return (href || '').replace(/^https?:\/\/[^/]+/, '').replace(/[?#].*$/, '').replace(/\/+$/, '') || '/';
     }
-    var here = clean(location.pathname);
-    var skip = [prefix || '/', prefix + '/contact', here];
-
-    var source = qsa('.pop-up_nav_menu .nav_link');
-    var items = (source.length ? source.map(function (a) {
-      return { href: clean(a.getAttribute('href')), text: a.textContent.trim() };
-    }) : [
-      { href: prefix + '/work', text: 'Work' }, { href: prefix + '/service', text: 'Service' },
-      { href: prefix + '/resources', text: 'Resources' }
-    ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
+    // the links, minus the page you are on; read from the page, so with Barba it runs again every time the menu opens
+    function menuLinks() {
+      var skip = [prefix || '/', prefix + '/contact', clean(location.pathname)];
+      var source = qsa('.pop-up_nav_menu .nav_link');
+      return (source.length ? source.map(function (a) {
+        return { href: clean(a.getAttribute('href')), text: a.textContent.trim() };
+      }) : [
+        { href: prefix + '/work', text: 'Work' }, { href: prefix + '/service', text: 'Service' },
+        { href: prefix + '/resources', text: 'Resources' }
+      ]).filter(function (it) { return skip.indexOf(it.href) < 0; }).map(function (it) {
+        return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link">' + it.text + '</a></li>';
+      }).join('');
+    }
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
     var logoSrc = brushLogoSrc();
-    qsa('img[src*="SVGLOGO2"]').forEach(function (img) { img.removeAttribute('srcset'); img.src = logoSrc; }); // the Webflow footer still points at the old logo file
     var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&amp;body=' +
       encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n"); // the footer's email
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -4938,11 +5404,9 @@
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
-    document.head.appendChild(style);
+    rdHead(style);
 
-    var lis = items.map(function (it) {
-      return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link">' + it.text + '</a></li>';
-    }).join('');
+    var lis = menuLinks();
     var lang = locales.length > 1 ? '<div class="bold-nav__lang" data-lang-toggle>' + locales.map(function (a) {
       return '<a hreflang="' + a.getAttribute('hreflang') + '" href="' + a.getAttribute('href') + '"' +
         (a.classList.contains('w--current') ? ' class="w--current" aria-current="page"' : '') + '>' + a.textContent.trim() + '</a>';
@@ -4997,7 +5461,7 @@
       tile.setAttribute('aria-hidden', active ? 'false' : 'true');
       if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
       if (tl) tl.kill();
-      if (active) nav.style.setProperty('--nf-bg', 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')');
+      if (active) { nav.style.setProperty('--nf-bg', 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')'); readPage(); }
 
       if (reduce) {
         gsap.set(tile, { visibility: active ? 'visible' : 'hidden', clipPath: 'none' });
@@ -5028,10 +5492,25 @@
     }
 
     btn.addEventListener('click', function () { set(!isOpen); });
+    rdNavFull.close = function () { set(false); }; // a link in the menu was clicked: the page changes underneath
 
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) set(false); });
+    // Barba: the page under the menu may have changed since it last opened
+    function readPage() {
+      var fresh = menuLinks();
+      if (fresh === lis) return;
+      lis = fresh;
+      qs('.bold-nav-full__ul', nav).innerHTML = lis;
+      links = qsa('.bold-nav-full__link', nav);
+      gsap.set(links, { yPercent: 110, rotate: 4 });
+      qsa('.nav a[hreflang]').forEach(function (a) { // each page knows its own address in the other language
+        var mine = qs('.bold-nav__lang a[hreflang="' + a.getAttribute('hreflang') + '"]', nav);
+        if (mine) mine.setAttribute('href', a.getAttribute('href'));
+      });
+    }
+
+    rdOn(document, 'keydown', function (e) { if (e.key === 'Escape' && isOpen) set(false); });
     // coming back with the browser's back button shows the page, not a menu left open
-    window.addEventListener('pageshow', function (e) {
+    rdOn(window, 'pageshow', function (e) {
       if (!e.persisted || !isOpen) return;
       reduce = true; set(false); reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     });
@@ -5191,9 +5670,9 @@
       balls.forEach(draw);
       if (onScreen) go();
     }, { rootMargin: '20% 0px' }).observe(qs('.loc_steps'));
-    document.addEventListener('visibilitychange', function () { if (onScreen && !document.hidden) go(); });
+    rdOn(document, 'visibilitychange', function () { if (onScreen && !document.hidden) go(); });
     var rt = null;
-    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { balls.forEach(draw); }, 150); });
+    rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { balls.forEach(draw); }, 150); });
   }
 
   function rdLocShow() {
@@ -5239,9 +5718,9 @@
       slider.appendChild(next);
       initSpatialCardsSlider();
       var watch = function () { clips = watchClips(); }; // after the page has loaded, so the clips don't compete with the hero photo
-      if (document.readyState === 'complete') watch(); else window.addEventListener('load', watch, { once: true });
+      if (document.readyState === 'complete') watch(); else rdOn(window, 'load', watch, { once: true });
       var rt = null; // Osmo re-clones the cards after a width change: watch the new clips too
-      window.addEventListener('resize', function () {
+      rdOn(window, 'resize', function () {
         clearTimeout(rt);
         rt = setTimeout(function () { if (clips) clips.disconnect(); clips = watchClips(); }, 450);
       });
@@ -5264,6 +5743,12 @@
   // =========================================================
   var FOOTER_SCRIPT = (document.currentScript && document.currentScript.src) || '';
   // F Brush, Rimbo's refined logo (5 Nov): it ships next to main.min.js (same tag); on localhost it comes from /media/
+  // the Webflow footer still points at the old logo file
+  function rdLogoSwap() {
+    var logoSrc = brushLogoSrc();
+    qsa('img[src*="SVGLOGO2"]').forEach(function (img) { img.removeAttribute('srcset'); img.src = logoSrc; });
+  }
+
   function brushLogoSrc() {
     return /\/main(\.min)?\.js/.test(FOOTER_SCRIPT) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(FOOTER_SCRIPT)
       ? FOOTER_SCRIPT.replace(/\/main(\.min)?\.js.*$/, '/media/logo-f-brush.svg') : '/media/logo-f-brush.svg';
@@ -5367,7 +5852,7 @@
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
-    document.head.appendChild(style);
+    rdHead(style);
 
     // ---- the markup (data-code: the HTML each box types first) ----
     function escA(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -5668,7 +6153,7 @@
     var relayT = 0;
     function relayout() { cancelAnimationFrame(relayT); relayT = requestAnimationFrame(function () { logo.layout(); layout(); }); }
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(relayout);
-    window.addEventListener('resize', relayout);
+    rdOn(window, 'resize', relayout);
     // and whenever a cell changes size (on phones the logo cell only gets its height once the logo has loaded)
     if ('ResizeObserver' in window) {
       var ro = new ResizeObserver(function () { layout(); }); // straight away: the lines must match the cells before the next frame
@@ -5684,7 +6169,7 @@
       else rulerLabel.textContent = t;
     }
     rulerLabel.style.opacity = 0;
-    window.addEventListener('resize', function () { if (!rulerOn) return; clearTimeout(rulerTimer); rulerTimer = setTimeout(function () { sizeLabel(true); }, 120); });
+    rdOn(window, 'resize', function () { if (!rulerOn) return; clearTimeout(rulerTimer); rulerTimer = setTimeout(function () { sizeLabel(true); }, 120); });
 
     // ---- hover (mouse only): the HTML types back in (not on the email and Based in, they swap) + an orange outline ----
     // one hover state for the whole cell, and only once the footer is built. A pointer already resting on a cell while the
@@ -5785,7 +6270,7 @@
       if (on && !raf) raf = requestAnimationFrame(tick);
       if (!on) { last = -1; tick(); } // one last frame, so it rests in its scrolled-away state
     }, { rootMargin: '0px 0px 10% 0px' }).observe(foot);
-    window.addEventListener('resize', function () { last = -1; if (!raf) tick(); });
+    rdOn(window, 'resize', function () { last = -1; if (!raf) tick(); });
   }
 
   // Wall of love (testimonials; lab: prototype/testimonials). Osmo's Centered Looping Slider with three things on top: the brand
@@ -5849,7 +6334,7 @@
       @media screen and (max-width: 479px) { .wall_section { --ball: 4.75; } }
       @media (prefers-reduced-motion: reduce) { .centered-slider-bullet img { transition: none; } }
     `;
-    document.head.appendChild(style);
+    rdHead(style);
 
     // the faces and the arrows, built from the slides
     var faces = document.createElement('div'), ul = document.createElement('ul');
@@ -6113,7 +6598,7 @@
         populateWidths();
         populateTimeline();
         populateOffsets();
-        window.addEventListener("resize", onResize);
+        rdOn(window, "resize", onResize);
         function toIndex(index, vars) {
           vars = vars || {};
           (Math.abs(index - curIndex) > length / 2) && (index += index > curIndex ? -length : length); // always go in the shortest direction
@@ -6435,8 +6920,7 @@
 
   // =========================================================
   // RUN
-  // Page sections run straight away, like the old Slater tags did. Each one
-  // runs on its own, so a missing element on one page can't stop the rest.
+  // Each section runs on its own, so a missing element on one page can't stop the rest.
   // =========================================================
   function run(name, fn, arg) {
     try {
@@ -6447,43 +6931,51 @@
   }
 
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
-  var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
-
-  run('full screen nav', rdNavFull); // before the band, so its opening can fade the logo + burger in last
-  if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
-  run('band', rdBand);   // builds the home-opening rows before the marquees start
-  run('global', rdGlobal);
-  run('location faq button', rdLocFaqBtn);
-  run('location button lines', rdLocBtnAlt);
-  run('buttons', rdButtons);
-  run('form validation', rdFormValidation);
-  run('post cards', rdPostCards);
-  // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
-  if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
-  run('location showcase', rdLocShow);
-  run('location balls', rdLocBalls);
-  run('wall of love', rdWall);
-
-  if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
-  else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
-  else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);
-  else if (path === '/work') run('work', rdWork);
-  else if (path.indexOf('/work/') === 0) run('case study', rdWorkItem);
-  else if (path === '/branding-brilliance-newsletter' || path === '/call-is-booked') run('newsletter', rdNewsletter);
-  else if (path === '/resources') run('resources', rdResources);
-  else if (path === '/rimbo-quiz') run('quiz', rdQuiz);
-  else if (path.indexOf('/post/') === 0) {
-    run('scroll ruler', rdScrollRuler);
-    run('cover hue drift', rdCoverHueDrift);
+  function pagePath() {
+    return location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
   }
 
-  // These two replace code that still sits in Webflow for now, so they wait for
-  // the whole page and check whether that old code has run first.
-  onReady(function () {
-    run('lenis', rdLenis);
+  // What runs on which page. Runs on every page, first load or swap
+  function initPageFunctions() {
+    var path = pagePath();
+    run('logo', rdLogoSwap);
+    if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
+    run('band', rdBand);   // builds the home-opening rows before the marquees start
+    run('global', rdGlobal);
+    run('location faq button', rdLocFaqBtn);
+    run('location button lines', rdLocBtnAlt);
+    run('buttons', rdButtons);
+    run('form validation', rdFormValidation);
+    run('post cards', rdPostCards);
+    // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
+    if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
+    run('location showcase', rdLocShow);
+    run('location balls', rdLocBalls);
+    run('wall of love', rdWall);
+
+    if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
+    else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
+    else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);
+    else if (path === '/work') run('work', rdWork);
+    else if (path.indexOf('/work/') === 0) run('case study', rdWorkItem);
+    else if (path === '/branding-brilliance-newsletter' || path === '/call-is-booked') run('newsletter', rdNewsletter);
+    else if (path === '/resources') run('resources', rdResources);
+    else if (path === '/rimbo-quiz') run('quiz', rdQuiz);
+    else if (path.indexOf('/post/') === 0) {
+      run('scroll ruler', rdScrollRuler);
+      run('cover hue drift', rdCoverHueDrift);
+    }
+  }
+
+  // The ones that need the whole page in place first
+  function initLateFunctions() {
+    var path = pagePath();
     if (qs('[data-glass-carousel]')) run('glass carousel', rdGlassCarousel);
     if (path === '/audit') run('letter reveal', rdLetterReveal, { duration: 2, delay: 0.4 });
     if (path === '/my-story') run('letter reveal', rdLetterReveal, { duration: 1.4, delay: 0.3 });
-  });
+  }
+
+  if (barbaOn) startBarba();
+  else initOnceFunctions();
 
 })();
