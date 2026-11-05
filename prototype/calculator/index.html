@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Calculator</title>
+<link rel="stylesheet" href="calculator.css?v=3">
+</head>
+<body>
+<main class="calc">
+  <header class="calc_head">
+    <p class="calc_eyebrow">Draft prices · grain balls palette</p>
+    <h1 class="calc_title">Build yours</h1>
+    <p class="calc_lede">Everything is built to the same standard. Pick what you need, switch off what you don't.</p>
+  </header>
+
+  <div class="calc_grid">
+    <div class="calc_form">
+      <fieldset class="calc_step">
+        <legend>01 Branding</legend>
+        <div id="branding"></div>
+      </fieldset>
+
+      <fieldset class="calc_step">
+        <legend>02 Pages</legend>
+        <div id="pages"></div>
+      </fieldset>
+
+      <fieldset class="calc_step">
+        <legend>03 Add what you need</legend>
+        <div id="toggles"></div>
+      </fieldset>
+    </div>
+
+    <div class="calc_side">
+    <aside class="calc_result" aria-live="polite">
+      <p class="calc_eyebrow" id="total-label">Your project</p>
+      <p class="calc_range"><span id="total" data-odometer-element>&nbsp;</span></p>
+      <div class="calc_meter" id="meter" hidden>
+        <div class="calc_meter_bar"><span id="meter-fill"></span></div>
+        <p class="calc_meter_text" id="meter-text"></p>
+      </div>
+      <ul class="calc_lines" id="lines"></ul>
+      <button class="calc_cta" id="cta" type="button" aria-controls="apply" aria-expanded="false">Apply with this scope</button>
+      <p class="calc_fine">Excl. VAT. An estimate; the proposal confirms the price.</p>
+    </aside>
+
+    <!-- Tip card: filled by the (i) buttons; hover previews, click pins -->
+    <aside class="calc_tip" id="tip" aria-live="polite" aria-labelledby="tip-title" hidden>
+      <button class="calc_tip_close" id="tip-close" type="button" aria-label="Close">×</button>
+      <h2 class="calc_tip_title" id="tip-title"></h2>
+      <p class="calc_tip_text" id="tip-text"></p>
+    </aside>
+    </div>
+  </div>
+
+  <!-- Apply step: revealed by #cta, same page, no redirect. Copy lives in CONFIG.copy in calculator.js -->
+  <section class="calc_apply" id="apply" aria-labelledby="apply-title" hidden>
+    <p class="calc_eyebrow">04 Apply</p>
+    <h2 class="calc_apply_title" id="apply-title">Apply to work with me</h2>
+    <p class="calc_apply_intro" id="apply-intro"></p>
+    <pre class="calc_scope" id="scope-summary" aria-label="Your scope"></pre>
+
+    <form class="calc_formfields" id="apply-form" novalidate>
+      <div class="calc_field">
+        <label for="f-name">Name</label>
+        <input id="f-name" name="name" type="text" autocomplete="name" required>
+      </div>
+      <div class="calc_field">
+        <label for="f-email">Email</label>
+        <input id="f-email" name="email" type="email" autocomplete="email" required>
+      </div>
+      <div class="calc_field">
+        <label for="f-company">Company / project name</label>
+        <input id="f-company" name="company" type="text" autocomplete="organization" required>
+      </div>
+      <div class="calc_field">
+        <label for="f-website">Current website <span class="calc_opt">optional</span></label>
+        <input id="f-website" name="website" type="url" inputmode="url" placeholder="https://" autocomplete="url">
+      </div>
+      <div class="calc_field calc_field_wide">
+        <label for="f-about">What is the project about?</label>
+        <textarea id="f-about" name="about" rows="4" required></textarea>
+      </div>
+      <div class="calc_field">
+        <label for="f-budget">Budget range</label>
+        <select id="f-budget" name="budget" required>
+          <option value="" selected disabled>Choose one</option>
+          <option value="under-3k">Under €3k</option>
+          <option value="3-10k">€3k to €10k</option>
+          <option value="10-20k">€10k to €20k</option>
+          <option value="20k-plus">€20k+</option>
+          <option value="not-sure">Not sure yet</option>
+        </select>
+      </div>
+      <div class="calc_field">
+        <label for="f-start">When do you want to start?</label>
+        <select id="f-start" name="start" required>
+          <option value="" selected disabled>Choose one</option>
+          <option value="asap">As soon as possible</option>
+          <option value="3-months">Within 3 months</option>
+          <option value="later">Later</option>
+          <option value="exploring">Just exploring</option>
+        </select>
+      </div>
+      <div class="calc_field">
+        <label for="f-decides">Who decides?</label>
+        <select id="f-decides" name="decides" required>
+          <option value="" selected disabled>Choose one</option>
+          <option value="me">Just me</option>
+          <option value="me-plus-one">Me and one other</option>
+          <option value="team">A team</option>
+        </select>
+      </div>
+
+      <!-- Newsletter opt-in: OPEN DECISION (docs/apply-flow.md §5.3 / §8.3). Off until Rimbo decides:
+           set CONFIG.showNewsletterOptIn = true. Must stay unticked by default. -->
+      <label class="calc_check" id="optin-row" hidden>
+        <input type="checkbox" name="optin" value="yes">
+        <span id="optin-label"></span>
+      </label>
+
+      <input type="hidden" name="selections" id="f-selections">
+      <input type="hidden" name="range_shown" id="f-range">
+
+      <p class="calc_error" id="apply-error" role="alert" hidden></p>
+      <div class="calc_submitrow">
+        <button class="calc_cta calc_submit" id="apply-submit" type="submit">Send my application</button>
+        <p class="calc_fine" id="apply-fine"></p>
+      </div>
+    </form>
+
+    <div class="calc_done" id="apply-done" role="status" tabindex="-1" hidden>
+      <h3 class="calc_done_title" id="done-title"></h3>
+      <p id="done-text"></p>
+      <p><a class="calc_link" id="done-link" href="#" target="_blank" rel="noopener"></a></p>
+    </div>
+  </section>
+</main>
+<svg class="calc_wire" id="wire" aria-hidden="true"><path id="wire-path" d=""/><rect id="wire-a" width="5" height="5"/><rect id="wire-b" width="5" height="5"/></svg>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/ScrollTrigger.min.js"></script>
+<script src="odometer.js?v=3"></script>
+<script src="calculator.js?v=3"></script>
+</body>
+</html>
