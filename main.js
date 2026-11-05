@@ -83,41 +83,10 @@
   // GLOBAL — every page (was Slater 35206 GLOBAL.js)
   // =========================================================
   function rdGlobal() {
-    initNav();
     qsa('[data-button-animate-chars]').forEach(staggerChars);
     initScrollReveals();
     initMarquees();
     initCursor();
-  }
-
-  // Top nav drops in on load. On desktop the fixed nav slides down as #Top_Nav scrolls away.
-  function initNav() {
-    var navItems = qsa('#Container_topNAv > *');
-    if (navItems.length) {
-      gsap.from(navItems, {
-        y: -50,
-        opacity: 0,
-        filter: 'blur(10px)',
-        duration: 1,
-        ease: 'expo.out',
-        stagger: { amount: 0.3, from: 'center' }
-      });
-    }
-
-    var topNav = byId('Top_Nav');
-    var fixedNav = byId('FIXED_NAV');
-    if (!topNav || !fixedNav) return;
-
-    // matchMedia reverts the set and the tween (with its ScrollTrigger) by itself
-    // when the window drops below 992px. The old cleanup function killed EVERY
-    // ScrollTrigger on the page instead, which froze all scroll animations after a resize.
-    gsap.matchMedia().add('(min-width: 992px)', function () {
-      gsap.set(fixedNav, { y: -64 });
-      gsap.to(fixedNav, {
-        y: 0,
-        scrollTrigger: { trigger: topNav, start: 'top top', end: 'top -300', scrub: true }
-      });
-    });
   }
 
   // Scroll-scrubbed reveals: [data-title], [data-paragraph] (line by line) and [data-component]
@@ -417,45 +386,6 @@
         trySubmit();
       });
     });
-  }
-
-  // =========================================================
-  // MENU — every page: the burger menu's links rise in letter by letter,
-  // like the hero titles. The Webflow interaction keeps doing the fade and
-  // the burger animation; this only adds the letters.
-  // =========================================================
-  function rdMenu() {
-    var nav = qs('.nav');
-    var links = qsa('.pop-up_nav_menu .nav_link');
-    if (!nav || !links.length) return;
-
-    var chars = [];
-    links.forEach(function (link) {
-      var pieces = split(link);
-      gsap.set(pieces.lines, { overflow: 'hidden' }); // the line masks the letters while they rise
-      chars = chars.concat(pieces.chars);
-    });
-    gsap.set(chars, { yPercent: 110 });
-
-    function reveal() {
-      gsap.fromTo(chars, { yPercent: 110 }, {
-        yPercent: 0,
-        duration: 0.9,
-        ease: 'expo.out',
-        stagger: 0.02,
-        delay: 0.15,
-        overwrite: true
-      });
-    }
-
-    // The interaction switches .nav from display:none to flex once the burger
-    // has animated; that moment is the cue to start.
-    var open = false;
-    new MutationObserver(function () {
-      var visible = getComputedStyle(nav).display !== 'none';
-      if (visible && !open) reveal();
-      open = visible;
-    }).observe(nav, { attributes: true, attributeFilter: ['style'] });
   }
 
   // =========================================================
@@ -846,7 +776,6 @@
   var faded = []; // [element, its inline styles before the fade]
   function leaveTargets() {
     return [qs('.main-wrapper') || document.body]
-      .concat(qsa('.nav').filter(function (n) { return getComputedStyle(n).opacity !== '0'; }))
       .concat(qsa('.bold-nav-full[data-navigation-status="active"] .bold-nav-full__tile')); // the open full-screen menu fades with the page
   }
   function rdLeave(href, delay) {
@@ -3169,7 +3098,7 @@
     var copy = qs('.band_copy', hero), title = qs('.band_title', hero), eyebrow = qs('.band_eyebrow', hero);
     var curve = 0; // set below (the curve experiment)
     var buttons = qsa('.btn', copy || hero), scrollLine = qs('.band_scroll', hero), loader = qs('.band_loader', hero);
-    var nav = [byId('FIXED_NAV'), qs('.burgermenu'), qs('.bold-nav-full__bar')].filter(Boolean); // the old or the new (rdNavFull) logo + burger
+    var nav = [qs('.bold-nav-full__bar')].filter(Boolean); // the logo + burger (rdNavFull)
     var hidden = false;
 
     // ---- the auto-advance clock (started by the opening, once the copy is in): a step every stepEvery seconds.
@@ -4527,10 +4456,6 @@
     // grain: the site's own GRAIN_EFFECT style, under the content, half the home's strength
     '.rf .rf-grain { opacity: .03; z-index: -1; }',
 
-    // header: no boxed menu; the logo and burger stay where they are, on screen from the start
-    '.rf #Top_Nav { display: none !important; }',
-    '.rf #FIXED_NAV { transform: none !important; }',
-
     // hero: two columns, a little narrower than the cover so the cover is the widest thing on screen
     '.rf .blog_intro { margin-top: 0; padding-top: 168px; }',
     '.rf .blog_intro .container-20 { display: block; width: min(58rem, 100vw - 20rem); max-width: none; }',
@@ -4815,16 +4740,6 @@
       if (list && qsa('.post', list).length - 1 === 2) list.classList.add('rf-two');
     }
 
-    // the burger is the only menu at the top now, so it must work from the keyboard too
-    var burger = qs('#FIXED_NAV .burgermenu');
-    if (burger && !burger.hasAttribute('tabindex')) {
-      burger.setAttribute('role', 'button');
-      burger.setAttribute('tabindex', '0');
-      if (!burger.getAttribute('aria-label')) burger.setAttribute('aria-label', 'Menu');
-      burger.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); burger.click(); }
-      });
-    }
   }
 
   // =========================================================
@@ -4912,20 +4827,15 @@
   }
 
 
-  var STAGING_HOST = /(\.webflow\.io|localhost|127\.0\.0\.1)$/;
-
   // =========================================================
-  // FULL SCREEN NAV — /home-copy and /resources: after Osmo Supply's "Bold Full Screen Navigation"
-  // (markup, class names and toggle logic). Ours:
-  // - the bar is the site's logo + burger in their own fixed difference-blend layer, visible the whole time
-  // - the links are read from the existing burger menu (so Dutch follows along), in Integral capitals,
-  //   minus Home (the logo goes home) and the page you are on
-  // - the tile is frosted glass: the site's cream, see-through and blurred, like the old menu
-  // - bottom row: the language toggle (the Resources pill) on the left, Amsterdam's time in the
-  //   middle, the email on the right
-  // - the motion is one GSAP timeline, so opening and closing can interrupt each other smoothly.
-  //   The tile comes in as a rounded swipe; ?menu=flat (straight edge) or ?menu=blur (a frost fade) to compare.
-  // The old burger / fixed nav are hidden on these pages. Lenis stops while the menu is open.
+  // FULL SCREEN NAV — every page, after Osmo Supply's "Bold Full Screen Navigation" (markup, class names, toggle logic):
+  // - the bar is the logo + burger in their own fixed difference-blend layer, visible the whole time
+  // - the links come from the Webflow menu (.pop-up_nav_menu, hidden; so Dutch follows along), in Integral capitals,
+  //   minus Home (the logo goes home), Contact (the email is here) and the page you are on
+  // - the tile is the footer's black, a little see-through and blurred
+  // - bottom row: the language pill left, Amsterdam's time in the middle, the email right
+  // - one GSAP timeline, so opening and closing can interrupt each other; the tile comes in as a rounded swipe
+  // Lenis stops while the menu is open.
   // =========================================================
   function rdNavFull() {
     if (qs('.bold-nav-full')) return;
@@ -4935,43 +4845,39 @@
       return (href || '').replace(/^https?:\/\/[^/]+/, '').replace(/[?#].*$/, '').replace(/\/+$/, '') || '/';
     }
     var here = clean(location.pathname);
-    var skip = [prefix || '/', here];
-    if (/^\/home-(copy|v\d+(-[a-z]+)?)$/.test(here.replace(prefix, ''))) skip.push(prefix || '/'); // a home exploration page (home-v4, home-v4-landing…) is the home: no Home link
+    var skip = [prefix || '/', prefix + '/contact', here];
 
     var source = qsa('.pop-up_nav_menu .nav_link');
     var items = (source.length ? source.map(function (a) {
       return { href: clean(a.getAttribute('href')), text: a.textContent.trim() };
     }) : [
-      { href: prefix + '/service', text: 'Service' }, { href: prefix + '/work', text: 'Work' },
-      { href: prefix + '/resources', text: 'Resources' }, { href: prefix + '/contact', text: 'Contact' }
+      { href: prefix + '/work', text: 'Work' }, { href: prefix + '/service', text: 'Service' },
+      { href: prefix + '/resources', text: 'Resources' }
     ]).filter(function (it) { return skip.indexOf(it.href) < 0; });
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
     var logoSrc = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6336c99b7172a159f774bf15_SVGLOGO2.svg';
     if (/^\/home-v4(-landing)?$/.test(here.replace(prefix, ''))) logoSrc = brushLogoSrc(); // home V4 (and its landing exploration) tries the F Brush logo first, like its footer (Rimbo, 5 Nov)
-    var mode = (location.search.match(/[?&]menu=(flat|blur)/) || [])[1] || 'curve';
-    // the open menu is dark since 5 Nov (Rimbo: "dark is better"); ?nav=cream on staging and localhost brings the earlier cream one back
-    var dark = !(STAGING_HOST.test(location.hostname) && /[?&]nav=cream/.test(location.search));
-    if (dark) items = items.filter(function (it) { return !/\/contact$/.test(it.href); }); // the email is in the menu, so no Contact link (Rimbo, 5 Nov)
-    var mailHref = !dark ? 'mailto:hello@rimbodesigns.com' : 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&amp;body=' +
-      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n").replace(/'/g, '%27'); // the footer's email
-    // hover extras to try, alone or combined: ?hover=magnet,blur,stretch,lean (default: only the fade)
-    var hover = ((location.search.match(/[?&]hover=([a-z,]+)/) || [])[1] || '').split(',');
-    function hoverHas(name) { return hover.indexOf(name) > -1; }
+    var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&amp;body=' +
+      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n"); // the footer's email
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // what is behind the menu right now: the first real background at the left edge (the body is cream even under a dark hero)
-    function pageIsLight() {
-      for (var el = document.elementFromPoint(4, window.innerHeight / 2); el; el = el.parentElement) {
+    // what is behind the menu right now: the first real background at the left edge, high, middle and low on the screen
+    // (a cream hero can sit above a dark section, and the body is cream even under a dark hero). Any light part counts.
+    function lightAt(y) {
+      for (var el = document.elementFromPoint(4, y); el; el = el.parentElement) {
         var c = (getComputedStyle(el).backgroundColor.match(/[\d.]+/g) || []).map(Number);
         if (c.length > 2 && c[3] !== 0) return (c[0] + c[1] + c[2]) / 3 > 128;
       }
       return true;
     }
+    function pageIsLight() {
+      return [0.12, 0.5, 0.88].some(function (k) { return lightAt(window.innerHeight * k); });
+    }
     var ease = 'cubic-bezier(.65, 0, .35, 1)';
     var css = [
       // the old navigation steps aside on these pages
       '#FIXED_NAV, #Top_Nav, .burgermenu, .nav { display: none !important; }',
-      '.bold-nav-full { --nf-bg: rgba(248, 245, 238, .8); --nf-ink: #131313; z-index: 1000; pointer-events: none; position: fixed; inset: 0; color: var(--nf-ink); }',
+      '.bold-nav-full { --nf-bg: rgba(12, 12, 12, .9); --nf-ink: #f8f5ee; z-index: 1000; pointer-events: none; position: fixed; inset: 0; color: var(--nf-ink); }',
       // the bar is its own fixed layer (not inside the nav), so difference blends it with the page: dark on cream, light on dark
       '.bold-nav-full__bar { z-index: 1001; pointer-events: none; justify-content: space-between; align-items: center; width: 100%; height: 5rem; padding: 0 5%; display: flex; position: fixed; top: 0; left: 0; mix-blend-mode: difference; }',
       '.bold-nav-full__logo { pointer-events: auto; display: block; width: 72px; line-height: 0; }',
@@ -4989,34 +4895,28 @@
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(.7, 1); }',
       '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(.7, 1); }',
       // the tile: frosted glass; its edge (clip-path) and the letters are driven by the timeline below
-      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; visibility: hidden; will-change: clip-path; }',
+      '.bold-nav-full__tile { pointer-events: auto; background-color: var(--nf-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); flex-flow: column; justify-content: center; align-items: center; width: 100%; height: 100%; display: flex; position: absolute; top: 0; left: 0; visibility: hidden; will-change: clip-path; }',
       '.bold-nav-full__ul { flex-flow: column; align-items: center; margin: 0; padding: 0; display: flex; list-style: none; }',
       '.bold-nav-full__li { justify-content: center; align-items: center; margin: 0; padding: 0; display: flex; position: relative; overflow: hidden; transition: opacity .5s ' + ease + '; }',
       '.bold-nav-full__link { display: block; color: var(--nf-ink); font-family: IntegralNEW, Arial, sans-serif; font-size: min(calc(4.4vw + 4.4vh), 9.5rem); font-weight: 400; line-height: 1.15; text-transform: uppercase; text-decoration: none; padding: 0 .05em; will-change: transform; }',
       // hover: the other links fade back, the hovered one stays as it is (no colour change, no roll)
-      '.bold-nav-full__link-text { display: block; will-change: transform; transition: letter-spacing .7s ' + ease + (hoverHas('lean') ? ', transform .6s ' + ease : '') + '; }', // GSAP moves it for the magnet, so no CSS transform transition then
-      // once the menu has settled the masks open up, so a hover that moves or leans a word is never clipped
-      '.bold-nav-full.is-settled .bold-nav-full__li { overflow: visible; }',
-      hoverHas('blur') ? '.bold-nav-full__li { transition: opacity .5s ' + ease + ', filter .5s ' + ease + '; } .bold-nav-full__ul:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) .bold-nav-full__li { filter: blur(4px); } .bold-nav-full__ul .bold-nav-full__li:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) { filter: none; }' : '',
-      hoverHas('stretch') ? '.bold-nav-full__link:hover .bold-nav-full__link-text, .bold-nav-full__link:focus-visible .bold-nav-full__link-text { letter-spacing: .06em; }' : '',
-      hoverHas('lean') ? '.bold-nav-full__link:hover .bold-nav-full__link-text, .bold-nav-full__link:focus-visible .bold-nav-full__link-text { transform: skewX(-9deg); }' : '',
       '.bold-nav-full__link:hover, .bold-nav-full__link:focus, .bold-nav-full__link:focus-visible { color: var(--nf-ink); outline: none; }', // the site's global link hover would turn it coral
       '.bold-nav-full__ul:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) .bold-nav-full__li { opacity: .25; }',
       '.bold-nav-full__ul .bold-nav-full__li:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) { opacity: 1; }',
       // bottom row: language left, time middle, email right
-      '.bold-nav__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; padding: 0 5% 2.25rem; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }',
+      '.bold-nav__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; padding: 0 5% 2.25rem; position: absolute; bottom: 0; left: 0; font-family: var(--font--rm-mono, "Rm Mono", monospace); text-transform: uppercase; }',
       '.bold-nav__bottom > * { opacity: 0; }',
-      '.bold-nav__word { margin: 0; color: inherit; text-decoration: none; white-space: nowrap; }',
-      '.bold-nav__time { grid-column: 2; font-variant-numeric: tabular-nums; color: rgba(19, 19, 19, .6); }',
-      '.bold-nav__mail { grid-column: 3; justify-self: end; color: rgba(19, 19, 19, .6); transition: color .3s; }',
-      '.bold-nav__mail:hover { color: #131313; }',
+      '.bold-nav__bottom .bold-nav__word, .bold-nav__bottom .bold-nav__word:hover { margin: 0; font-size: .68rem; line-height: 1.4; letter-spacing: .1em; text-decoration: none; white-space: nowrap; }', // on the words themselves: the site's p and a styles beat a size on the row
+      '.bold-nav__time { grid-column: 2; font-variant-numeric: tabular-nums; color: rgba(248, 245, 238, .6); }',
+      '.bold-nav__mail { grid-column: 3; justify-self: end; color: rgba(248, 245, 238, .6); transition: color .3s; }',
+      '.bold-nav__mail:hover { color: #f8f5ee; }',
       // the language toggle, the same pill as on Resources (rdLangToggle drives it)
-      '.bold-nav__lang { grid-column: 1; justify-self: start; position: relative; display: inline-grid; grid-template-columns: repeat(var(--toggle-count, 2), 1fr); padding: .1875rem; border-radius: .375rem; background-color: rgba(19, 19, 19, .06); }',
-      '.bold-nav__lang .rs-lang__pill { position: absolute; top: .1875rem; bottom: .1875rem; left: .1875rem; width: calc((100% - .375rem) / var(--toggle-count, 2)); transform: translateX(calc(var(--toggle-active, 0) * 100%)); border-radius: .25rem; background-color: #fff; box-shadow: 0 1px 2px rgba(19, 19, 19, .08); transition: transform .5s cubic-bezier(.625, .05, 0, 1); }',
-      '.bold-nav__lang a { position: relative; z-index: 1; display: block; padding: .35rem .7rem .3rem; border-radius: .25rem; color: rgba(19, 19, 19, .45); font-family: Akkuratllsub, sans-serif; font-size: .75rem; line-height: 1; letter-spacing: .04em; text-align: center; text-transform: uppercase; text-decoration: none; transition: color .3s; }',
-      '.bold-nav__lang a:hover { color: rgba(19, 19, 19, .8); }',
+      '.bold-nav__lang { grid-column: 1; justify-self: start; position: relative; display: inline-grid; grid-template-columns: repeat(var(--toggle-count, 2), 1fr); padding: .1875rem; border-radius: .375rem; background-color: rgba(248, 245, 238, .1); }',
+      '.bold-nav__lang .rs-lang__pill { position: absolute; top: .1875rem; bottom: .1875rem; left: .1875rem; width: calc((100% - .375rem) / var(--toggle-count, 2)); transform: translateX(calc(var(--toggle-active, 0) * 100%)); border-radius: .25rem; background-color: #f8f5ee; transition: transform .5s cubic-bezier(.625, .05, 0, 1); }',
+      '.bold-nav__lang a { position: relative; z-index: 1; display: block; padding: .28rem .55rem .24rem; border-radius: .25rem; color: rgba(248, 245, 238, .5); font-family: Akkuratllsub, sans-serif; font-size: .62rem; line-height: 1; letter-spacing: .04em; text-align: center; text-transform: uppercase; text-decoration: none; transition: color .3s; }',
+      '.bold-nav__lang a:hover { color: rgba(248, 245, 238, .85); }',
       '.bold-nav__lang a[data-toggle-active] { color: #131313; }',
-      '.bold-nav__lang a:focus-visible { outline: 1px solid #131313; outline-offset: 2px; }',
+      '.bold-nav__lang a:focus-visible { outline: 1px solid #f8f5ee; outline-offset: 2px; }',
       '.bold-nav__mid { display: none; }',
       '.bold-nav__mid > * { opacity: 0; }',
       // phones: bigger words with more air between them; the language pill moves up into the middle of the gap
@@ -5029,28 +4929,14 @@
         ' .bold-nav__mid { flex: 1 1 0; display: flex; align-items: center; justify-content: center; }' +
         ' .bold-nav__bottom { position: relative; flex: none; grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; }' +
         ' .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; }' +
-      ' }',
-      // the dark menu, in the footer's black, its bottom row small and quiet. On a light page the glass is nearly solid, or the cream behind it turns it grey
-      !dark ? '' : [
-        '.bold-nav-full { --nf-bg: rgba(12, 12, 12, .9); --nf-ink: #f8f5ee; }',
-        '.bold-nav-full__tile { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }',
-        '.bold-nav__bottom .bold-nav__word, .bold-nav__bottom .bold-nav__word:hover { font-size: .68rem; line-height: 1.4; letter-spacing: .1em; }', // on the words themselves: the site's p and a styles beat the row's size (it was 18px)
-        '.bold-nav__time, .bold-nav__mail { color: rgba(248, 245, 238, .6); }',
-        '.bold-nav__mail:hover { color: #f8f5ee; }',
-        '.bold-nav__lang { background-color: rgba(248, 245, 238, .1); }',
-        '.bold-nav__lang .rs-lang__pill { background-color: #f8f5ee; box-shadow: none; }',
-        '.bold-nav__lang a { padding: .28rem .55rem .24rem; font-size: .62rem; color: rgba(248, 245, 238, .5); }',
-        '.bold-nav__lang a:hover { color: rgba(248, 245, 238, .85); }',
-        '.bold-nav__lang a[data-toggle-active] { color: #131313; }',
-        '.bold-nav__lang a:focus-visible { outline-color: #f8f5ee; }'
-      ].join('\n')
+      ' }'
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
     document.head.appendChild(style);
 
     var lis = items.map(function (it) {
-      return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link"><span class="bold-nav-full__link-text">' + it.text + '</span></a></li>';
+      return '<li class="bold-nav-full__li"><a href="' + it.href + '" class="bold-nav-full__link">' + it.text + '</a></li>';
     }).join('');
     var lang = locales.length > 1 ? '<div class="bold-nav__lang" data-lang-toggle>' + locales.map(function (a) {
       return '<a hreflang="' + a.getAttribute('hreflang') + '" href="' + a.getAttribute('href') + '"' +
@@ -5062,7 +4948,7 @@
     nav.setAttribute('aria-label', 'Main');
     nav.innerHTML =
       '<div class="bold-nav-full__tile" aria-hidden="true"><ul class="bold-nav-full__ul">' + lis + '</ul><div class="bold-nav__mid"></div>' +
-        '<div class="bold-nav__bottom">' + lang + '<p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="' + mailHref + '">hello@rimbodesigns.com</a></div></div>';
+        '<div class="bold-nav__bottom">' + lang + '<p class="bold-nav__word bold-nav__time">' + (nl ? 'Nederland' : 'Netherlands') + ' · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="' + mail + '">hello@rimbodesigns.com</a></div></div>';
     var bar = document.createElement('div');
     bar.className = 'bold-nav-full__bar';
     bar.setAttribute('data-navigation-status', 'not-active');
@@ -5092,7 +4978,7 @@
     var edge = { p: 0, dir: 1 };
     function draw() {
       var w = window.innerWidth, h = window.innerHeight, y = edge.p * h;
-      var bow = mode === 'curve' ? Math.sin(edge.p * Math.PI) * h * 0.22 * edge.dir : 0;
+      var bow = Math.sin(edge.p * Math.PI) * h * 0.22 * edge.dir;
       tile.style.clipPath = 'path("M0 0 H' + w + ' V' + y.toFixed(1) + ' Q' + (w / 2) + ' ' + (y + bow * 2).toFixed(1) + ' 0 ' + y.toFixed(1) + ' Z")';
     }
 
@@ -5106,70 +4992,38 @@
       tile.setAttribute('aria-hidden', active ? 'false' : 'true');
       if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
       if (tl) tl.kill();
-      if (dark && active) nav.style.setProperty('--nf-bg', 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')');
+      if (active) nav.style.setProperty('--nf-bg', 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')');
 
       if (reduce) {
-        gsap.set(tile, { visibility: active ? 'visible' : 'hidden', clipPath: 'none', opacity: 1 });
+        gsap.set(tile, { visibility: active ? 'visible' : 'hidden', clipPath: 'none' });
         gsap.set(links, { yPercent: active ? 0 : 110, rotate: 0 });
         gsap.set(bottom, { opacity: active ? 1 : 0, y: 0 });
         return;
       }
 
       if (active) {
-        tl = gsap.timeline({ onComplete: function () { tile.style.clipPath = 'none'; nav.classList.add('is-settled'); } }); // open: no clip, so a resize can't cut it
-        tl.set(tile, { visibility: 'visible' });
-        if (mode === 'blur') {
-          if (edge.p === 0) tl.set(tile, { opacity: 0 }, 0); // from fully closed: fade in from nothing
-          tl.set(tile, { clipPath: 'none' }, 0).to(tile, { opacity: 1, duration: 0.7, ease: 'power2.out' }, 0);
-          edge.p = 1;
-        } else {
-          edge.dir = 1;
-          tl.set(tile, { opacity: 1 })
-            .to(edge, { p: 1, duration: 1, ease: 'power3.inOut', onUpdate: draw }, 0);
-        }
-        tl.to(links, { yPercent: 0, rotate: 0, duration: 1.2, ease: 'expo.out', stagger: 0.07 }, mode === 'blur' ? 0.15 : 0.45)
-          .to(bottom, { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out', stagger: 0.06, startAt: { y: 8 } }, mode === 'blur' ? 0.35 : 0.7);
+        edge.dir = 1;
+        tl = gsap.timeline({ onComplete: function () { tile.style.clipPath = 'none'; } }); // open: no clip, so a resize can't cut it
+        tl.set(tile, { visibility: 'visible' })
+          .to(edge, { p: 1, duration: 1, ease: 'power3.inOut', onUpdate: draw }, 0)
+          .to(links, { yPercent: 0, rotate: 0, duration: 1.2, ease: 'expo.out', stagger: 0.07 }, 0.45)
+          .to(bottom, { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out', stagger: 0.06, startAt: { y: 8 } }, 0.7);
       } else {
-        nav.classList.remove('is-settled');
+        edge.dir = -1;
         tl = gsap.timeline({ onComplete: function () {
           gsap.set(tile, { visibility: 'hidden' });
           gsap.set(links, { rotate: 4 }); // ready to rise from below next time
-          gsap.set(qsa('.bold-nav-full__link-text', nav), { x: 0, y: 0 }); // a magnet hover never stays behind
         } });
-        // the words sink back down into their masks (going up would pull the hover copy, the text-shadow under
-        // each word, through the mask); bottom word first, so the stack empties from below
+        // the words sink back into their masks, bottom word first; the tile only lifts once they are nearly gone, so its edge never cuts through them
         tl.to(links, { yPercent: 110, rotate: 0, duration: 0.5, ease: 'power2.in', stagger: { each: 0.04, from: 'end' } }, 0)
-          .to(bottom, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0);
-        if (mode === 'blur') {
-          tl.to(tile, { opacity: 0, duration: 0.5, ease: 'power2.inOut' }, 0.35);
-          tl.add(function () { edge.p = 0; });
-        } else {
-          edge.dir = -1;
-          tl.add(draw, 0.35) // the tile only lifts once the words are nearly gone, so its edge never cuts through them
-            .to(edge, { p: 0, duration: 0.85, ease: 'power3.inOut', onUpdate: draw }, 0.35);
-        }
+          .to(bottom, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0)
+          .add(draw, 0.35)
+          .to(edge, { p: 0, duration: 0.85, ease: 'power3.inOut', onUpdate: draw }, 0.35);
       }
     }
 
     btn.addEventListener('click', function () { set(!isOpen); });
 
-    // ?hover=magnet: the word under the pointer leans a little towards it and springs back when the pointer leaves
-    if (hoverHas('magnet') && !reduce && window.matchMedia('(pointer: fine)').matches) {
-      links.forEach(function (a) {
-        var text = qs('.bold-nav-full__link-text', a);
-        a.addEventListener('pointermove', function (e) {
-          var r = a.getBoundingClientRect();
-          gsap.to(text, {
-            x: (e.clientX - (r.left + r.width / 2)) * 0.12,
-            y: (e.clientY - (r.top + r.height / 2)) * 0.25,
-            duration: 0.6, ease: 'power3.out', overwrite: 'auto'
-          });
-        });
-        a.addEventListener('pointerleave', function () {
-          gsap.to(text, { x: 0, y: 0, duration: 1.1, ease: 'elastic.out(1, 0.45)', overwrite: 'auto' });
-        });
-      });
-    }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) set(false); });
     // coming back with the browser's back button shows the page, not a menu left open
     window.addEventListener('pageshow', function (e) {
@@ -5769,14 +5623,12 @@
   // "/nl/work/anapana/" → "/work/anapana": the Dutch pages run the same code
   var path = location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
 
-  var navFull = path === '/home-copy' || path === '/home-v4' || path === '/home-v4-landing' || path === '/resources' || path === '/locations' || path.indexOf('/locations/') === 0; // the new menu, page by page until Rimbo's go (home-v4 + its landing exploration: Rimbo, 5 Nov)
-  if (navFull || (/[?&]nav=(dark|cream)/.test(location.search) && STAGING_HOST.test(location.hostname))) run('full screen nav', rdNavFull); // before the band, so its opening can fade the new logo + burger in last
+  run('full screen nav', rdNavFull); // before the band, so its opening can fade the logo + burger in last
   if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
   run('band', rdBand);   // builds the home-opening rows before the marquees start
   run('global', rdGlobal);
   run('buttons', rdButtons);
   run('form validation', rdFormValidation);
-  run('menu', rdMenu);
   run('post cards', rdPostCards);
   // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
   if (path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
