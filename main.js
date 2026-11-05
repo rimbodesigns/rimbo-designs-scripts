@@ -5139,7 +5139,7 @@
     var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // One size. The steps go from calm to alive: bias walks the ball along the fade (high = beige and steel, low = red),
     // flow is how fast the colours move. Meet is beige and blue, Design more blue with a little pink and orange, Build red
-    var SPEC = [{ seed: 14, bias: 0.26, flow: 0.6 }, { seed: 23, bias: -0.02, flow: 1 }, { seed: 37, bias: -0.2, flow: 1.5 }];
+    var SPEC = [{ seed: 14, bias: 0.5, flow: 0.6 }, { seed: 23, bias: -0.04, flow: 1 }, { seed: 37, bias: -0.44, flow: 1.5 }];
     var time = 0, last = 0, lastDraw = 0, onScreen = false, running = false;
     function draw(b) {
       var box = b.card.getBoundingClientRect();
