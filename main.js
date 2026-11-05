@@ -5215,12 +5215,12 @@
       '  float y = p.y / res.y;\n' +
       '  if (flip > 0.5) y = 1.0 - y;\n' + // y runs from the page (0) to the dark (1)
       '  float x = p.x / res.y;\n' +
-      '  float w = (fbm(vec2(x * 0.9 + t * 0.06, t * 0.05 + flip * 9.0)) - 0.5) * 0.75 + sin(x * 2.2 + t * 0.22 + flip * 3.0) * 0.07 + sin(x * 5.1 - t * 0.16) * 0.03;\n' +
-      '  float d = y + w * smoothstep(0.0, 0.35, y) * smoothstep(1.0, 0.65, y);\n' +
-      '  float dens = smoothstep(0.12, 0.82, d) * smoothstep(0.0, 0.1, y);\n' +
-      '  dens = mix(dens, 1.0, smoothstep(0.9, 1.0, y));\n' +
-      '  float g = hash(floor(p / grainScale));\n' +
-      '  outColor = vec4(0.0745, 0.0745, 0.0745, smoothstep(g - 0.12, g + 0.12, dens));\n' +
+      '  float w = (fbm(vec2(x * 0.8 + t * 0.06, t * 0.05 + flip * 9.0)) - 0.5) * 0.8 + sin(x * 1.5 + t * 0.2 + flip * 3.0) * 0.13 + sin(x * 3.7 - t * 0.14) * 0.05;\n' +
+      '  float d = y + w * smoothstep(0.0, 0.3, y) * smoothstep(1.0, 0.7, y);\n' +
+      '  float dens = smoothstep(0.2, 0.74, d) * smoothstep(0.0, 0.16, y);\n' +
+      '  dens = mix(dens, 1.0, smoothstep(0.84, 1.0, y));\n' +
+      '  float g = 0.04 + hash(floor(p / grainScale)) * 0.92;\n' + // kept off 0 and 1, so the stipple ends where the wave ends: no straight line at either end
+      '  outColor = vec4(0.0745, 0.0745, 0.0745, mix(dens, smoothstep(g - 0.04, g + 0.04, dens), 0.5));\n' +
       '}';
     function wave(flip) {
       var cv = document.createElement('canvas');
