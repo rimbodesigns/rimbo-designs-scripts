@@ -30,7 +30,7 @@ body { min-height: 100svh; font-family: "RM MONO", monospace; font-size: 12px; l
 .lab-cell.is-on .lab-stage { cursor: zoom-out; }
 .scene { position: absolute; inset: 0; }
 .scene-copy { position: absolute; left: 0; right: 0; top: 11%; text-align: center; text-transform: uppercase; font-size: 11px; letter-spacing: .22em; color: var(--ink); pointer-events: none; }
-.scene-next { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; text-transform: uppercase; letter-spacing: .3em; font-size: 22px; color: var(--ink); opacity: 0; pointer-events: none; }
+.scene-next { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; text-transform: uppercase; letter-spacing: .3em; font-size: 22px; color: var(--ink); opacity: 0; pointer-events: none; }
 .scene-next small { display: block; margin-top: 10px; font-size: 10px; color: var(--dim); letter-spacing: .18em; }
 .counter { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; font-size: 11px; letter-spacing: .3em; color: var(--dim); }
 .counter b { font-weight: 400; color: var(--ink); }
