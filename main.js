@@ -5260,8 +5260,9 @@
     var main = byId('MainWrap'), wrap = main ? main.parentNode : document.body;
     if (main) main.insertAdjacentElement('afterend', foot); else document.body.appendChild(foot);
     // the last section with its own background lifts off the footer
-    var prev = foot.previousElementSibling;
+    var top = foot.previousElementSibling, prev = top;
     while (prev && prev.lastElementChild && getComputedStyle(prev).backgroundColor === 'rgba(0, 0, 0, 0)') prev = prev.lastElementChild;
+    if (prev && prev.offsetWidth < foot.offsetWidth * .9) prev = top; // a small element at the end of the page (a language pill) is not a section
     if (prev) prev.classList.add('rdf-prev');
     var inner = qs('.rdf-in', foot);
 
