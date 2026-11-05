@@ -1331,16 +1331,20 @@
     var arcNarrow = 14; // below 768px: degrees per panel, hub distance and panel width (V3's phone wheel)
     var arcRadiusNarrow = 4.25;
     var panelWidthNarrowWheel = 0.62;
-    // The wheel's opening, V3's roll-in: the wheel waits turned arcRollIn degrees on and rolls back to rest while the
-    // stage fades in and the title rises. (Rimbo tried the other opening on 2026-11-05 — the top card alone slides in
-    // from the right, then the others grow in at their places, then the wheel turns — and sent it back: "not working,
-    // revert". It is still here behind ?rollin=0.)
-    var flyDuration = 0.9; // s, the first card's slide (the ?rollin=0 opening)
+    // The wheel's opening, V3's (Rimbo, 2026-11-05: "look at V3: the first one comes in, followed by the rest; in V5
+    // you see them all at once spinning"): every panel starts hidden and the wheel rolls one full loop from the
+    // reveal, so each panel comes in from the right exactly once and is shown the moment it comes round past
+    // entryDeg (still off screen). The roll's extra speed falls off as the square of the time left over arcRollDuration
+    // (quick at first, a long gentle tail) into the drift, so the wheel never stops: the roll becomes the loop. A hand
+    // on the wheel ends the roll where it is and fades the rest in. ?rollin=N rolls N degrees instead of one loop
+    // (data-glass-carousel-rollin), ?roll=S (-roll) the seconds. ?rollin=0 is the rejected fly-in below.
+    var arcRollIn = -1; // degrees for the roll-in; -1 = one full loop (every panel once); 0 = the fly-in
+    var arcRollDuration = 6; // seconds until the roll's extra speed is gone and the drift alone carries on
+    var entryDeg = 100; // a panel this far round on the right is off screen on every layout: shown there, it arrives unseen
+    var flyDuration = 0.9; // s, the first card's slide (the ?rollin=0 opening, rejected on V5 and V3)
     var fillStart = 0.5; // s after the first card sets off, the others begin to grow in
     var fillStagger = 0.1; // s per card away from the top
     var fillDuration = 0.8; // s for one card to grow
-    var arcRollIn = 90; // the opening: the wheel waits turned this many degrees on and rolls back to rest (0 = the fly-in above)
-    var arcRollDuration = 3.6; // seconds, a long even slow-down while the stage fades in and the title rises
     var arcDrift = 3; // degrees a second at rest, the same way round as the opening (0 = off; replaces autoDrift on the wheel); it eases up to speed over about a second and a half
     var arcStep = 0; // seconds between stepped turns of one card (V4's "1, 2, 3" clock) instead of the drift; 0 = drift (?step=3.5 to try)
     var arcSpin = 24; // degrees the wheel turns while the hero scrolls away, back again on the way up (0 = off)
@@ -1545,7 +1549,9 @@
       var arcDeg = function () { return narrow ? arcDegNarrow : arc; };
       var hubRadius = function () { return (narrow ? radiusShareNarrow : radiusShare) * panelH; };
       var pxPerDeg = function () { return (totalWidth / Math.max(1, total)) / Math.max(1, arcDeg()); }; // one slot along the rim is one arc
-      var roll = { v: 0 }, rolling = false; // the roll-in: an offset on the view, so the scroll model underneath is untouched
+      var rollDur = Math.max(0.1, urlNum('roll', attrNum('roll', arcRollDuration)));
+      var rolling = false, rollWait = 0, rollLeft = 0, rollExtra = 0, rollFresh = false; // the roll-in: extra speed on the scroll model itself
+      var rollEnded = !(arc && rollInDeg !== 0); // until the roll has ended (or there is none) the panels wait hidden for their turn
       var spinOffset = 0;
       var introEvent = wrapper.getAttribute('data-glass-carousel-intro-event');
       var introEventFired = !introEvent;
@@ -1576,7 +1582,9 @@
           tex: null,
           aspect: 1,
           image: media,
-          video: media && media.tagName === 'VIDEO'
+          video: media && media.tagName === 'VIDEO',
+          entered: true, // the wheel's roll-in hides every clip until its panel comes round
+          fadeFrom: 0
         };
       });
 
@@ -1605,9 +1613,15 @@
           window.dispatchEvent(new CustomEvent('glass-carousel:intro-done', { detail: { wrapper: wrapper } }));
         };
         var wheelOpening = arc && !rollInDeg;
-        if (arc && rollInDeg) { // the earlier opening: the wheel waits turned on by rollInDeg and rolls back to rest, the same way round as the drift
-          rolling = true;
-          gsap.fromTo(roll, { v: -rollInDeg * pxPerDeg() }, { v: 0, duration: arcRollDuration, delay: 0.15, ease: 'power2.out', overwrite: true, onComplete: function () { roll.v = 0; rolling = false; } });
+        if (arc && rollInDeg) { // the roll-in: one loop (or rollInDeg degrees) of extra speed on top of the drift, the panels shown as they come round
+          var rollPx = rollInDeg < 0 ? totalWidth : rollInDeg * pxPerDeg();
+          var driftNow = driftDeg * pxPerDeg();
+          rolling = true; rollFresh = true;
+          rollWait = 0.15; rollLeft = rollDur;
+          rollExtra = Math.max(0, 3 * (rollPx - driftNow * rollDur) / rollDur);
+          driftV = driftNow; // sets off at full drift speed, so the roll's tail runs straight into the loop
+          sources.forEach(function (src) { src.entered = false; src.fadeFrom = 0; }); // per clip: the same clip's other copies sit a loop away, off screen
+          pool.forEach(function (p) { p.prevTheta = undefined; });
         }
         if (wheelOpening) { // the first card flies in, the rest fill in (drawn in layout from introStart); done once the farthest card is in
           opening = true;
@@ -1624,6 +1638,12 @@
         gsap.to([captionEl, counterEl].filter(Boolean), {
           autoAlpha: 1, duration: 0.8, ease: 'power2.out', delay: introCaptionDelay, overwrite: true
         });
+      }
+
+      function rollDone() { // the roll's extra speed is spent, or a hand took the wheel: whatever is still hidden fades in where it is
+        rolling = false; rollEnded = true; rollLeft = 0;
+        var now = performance.now();
+        sources.forEach(function (src) { if (!src.entered) { src.entered = true; src.fadeFrom = now; } });
       }
 
       // The pop waits for two things: the first texture, and introDelay seconds after the page was ready
@@ -1847,7 +1867,7 @@
           var mesh = new THREE.Mesh(panelGeometry, mat);
           mesh.visible = false;
           scene.add(mesh);
-          pool.push({ mesh: mesh, mat: mat, rim: rim, srcIndex: i, bound: false });
+          pool.push({ mesh: mesh, mat: mat, rim: rim, srcIndex: i, bound: false, prevTheta: undefined });
         }
       }
 
@@ -1955,7 +1975,8 @@
         var centeredDist = Infinity;
         var half = W / 2;
         var buffer = panelH;
-        var view = scroll + roll.v + spinOffset; // what is seen: the scroll model plus the roll-in and the scroll turn
+        var view = scroll + spinOffset; // what is seen: the scroll model plus the scroll turn
+        var nowL = performance.now();
         var degPx = arc ? pxPerDeg() : 0, radius = arc ? hubRadius() : 0;
         var reach = arc ? Math.PI * 0.6 * degPx * 180 / Math.PI : 0; // beyond ~108° a panel is under the hub
 
@@ -2022,6 +2043,22 @@
               h *= e2;
             }
           }
+          if (arc && !rollEnded) { // the roll-in: a clip is shown the moment its panel comes round past entryDeg on the right
+            var theta = centerX / degPx, was = p.prevTheta;
+            p.prevTheta = theta;
+            if (!src.entered) {
+              if (was === undefined) was = 9999; // first look: counts as arriving only if it is already round on the right
+              if (theta - was > 90) was = 9999; // wrapped from the far left to the far right this frame
+              var offRight = theta > 0 && theta <= entryDeg && (cx - (Math.abs(w / 2 * Math.cos(tilt)) + Math.abs(h / 2 * Math.sin(tilt))) >= half || -cy - (Math.abs(w / 2 * Math.sin(tilt)) + Math.abs(h / 2 * Math.cos(tilt))) >= H / 2);
+              if (rollFresh && offRight) src.entered = true; // already waiting off screen on the right: it comes in first
+              else if (was > entryDeg && theta <= entryDeg && theta > 0) src.entered = true;
+              if (!src.entered) { p.mesh.visible = false; if (p.rim) p.rim.visible = false; return; }
+            }
+          }
+          var alpha = 1;
+          if (src.fadeFrom) { alpha = gsap.utils.clamp(0, 1, (nowL - src.fadeFrom) / 500); if (alpha >= 1) src.fadeFrom = 0; }
+          if (p.mat.opacity !== alpha) p.mat.opacity = alpha;
+          if (p.rim && p.rim.material.opacity !== alpha * panelBorderAlpha) p.rim.material.opacity = alpha * panelBorderAlpha;
           p.mesh.visible = true;
           p.mesh.position.set(cx, cy, depth);
           p.mesh.rotation.z = -tilt;
@@ -2052,6 +2089,7 @@
             centeredPanel = { srcIndex: i, poolIdx: poolIdx };
           }
         });
+        rollFresh = false;
       }
 
       var el = mount;
@@ -2128,7 +2166,7 @@
         suppressClick = false;
         if (dragging) return;
         if (e.button !== 0 && e.pointerType === 'mouse') return;
-        if (rolling) { gsap.killTweensOf(roll); scroll += roll.v; target += roll.v; roll.v = 0; rolling = false; } // a hand on the wheel ends the roll-in where it is
+        if (rolling) rollDone(); // a hand on the wheel ends the roll-in where it is and shows the rest
         dragging = true;
         dragPointerId = e.pointerId;
         dragPointerType = e.pointerType || 'mouse';
@@ -2265,8 +2303,18 @@
           velocity *= friction;
           if (Math.abs(velocity) < 0.05) velocity = 0;
 
+          if (rolling) { // the roll-in: the drift's speed plus an extra that falls off as the square of the time left
+            if (rollWait > 0) rollWait -= dt;
+            else {
+              var leftR = rollLeft / rollDur;
+              target += (driftV + rollExtra * leftR * leftR) * dt;
+              snapped = false;
+              rollLeft -= dt;
+              if (rollLeft <= 0) rollDone();
+            }
+          }
           drifting = driftPx > 0 && idle > driftResume * 1000 && now > holdUntil && !rolling && !opening; // also during the row's intro: it moves from the start; the wheel waits for its opening
-          var wantV = drifting ? driftPx : 0;
+          var wantV = (drifting || rolling) ? driftPx : 0; // the roll-in rides on the drift's speed
           driftV += (wantV - driftV) * Math.min(1, dt * (arc ? (wantV ? 1.5 : 6) : 60)); // the wheel eases up to speed (V3), the row is at speed at once
           if (drifting) {
             target += driftV * dt; // the row rolls left on its own
@@ -2278,7 +2326,7 @@
               target = centerForIndex(nearestIndex(scroll) + 1);
               snapped = true;
             }
-          } else if (!snapped && idle > snapIdle) {
+          } else if (!snapped && !rolling && idle > snapIdle) { // (never while the roll-in moves the target itself)
             target = centerForIndex(nearestIndex(scroll));
             snapped = true;
           }
@@ -3589,6 +3637,7 @@
         hideCards(); turn(rollDeg); startDrift(rollDeg);
       }
       var stageNow = !(cardsAfter || glassAfter || flyAfter);
+      if (stageNow && stage && !reduced && qs('[data-glass-carousel-arc]', hero)) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the glass wheel: no rise and no fade, its panels arrive one by one (V3)
       [stageNow ? stage : null, copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); });
       if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
