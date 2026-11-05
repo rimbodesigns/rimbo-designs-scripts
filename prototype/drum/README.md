@@ -25,4 +25,4 @@ One scrubber at the bottom is the hero's scroll-away, p from 0 to 1, for every s
 
 ## Decision
 
-Open: Rimbo is judging them in the lab.
+Rimbo picked the **roulette** (5 November 2026, evening): "I really like the roulette… it could be a scroll experience where from a certain point you can just scroll through the circle." V4 stays the home hero as it is; the roulette got its own page, /home-extreme (a copy of V4), built in main.js as `buildRing` on a slider root that carries `data-ring`. His first look at it: he loved the experience but not that the ring repeated the works three times to fill the circle, and asked whether it was too heavy. The second round became **the dial**: no copies, five works (the course and the in-use clip left off that page), the arc opening into a flat dial of five over a 1.5-screen hold, one round of names, then the dial closing into its middle. Still open: his verdict on the dial, and how the About section rises in its middle (that needs the About session's section to overlap the hold).
