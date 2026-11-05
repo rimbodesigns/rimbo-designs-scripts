@@ -3130,10 +3130,12 @@
     //            the wheel rolls one full loop from the reveal (Osmo keeps the cards wrapped around the top, half the
     //            loop either side, so a card leaving on the left comes back on the right: one loop = every card comes
     //            in from the right exactly once) and each card is shown the moment it comes round past 100 degrees
-    //            on the right, still off screen. The roll's speed falls off in a straight line into the drift's over
-    //            ?roll=S seconds, so the wheel never stops: the roll becomes the loop. ?rollin=N rolls N degrees
-    //            instead of one loop (data-band-rollin; 0 = the fly-in below), ?roll=S / data-band-roll, default 6.
-    //            No rise and no fade for the stage. A hand on the wheel ends the roll where it is and shows the rest.
+    //            on the right, still off screen; a card that already waits off screen on the right goes first, at
+    //            once. The roll's speed falls off as a curve into the drift's over ?roll=S seconds (Rimbo: "we can
+    //            definitely roll in at the start faster"): quick at first, then a long gentle tail, so the wheel never
+    //            stops: the roll becomes the loop. ?rollin=N rolls N degrees instead of one loop (data-band-rollin;
+    //            0 = the fly-in below), ?roll=S / data-band-roll, default 6. No rise and no fade for the stage. A
+    //            hand on the wheel ends the roll where it is and shows the rest.
     //   fly-in   ?rollin=0 (rejected: V5 2026-11-05 "not working", V3 the same night "weird"): title first, then the
     //            top card alone slides in straight from the right, the others grow in at their places, then the wheel
     //            turns. Knobs ?fly= ?fill= ?spread= ?grow= (data-band-fly/-fill/-spread/-grow). In open() (flyAfter).
@@ -3183,17 +3185,21 @@
       gsap.to(proxy, { x: to, duration: 0.6, ease: 'power2.out', onUpdate: render, onComplete: function () { d.update(); render(); } });
     };
     // The wheel's own motion, one ticker: the roll-in (once, from the opening) and the drift. The roll-in is extra
-    // speed on top of the drift that falls off in a straight line to nothing over rollDur, sized so the wheel covers
-    // roll degrees in that time (drift x rollDur + extra x rollDur / 2); when it is gone the drift is simply still
-    // running, so the roll becomes the loop without a stop. The cards start hidden and each is shown as it comes
-    // round the right side past entryDeg (off screen), so they arrive one after another; whatever is still hidden
-    // when the roll ends, or when a hand ends it, fades in where it is.
+    // speed on top of the drift that falls off as the square of the time left (quick at first, a long gentle tail)
+    // to nothing over rollDur, sized so the wheel covers roll degrees in that time (drift x rollDur + extra x rollDur
+    // / 3); when it is gone the drift is simply still running, so the roll becomes the loop without a stop. The
+    // cards start hidden and each is shown as it comes round the right side past entryDeg (off screen), so they
+    // arrive one after another; a card that already waits off screen on the right at the start is first in; whatever
+    // is still hidden when the roll ends, or when a hand ends it, fades in where it is.
     var rollWait = 0, rollLeft = 0, rollExtra = 0, wheelRunning = false, waiting = []; // waiting: the hidden cards
     var entryDeg = 100; // a card this far round on the right is off screen on every layout, and inside Osmo's wrap
     var itemRot = function (it) { return parseFloat(gsap.getProperty(it, 'rotation')) || 0; };
     var hideCards = function () { // called by the opening before the stage shows
       waiting = qsa('[data-radial-slider-item]', wheel);
-      waiting.forEach(function (it) { it.__rollRot = itemRot(it); });
+      waiting.forEach(function (it) {
+        var r = itemRot(it);
+        it.__rollRot = (r > 0 && r <= entryDeg && it.getBoundingClientRect().left >= window.innerWidth) ? 9999 : r; // off screen on the right already: it comes in first, so count it as arriving
+      });
       gsap.set(waiting, { autoAlpha: 0 });
     };
     var showArrivals = function () { // the cards that have just come round past entryDeg on the right
@@ -3211,7 +3217,7 @@
     };
     var startDrift = function (roll) { // roll: degrees for the roll-in, or nothing (the drift alone)
       if (!wheel) return;
-      if (roll && rollDur) { rollWait = 0.15; rollLeft = rollDur; rollExtra = Math.max(0, 2 * (roll - drift * rollDur) / rollDur); }
+      if (roll && rollDur) { rollWait = 0.15; rollLeft = rollDur; rollExtra = Math.max(0, 3 * (roll - drift * rollDur) / rollDur); }
       if (wheelRunning || (!drift && !roll)) return;
       wheelRunning = true;
       var v = roll ? drift : 0; // degrees a second right now (the drift's share), easing towards drift or 0; the roll-in sets off at full drift speed
@@ -3223,7 +3229,7 @@
         var extra = 0;
         if (rollLeft > 0) {
           if (wheelHeld()) rollDone();
-          else { extra = rollExtra * rollLeft / rollDur; rollLeft -= s; if (rollLeft <= 0) rollDone(); }
+          else { var left = rollLeft / rollDur; extra = rollExtra * left * left; rollLeft -= s; if (rollLeft <= 0) rollDone(); }
         }
         if (Math.abs(v) + extra < 0.01) { v = 0; return; }
         if (wheelHeld()) return;
