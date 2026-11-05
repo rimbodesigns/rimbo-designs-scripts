@@ -1,6 +1,6 @@
 /* Project calculator. Plain JS, no build.
    Every price and every info text lives in CONFIG. Prices are the draft numbers from docs/offer.md.
-   Prices only: no hours anywhere. */
+   Prices, not hours: the one exception is content migration, sold by the hour with a slider. */
 (function () {
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
@@ -80,26 +80,36 @@
       ]
     },
 
-    // Everything else, ranked by how often it is needed (the big builds last)
+    // Everything else, in groups after Branding and Pages (numbered 03, 04, …).
+    // Within a group: ranked by how often it is needed (the big builds last).
+    groups: [
+      { id: "search", legend: "Search and content" },
+      { id: "motion", legend: "Motion and feel" },
+      { id: "more",   legend: "Add what you need" }
+    ],
     toggles: [
-      { id: "seo",        label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site." },
-      { id: "legal",      label: "Legal pages, done for you",                 price: 500,  info: "Privacy, cookie and terms pages written for your business and checked against GDPR. You don't write a word." },
-      { id: "cms",        label: "Blog / CMS, with content and SEO training", price: 2000, info: "A blog or collection you edit yourself in Webflow, plus a session on writing and publishing posts that get found." },
-      { id: "i18n",       label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
-      { id: "loader",     label: "Custom page loader",                        price: 800,  info: "A branded intro animation while the site loads." },
-      { id: "transition", label: "Custom page transitions",                   price: 1500, info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
-      { id: "theme",      label: "Light and dark mode",                       price: 600,  info: "A light and a dark version of the whole site, with a switch." },
-      { id: "leads",      label: "Lead automation",                           price: 1500, info: "Form leads go straight into your CRM or mailing list, with automatic follow-up." },
-      { id: "migration",  label: "Content migration",                         price: 970,  info: "Moving your existing pages, posts and images to the new site. €97 an hour, estimated at 10 hours." },
-      { id: "chatbot",    label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
-      { id: "system",     label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system. This adds written documentation and a training session, so your team can build new pages with it." },
-      { id: "members",    label: "Members area",                              price: 4000, info: "Log-in, member-only pages and gated content, with payments if needed." },
-      { id: "shop",       label: "Webshop",                                   price: 4000, info: "Products, cart and checkout, built on Webflow e-commerce." },
-      { id: "priority",   label: "Priority start (jump the queue)",           pct: true,   info: "Your project takes the next free slot instead of waiting in line." }
+      { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site. Search and AI search are the same work, so they come together." },
+      { id: "cms",        group: "search", label: "Blog / CMS, with content and SEO training", price: 2000, info: "A blog or collection you edit yourself in Webflow, plus a session on writing and publishing posts that get found." },
+      { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
+      { id: "migration",  group: "search", label: "Content migration",                         hourly: 97, hours: { min: 1, max: 40, start: 10 },
+        info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Paid by the hour: set what you expect, the proposal confirms it." },
+      { id: "loader",     group: "motion", label: "Custom page loader",                        price: 800,  info: "A branded intro animation while the site loads." },
+      { id: "transition", group: "motion", label: "Custom page transitions",                   price: 1500, info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
+      { id: "theme",      group: "motion", label: "Light and dark mode",                       price: 600,  info: "A light and a dark version of the whole site, with a switch." },
+      { id: "legal",      group: "more",   label: "Legal pages, done for you",                 price: 500,  info: "Privacy, cookie and terms pages written for your business and checked against GDPR. You don't write a word." },
+      { id: "leads",      group: "more",   label: "Lead automation",                           price: 1500, info: "Form leads go straight into your CRM or mailing list, with automatic follow-up." },
+      { id: "chatbot",    group: "more",   label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
+      { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system. This adds written documentation and a training session, so your team can build new pages with it." },
+      { id: "members",    group: "more",   label: "Members area",                              price: 4000, info: "Log-in, member-only pages and gated content, with payments if needed." },
+      { id: "shop",       group: "more",   label: "Webshop",                                   price: 4000, info: "Products, cart and checkout, built on Webflow e-commerce." },
+      { id: "priority",   group: "more",   label: "Priority start (jump the queue)",           pct: true,   info: "Your project takes the next free slot instead of waiting in line." }
     ]
   };
 
-  var state = { pages: { simple: 2, medium: 4, complex: 2 }, brandOn: false, brandTouched: false, toggles: {} };
+  var state = { pages: { simple: 2, medium: 4, complex: 2 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
+  CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.hours.start; });
+  // An item's price: fixed, or hours × rate
+  function priceOf(t) { return t.hourly ? t.hourly * state.hours[t.id] : t.price; }
 
   var q = new URLSearchParams(location.search);
   if (q.get("theme") === "light" || q.get("theme") === "dark") {
@@ -134,21 +144,32 @@
   var mode = q.has("make") ? "make" : share ? "client" : "public";
   addEventListener("hashchange", function () { location.reload(); }); // a different link pasted into the same tab
 
-  // The scope as a small object: page counts, branding on/off, the ids that are on (brand parts only with branding on)
+  // The scope as a small object: page counts, branding on/off, the ids that are on (brand parts only with
+  // branding on), and the hours of hourly items that are on
   function snap() {
-    return {
+    var s = {
       p: CONFIG.pages.map(function (p) { return state.pages[p.id]; }),
       b: state.brandOn ? 1 : 0,
       t: Object.keys(byId).filter(function (id) { return state.toggles[id] && (state.brandOn || !isBrandPart(id)); }).sort()
     };
+    s.t.forEach(function (id) { if (byId[id].hourly) { s.h = s.h || {}; s.h[id] = state.hours[id]; } });
+    return s;
   }
+  function clampHours(t, n) { return Math.max(t.hours.min, Math.min(t.hours.max, Math.round(+n) || t.hours.start)); }
   function applySnap(s) {
     CONFIG.pages.forEach(function (p, i) { state.pages[p.id] = Math.max(0, Math.min(p.max, Math.round(+s.p[i]) || 0)); });
     state.brandOn = !!s.b; state.brandTouched = !!s.b;
     state.toggles = {};
     (s.t || []).forEach(function (id) { if (byId[id]) state.toggles[id] = true; });
+    CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = clampHours(t, s.h && s.h[t.id]); });
   }
-  function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify({ p: b.p, b: b.b ? 1 : 0, t: (b.t || []).slice().sort() }); }
+  // A link's pick in the same shape as snap(), so the two compare
+  function normSnap(b) {
+    var s = { p: b.p, b: b.b ? 1 : 0, t: (b.t || []).slice().sort() };
+    s.t.forEach(function (id) { var t = byId[id]; if (t && t.hourly) { s.h = s.h || {}; s.h[id] = clampHours(t, b.h && b.h[id]); } });
+    return s;
+  }
+  function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify(normSnap(b)); }
 
   // Nothing picked yet: no lines, an empty bar
   function picked() {
@@ -166,7 +187,9 @@
       if (n) out.push([n + " × " + p.label.toLowerCase(), n * p.price]);
     });
     if (state.brandOn) CONFIG.brand.items.forEach(function (t) { if (state.toggles[t.id]) out.push(["Branding: " + t.label.toLowerCase(), t.price]); });
-    CONFIG.toggles.forEach(function (t) { if (!t.pct && state.toggles[t.id]) out.push([t.label, t.price]); });
+    CONFIG.toggles.forEach(function (t) {
+      if (!t.pct && state.toggles[t.id]) out.push([t.label + (t.hourly ? " (" + state.hours[t.id] + " h)" : ""), priceOf(t)]);
+    });
     var scope = out.reduce(function (a, x) { return a + x[1]; }, 0), sum = scope;
     if (sum < CONFIG.minimum) { out.push(["Minimum project top-up", CONFIG.minimum - sum]); sum = CONFIG.minimum; }
     if (state.toggles.priority) { var extra = sum * CONFIG.priorityPct; out.push(["Priority start (+" + Math.round(CONFIG.priorityPct * 100) + "%)", extra]); sum += extra; }
@@ -300,28 +323,49 @@
     root.appendChild(subs);
   }
 
+  // The add-ons: one numbered box per group, after 01 Branding and 02 Pages
   function buildToggles() {
-    var root = $("toggles");
-    CONFIG.toggles.forEach(function (t) {
-      root.appendChild(makeItem(t, t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : "+" + eur(t.price),
-        function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
+    var root = $("groups");
+    CONFIG.groups.forEach(function (g, gi) {
+      var box = el("fieldset", "calc_step"), list = el("div");
+      box.appendChild(el("legend", "", String(gi + 3).padStart(2, "0") + " " + g.legend));
+      box.appendChild(list);
+      CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
+        var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
+        list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
+        if (t.hourly) list.appendChild(makeHours(t));
+      });
+      root.appendChild(box);
     });
+  }
+
+  // Hourly item: switched on, a slider for the hours opens under it
+  function makeHours(t) {
+    var wrap = el("div", "calc_subs calc_hours"); wrap.id = "hours-" + t.id; wrap.hidden = true;
+    var lab = el("label", "calc_hours_label", "Hours"); lab.htmlFor = "range-" + t.id;
+    var range = el("input", "calc_range_input"); range.type = "range"; range.id = "range-" + t.id;
+    range.min = t.hours.min; range.max = t.hours.max; range.step = 1; range.value = state.hours[t.id];
+    var out = el("output", "calc_hours_out"); out.id = "hours-out-" + t.id; out.htmlFor = range.id;
+    range.addEventListener("input", function () { state.hours[t.id] = clampHours(t, range.value); render(true); });
+    wrap.appendChild(lab); wrap.appendChild(range); wrap.appendChild(out);
+    return wrap;
   }
 
   // The big number: Osmo's odometer rolls it; without GSAP or with reduced motion it just changes
   var odometer = (window.gsap && typeof initNumberOdometer === "function") ? initNumberOdometer() : null;
   var reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   var firstPaint = true;
-  function setTotal(text) {
+  function setTotal(text, instant) {
     var n = $("total");
-    if (firstPaint || !odometer || reduceMotion) { n.textContent = text; firstPaint = false; return; }
     // A click during a roll: finish the running roll first, so the next one starts from a clean number
     var rollers = n.querySelectorAll('[data-odometer-part="roller"]');
     if (rollers.length) gsap.getTweensOf(rollers).forEach(function (tw) { (tw.parent && tw.parent !== gsap.globalTimeline ? tw.parent : tw).progress(1); });
+    // First paint, no GSAP, reduced motion, or dragging a slider: the number just changes
+    if (firstPaint || instant || !odometer || reduceMotion) { if (n.textContent.trim() !== text) n.textContent = text; firstPaint = false; return; }
     odometer(n, text);
   }
 
-  function render() {
+  function render(instant) {
     CONFIG.pages.forEach(function (p) { $("n-" + p.id).textContent = state.pages[p.id]; });
 
     document.querySelectorAll(".calc_toggle").forEach(function (s) {
@@ -334,9 +378,18 @@
     $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum())
       : "from " + eur(Math.min.apply(null, CONFIG.brand.items.map(function (t) { return t.price; })));
 
+    CONFIG.toggles.forEach(function (t) {
+      if (!t.hourly) return;
+      var on = !!state.toggles[t.id];
+      $("hours-" + t.id).hidden = !on;
+      $("range-" + t.id).value = state.hours[t.id];
+      $("hours-out-" + t.id).textContent = state.hours[t.id] + " h";
+      $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
+    });
+
     var r = calc(), reached = r.scope >= CONFIG.minimum;
     $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
-    setTotal(eur(r.total));
+    setTotal(eur(r.total), instant === true);
 
     // Under the minimum: a bar that fills as the scope grows, gone once the minimum is reached
     $("meter").hidden = reached;
@@ -434,17 +487,21 @@
       var price = $("price-" + id); if (!price) return;
       var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", C.recommended));
       price.parentNode.insertBefore(tag, price);
+      var t = byId[id];
+      if (t && t.hourly) $("hours-" + id).appendChild(el("span", "calc_rec_hint calc_hours_rec", C.recommended.toLowerCase() + ": " + clampHours(t, r.h && r.h[id]) + " h"));
     });
   }
 
   var current = { scope: "", range: "" };
 
-  // The scope as plain lines for the application. Prices of single items and any hours are left out on purpose.
+  // The scope as plain lines for the application. Prices of single items are left out on purpose;
+  // the only hours are those of hourly items (content migration), since that is what they are sold by.
   function scopeText(total) {
     var pages = CONFIG.pages.slice().reverse().filter(function (p) { return state.pages[p.id]; })
       .map(function (p) { return state.pages[p.id] + " " + p.id; });
     var b = state.brandOn ? CONFIG.brand.items.filter(function (t) { return state.toggles[t.id]; }).map(function (t) { return t.label.toLowerCase(); }) : [];
-    var tg = CONFIG.toggles.filter(function (t) { return state.toggles[t.id]; }).map(function (t) { return t.label; });
+    var tg = CONFIG.toggles.filter(function (t) { return state.toggles[t.id]; })
+      .map(function (t) { return t.label + (t.hourly ? " (" + state.hours[t.id] + " h)" : ""); });
     return "Pages: " + (pages.join(", ") || "none") + "\n" +
       "Branding: " + (b.join(", ") || "none") + "\n" +
       "Toggles: " + (tg.join(", ") || "none") + "\n" +
