@@ -3131,7 +3131,10 @@
     };
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
     var pinScreens = ring ? param('pin', 'pin', 1.5) : 0; // home-extreme: screens of scroll the hero stays pinned while the dial tips over, turns and closes
-    if (ring && !/[?&]step=/.test(location.search)) stepEvery = 0; // the dial's five cannot loop at rest, so the clock stays off there unless asked for
+    var ringSlots = ring ? param('slots', 'slots', 15) : 0; // home-extreme: cards on the dial; the works repeat to fill it (fifteen = the five works three times, 24° apart: a whole cylinder, so at rest it keeps going round like home-v4; ten = twice, each opposite itself, a part-cylinder that slides open)
+    var ringGrow = ring ? param('grow', 'grow', 1.15) : 1; // home-extreme: how much wider the flat dial is than the drum, so the cards slide outward as it tips
+    var ringFull = ring && ringSlots * 22.5 >= 359.9; // fifteen or more: the drum is a whole cylinder at rest, so it loops like home-v4 and the clock may run
+    if (ring && !ringFull && !/[?&]step=/.test(location.search)) stepEvery = 0; // a part-cylinder cannot loop at rest, so the clock stays off there unless asked for
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
     var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
@@ -3303,10 +3306,10 @@
       });
     };
 
-    // ---- home-extreme, the dial (Rimbo's roulette from the drum lab; round 2: no copies, five cards): the slider
-    // root carries [data-ring] instead of Osmo's init attribute. The cards on the page (five) sit on a cylinder, the
-    // axis behind the front card. At rest they are 22.5° apart and read as the five-card arc of home-v4, the middle
-    // card in front. The hero stays pinned for pinScreens screens of scroll: over the first 35% the ring tips about
+    // ---- home-extreme, the dial (Rimbo's roulette from the drum lab; round 3: ringSlots cards, the works on the page
+    // repeating to fill them, "5 is a bit little"): the slider root carries [data-ring] instead of Osmo's init
+    // attribute. The cards sit on a cylinder, the axis behind the front card. At rest they are 22.5° apart and read as
+    // the arc of home-v4, the first card in front (a part-cylinder keeps its gap at the back, out of sight). The hero stays pinned for pinScreens screens of scroll: over the first 35% the ring tips about
     // its axis until you look down on it, every card turning face-up, the spacing opening to a full 360/N so the
     // five fill the circle as a dial (the radius tightens with it), the name of the card at the bottom fading in at
     // the centre; the next 50% turns it one full round, one name per notch; the last 15% closes it, the dial drawing
@@ -3319,18 +3322,21 @@
       var list = qs('.spatial-gsap-slider__list', ring) || drum;
       var originals = qsa('.spatial-gsap-slider__item', list);
       if (!drum || originals.length < 2) return null;
-      var N = originals.length, REST = 22.5, FULL = 360 / N, mid = Math.floor(N / 2), rad = Math.PI / 180;
-      var items = originals.map(function (el, i) { return { el: el, k: i <= mid ? i : i - N, name: (qs('[data-band-name]', el) || el).getAttribute('data-band-name') || '' }; }); // 0 = the first card, in front at rest; the last ones sit to its left
+      var N = Math.max(originals.length, Math.round(ringSlots)), FULL = 360 / N, REST = Math.min(22.5, FULL), mid = Math.floor(N / 2), rad = Math.PI / 180;
+      for (var ci = originals.length; ci < N; ci++) { var cl = originals[ci % originals.length].cloneNode(true); cl.setAttribute('data-ring-clone', ''); cl.setAttribute('aria-hidden', 'true'); list.appendChild(cl); } // the works repeat round the dial; dedupeClips turns the copies into canvases
+      var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) { var panel = qs('[data-band-name]', el) || el; return { el: el, k: i <= mid ? i : i - N, name: panel.getAttribute('data-band-name') || '', line: panel.getAttribute('data-ring-line') || panel.getAttribute('data-band-name') || '' }; }); // 0 = the first card, in front at rest; the last ones sit to its left; the line is what the dial says in its middle (data-ring-line on the panel, the name if there is none)
       var label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label);
       var bottomFade = qs('.band_fade.is-bottom', hero); // covers the clip edge at rest; it lifts while the dial lies flat, so the lower cards stay bright
-      var st = { steps: 0, scroll: 0, tip: 0, open: 0, scale: 1, y: 0, fade: 1, pitch: 0, w: 0, h: 0, tween: null, front: -1, dir: 1 };
+      var st = { steps: 0, scroll: 0, tip: 0, open: 0, scale: 1, y: 0, fade: 1, pitch: 0, w: 0, h: 0, fit: 0.45, tween: null, front: -1, dir: 1 };
       var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
-      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; };
+      var arcR = function () { return st.pitch / (2 * Math.sin(REST / 2 * rad)); }; // the drum's cylinder: the cards a pitch apart along it
+      var dialR = function () { return Math.max(arcR() * ringGrow, st.w / (2 * Math.sin(Math.PI / N)) + st.h * 0.3); }; // the flat dial: the drum grown a little, and never so tight that the cards pile up in the middle
+      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))); }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count
       var spacing = function () { return REST + (FULL - REST) * st.open; };
       var render = function () {
         var sp = spacing(), turn = st.steps + st.scroll, s = st.scale.toFixed(4);
         var ang = (((-turn * sp) % 360) + 540) % 360 - 180; // wrapped to a half-turn either way, so a long turn never hands the browser a huge angle
-        var Rarc = st.pitch / (2 * Math.sin(REST / 2 * rad)), Rdial = st.w / (2 * Math.sin(Math.PI / N)) + st.h / 2 + st.pitch * 0.04; // the arc's cylinder; the dial just wide enough that the cards' inner corners clear each other
+        var Rarc = arcR(), Rdial = dialR(); // the drum's cylinder, then the dial
         var R = Rarc + (Rdial - Rarc) * st.open;
         // written as strings: the order matters (a card turns about the axis first, then moves out to the cylinder), and GSAP would translate first
         drum.style.transform = 'translate3d(0,' + st.y.toFixed(1) + 'px,' + (-R).toFixed(1) + 'px) rotateX(' + st.tip.toFixed(3) + 'deg) rotateY(' + ang.toFixed(3) + 'deg) scale3d(' + s + ',' + s + ',' + s + ')';
@@ -3338,11 +3344,11 @@
         // own plane, and the drum's plane is edge-on when the dial lies flat, so a faded drum painted nothing at all
         items.forEach(function (it) { it.el.style.transform = 'rotateY(' + (it.k * sp).toFixed(3) + 'deg) translateZ(' + R.toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; it.el.style.opacity = st.fade.toFixed(3); });
         var front = ((Math.round(turn) % N) + N) % N;
-        if (front !== st.front) { st.front = front; label.textContent = items[front].name; }
+        if (front !== st.front) { st.front = front; label.textContent = items[front].line; }
       };
       measure(); render();
       var rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
-      var lo = -mid, hi = N - 1 - mid, flat = function () { return st.open >= 0.5; };
+      var lim = ringFull ? Infinity : Math.max(0, Math.floor((N - 1) / 2 - 2)), lo = -lim, hi = lim, flat = function () { return st.open >= 0.5 || ringFull; }; // a part-cylinder may only turn until its gap would show; a whole one is free
       var held = function (v) { if (flat()) return v; return v < lo ? lo + (v - lo) * 0.25 : v > hi ? hi + (v - hi) * 0.25 : v; }; // the rubber band at rest
       // drags: a pitch of pointer travel is one card; on release it settles on the nearest card, a flick carries on a little
       var down = null;
@@ -3354,7 +3360,7 @@
       var ease3 = function (q) { q = clamp01(q); return 1 - Math.pow(1 - q, 3); };
       return {
         busy: function () { return !!down; },
-        state: function () { return { steps: st.steps, scroll: st.scroll, tip: st.tip, open: st.open, scale: st.scale, fade: st.fade, front: st.front, cards: N }; },
+        state: function () { return { steps: st.steps, scroll: st.scroll, tip: st.tip, open: st.open, scale: st.scale, fade: st.fade, front: st.front, cards: N, works: originals.length, fit: st.fit }; },
         step: function (n) {
           var cur = Math.round(st.steps), next = cur + n * st.dir;
           if (!flat() && (next > hi || next < lo)) { st.dir = -st.dir; next = cur + n * st.dir; } // 1-2-3-4-5 and back
@@ -3368,7 +3374,7 @@
           var e = ease3(q / 0.35), x = clamp01((q - 0.85) / 0.15); // e: the tip-over; x: the close
           st.tip = 90 * e; st.open = e; st.y = -window.innerHeight * 0.08 * e;
           st.scroll = (q > 0.35 ? Math.min(1, (q - 0.35) / 0.5) * N : 0) + x * 0.6; // one full round, then a little more as it closes
-          st.scale = (1 - 0.55 * e) * (1 - 0.5 * x); st.fade = 1 - x;
+          st.scale = (1 - (1 - st.fit) * e) * (1 - 0.5 * x); st.fade = 1 - x;
           if (bottomFade) gsap.set(bottomFade, { opacity: 1 - e });
           gsap.set(label, { opacity: clamp01((q - 0.3) / 0.08) * (1 - x) });
           render();
