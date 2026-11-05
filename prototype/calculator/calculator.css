@@ -130,13 +130,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 [data-odometer-part="roller"] { display: block; white-space: pre; text-align: center; will-change: transform; }
 [data-odometer-part="static"] { display: inline-block; }
 
-.calc_lines { margin: 0 0 20px; padding: 0; list-style: none; font-size: 14px; line-height: 1.35; max-height: 38vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--track) transparent; }
+.calc_lines { margin: 0 0 20px; padding: 0; list-style: none; font-size: 14px; line-height: 1.35; }
 .calc_lines[hidden] { display: none; }
 .calc_lines li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); color: var(--muted); }
 .calc_lines li span:last-child { color: var(--text); font: 13px/1.45 var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 
-/* Tip card under the price card, joined to its item by the dashed line */
-.calc_tip { position: relative; padding: 24px 24px 26px; border: 1px solid var(--on); border-radius: var(--r); background: var(--solid); box-shadow: 8px 8px 0 rgba(0, 0, 0, .55); }
+/* Tip card under the price card, the same frosted card, joined to its item by the dashed line.
+   Sticky: on a short window it slides up over the price card instead of falling off the screen. */
+.calc_tip { position: sticky; bottom: 16px; z-index: 2; padding: 24px 24px 26px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
 .calc_tip[hidden] { display: none; }
 .calc_tip.is-in { animation: calc-tip-in .28s ease-out; }
 @keyframes calc-tip-in { from { opacity: 0; } to { opacity: 1; } }
@@ -197,8 +198,10 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 
 /* The pop-up: bottom of the screen, a moment, then gone */
 .calc_toast { position: fixed; left: 50%; bottom: 24px; z-index: 30; max-width: calc(100% - 32px); transform: translateX(-50%);
-  padding: 12px 16px 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--on); border-radius: var(--r);
-  background: var(--solid); color: var(--text); font-size: 14px; box-shadow: 6px 6px 0 rgba(0, 0, 0, .55); }
+  display: flex; align-items: center; gap: 14px; padding: 12px 16px 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--on); border-radius: var(--r);
+  background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); color: var(--text); font-size: 14px; }
+.calc_toast_btn { appearance: none; padding: 0; border: 0; background: none; cursor: pointer; color: var(--text); font: 14px/1.2 var(--read); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--on); }
+.calc_toast_btn:hover { color: var(--muted); }
 .calc_toast[hidden] { display: none; }
 .calc_toast.is-bad { border-left-color: var(--error); }
 .calc_toast.is-in { animation: calc-toast-in .25s ease-out; }
@@ -269,7 +272,6 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 @media (max-width: 860px) {
   .calc_grid { grid-template-columns: 1fr; }
   .calc_side { position: static; }
-  .calc_lines { max-height: none; }
   /* Phone: the tip is a card at the bottom of the screen; no line */
   .calc_tip { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; max-height: 50vh; overflow-y: auto; }
   .calc_wire { display: none; }

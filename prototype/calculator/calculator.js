@@ -12,7 +12,7 @@
     dfsUrl: "https://digitalfengshui.com", // PLACEHOLDER: Digital Feng Shui link
     copy: {
       intro: "This is the scope you picked. I'll reply within 2 working days with a suggestion and a price. If it fits, we talk.",
-      fine: "No sales call to book. I read every application myself.",
+      fine: "I read every application myself.",
       optIn: "Send me a rare personal update (a few times a year)",
       doneTitle: "Got it. Thank you.",
       doneText: "I'll reply within 2 working days with a suggestion and a price.",
@@ -31,11 +31,14 @@
       makeCta: "Create link",
       makeCtaAlt: "Copies it for you",
       applyCta: "Apply with this scope",
-      applyCtaAlt: "No sales call",
+      applyCtaAlt: "A few short questions",
       submit: "Send my application",
       submitAlt: "I read every one",
       makeNeedName: "Give it a project name first.",
       needScope: "Pick something first.",
+      startOver: "Start over",
+      cleared: "All cleared.",
+      undo: "Undo",
       makeDone: "Link copied to your clipboard.",
       copy: "Copy",
       makeOpen: "Open it",
@@ -101,7 +104,7 @@
     groups: [
       { id: "search", legend: "Search and analytics" },
       { id: "motion", legend: "Motion and feel" },
-      { id: "more",   legend: "Add what you need" }
+      { id: "more",   legend: "Add what you need", line: "Extras" }
     ],
     // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250 and transitions
     // to a medium page's €900, automations €500 (Rimbo, 2026-11-05)
@@ -215,14 +218,13 @@
   //   total  the estimate for the application: never below the minimum, priority on top
   function calc() {
     if (!picked()) return { lines: [], scope: 0, shown: 0, total: CONFIG.minimum };
+    // One line per section, so the card stays short however much is on (the switches already show what's picked)
     var out = [];
-    CONFIG.pages.forEach(function (p) {
-      var n = state.pages[p.id];
-      if (n) out.push([n + " × " + p.label.replace(/^[A-Z][a-z]/, function (c) { return c.toLowerCase(); }), n * p.price]); // "simple pages", "CMS templates"
-    });
-    if (state.brandOn) CONFIG.brand.items.forEach(function (t) { if (state.toggles[t.id]) out.push(["Branding: " + t.label.toLowerCase(), t.price]); });
-    CONFIG.toggles.forEach(function (t) {
-      if (!t.pct && state.toggles[t.id]) out.push([t.label + (t.hourly ? " (" + levelOf(t).label.toLowerCase() + ")" : ""), priceOf(t)]);
+    function line(label, sum) { if (sum) out.push([label, sum]); }
+    line(CONFIG.brand.label, state.brandOn ? brandSum() : 0);
+    line("Pages", CONFIG.pages.reduce(function (a, p) { return a + state.pages[p.id] * p.price; }, 0));
+    CONFIG.groups.forEach(function (g) {
+      line(g.line || g.legend, CONFIG.toggles.reduce(function (a, t) { return a + (t.group === g.id && !t.pct && state.toggles[t.id] ? priceOf(t) : 0); }, 0));
     });
     var scope = out.reduce(function (a, x) { return a + x[1]; }, 0), pr = state.toggles.priority ? CONFIG.priorityPct : 0;
     if (pr) out.push(["Priority start (+" + Math.round(pr * 100) + "%)", scope * pr]);
@@ -448,6 +450,7 @@
     $("scope-summary").textContent = current.scope;
     $("f-selections").value = current.scope.split("\nEstimate:")[0];
     $("f-range").value = current.range;
+    $("start-over").hidden = mode === "client" || !picked(); // the lead has "Back to my recommendation"
     if (mode !== "public") syncShare();
     queueWire();
   }
@@ -478,11 +481,28 @@
 
   // A short pop-up at the bottom of the screen (copied, or what's missing)
   var toastT = 0;
-  function toast(text, bad) {
+  function toast(text, bad, action, onAction) {
     var t = $("toast");
     t.textContent = text; t.classList.toggle("is-bad", !!bad);
+    if (action) {
+      var b = el("button", "calc_toast_btn", action); b.type = "button";
+      b.addEventListener("click", function () { t.hidden = true; onAction(); });
+      t.appendChild(b);
+    }
     t.hidden = false; t.classList.remove("is-in"); void t.offsetWidth; t.classList.add("is-in");
-    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, action ? 7000 : 2800);
+  }
+
+  // Start over: clears everything at once, so the pop-up offers the way back
+  function setupStartOver() {
+    var C = CONFIG.copy;
+    $("start-over").textContent = C.startOver;
+    $("start-over").addEventListener("click", function () {
+      var before = snap();
+      applySnap({ p: [], b: 0, t: [] });
+      render();
+      toast(C.cleared, false, C.undo, function () { applySnap(before); render(); });
+    });
   }
 
   function setupShare() {
@@ -666,6 +686,7 @@
   document.documentElement.setAttribute("data-mode", mode);
   if (share) applySnap(share.c || share.r);
   if (mode === "public") setupApply(); else setupShare();
+  setupStartOver();
   if (window.gsap && window.rdButtons) rdButtons();
   render();
 })();

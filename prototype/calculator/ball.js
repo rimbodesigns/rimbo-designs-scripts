@@ -114,7 +114,7 @@
     gl.viewport(0, 0, cv.width, cv.height);
     if (wide) {
       var r = side.getBoundingClientRect();
-      B.cx = Math.min(r.right + 40, w - 10); B.cy = h * .92; B.min = Math.max(96, h * .17); B.max = h * .72;
+      B.cx = Math.min(r.right + 40, w - 10); B.cy = h * .92; B.min = Math.max(96, h * .17); B.max = h * .54;
     } else {
       B.cx = w * .98; B.cy = 30; B.min = 62; B.max = 165;
     }
