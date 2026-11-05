@@ -5868,6 +5868,7 @@
       .wall_section { --ball: 5.75; --c: .5em; }
       .wall_faces, .wall_arrows { display: flex; justify-content: center; align-items: center; padding: 0 1rem; }
       .centered-slider-bullet__list { display: flex; flex-flow: row nowrap; justify-content: center; align-items: center; gap: 1.5em; position: relative; margin: 0; padding: 0; list-style: none; }
+      .centered-slider-bullet__item { font-size: 16px; } /* the site's li is 18px */
       .centered-slider-bullet { display: block; position: relative; width: 2.5em; height: 2.5em; padding: 0; border: 0; border-radius: .25em; background: transparent; font: inherit; cursor: pointer; }
       .centered-slider-bullet:focus { outline: none; }
       .centered-slider-bullet img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: .25em; filter: grayscale(1); opacity: .6; transition: opacity .4s cubic-bezier(.625, .05, 0, 1); }
