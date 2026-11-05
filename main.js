@@ -1206,7 +1206,7 @@
     var lensHeightNarrow = 0.7;
     var lensRotationNarrow = 90;
 
-    var lensColor = '#ff7373'; // the ring and its aura (Rimbo coral)
+    var lensColor = '#e4441c'; // the ring and its aura (brand orange)
     var lensGlow = 4; // brightness of the ring, the outline and the centre, 0 to 17
     var lensRing = 1; // the coloured ring, 0 removes it
     var lensRingRadius = 0.49; // 0.1 sits near the middle, 0.49 on the edge
@@ -4062,7 +4062,7 @@
 
   // Osmo's CSS, with RM Mono in place of Haffer Mono. The site's theme comes after it.
   var SCROLL_RULER_CSS = [
-    '.scroll-ruler { --scroll-ruler-color: #f2f2f2; --scroll-ruler-accent: #ff5a36; z-index: 50; color: var(--scroll-ruler-color); padding-left: 1.25em; padding-right: 2.5em; position: fixed; top: 20svh; bottom: 20svh; left: 0; cursor: pointer; touch-action: manipulation; user-select: none; transition: opacity 0.6s ease; }',
+    '.scroll-ruler { --scroll-ruler-color: #f2f2f2; --scroll-ruler-accent: #e4441c; z-index: 50; color: var(--scroll-ruler-color); padding-left: 1.25em; padding-right: 2.5em; position: fixed; top: 20svh; bottom: 20svh; left: 0; cursor: pointer; touch-action: manipulation; user-select: none; transition: opacity 0.6s ease; }',
     '.scroll-ruler[data-scroll-ruler-status="idle"] { opacity: 0.4; }',
     '.scroll-ruler__list { flex-direction: column; justify-content: space-between; align-items: flex-start; height: 100%; display: flex; }',
     '.scroll-ruler__tick { opacity: 0.3; transform-origin: 0%; background-color: currentColor; width: 0.75em; height: 1px; }',
@@ -4080,8 +4080,8 @@
     // ---- the site's theme
     // Like the fixed nav (.mix_blend), the ruler is white with mix-blend-mode: difference, so it reads
     // dark on the beige page and light over a dark screenshot. Difference also turns the accent around:
-    // #00a19a over the beige (#f8f5ee) comes out as the link red (#ff5454); over black it shows as itself.
-    '.scroll-ruler { --scroll-ruler-color: #fff; --scroll-ruler-accent: #00a19a; mix-blend-mode: difference; }',
+    // #2cb9d6 over the beige (#f8f5ee) comes out as the link orange (#cc3c18); over black it shows as itself.
+    '.scroll-ruler { --scroll-ruler-color: #fff; --scroll-ruler-accent: #2cb9d6; mix-blend-mode: difference; }',
     // a bit taller and tighter labels, so short sections (a list under an H2) still get their label:
     // Osmo hides a label that would touch the one above it
     '.scroll-ruler { top: 15svh; bottom: 15svh; }',
@@ -4451,7 +4451,7 @@
   // Runs before the buttons and the ruler: they pick up what it builds.
   // =========================================================
   var POST_REFRESH_CSS = [
-    '.rf { --rf-ink: #131313; --rf-ink-60: rgba(19, 19, 19, .6); --rf-red: #ff5454; --rf-red-text: #c0362c; --rf-coral: #ff7373; --rf-dark: #0c0c0c; --rf-col: 40rem; --rf-mono: var(--font--rm-mono, "Rm Mono", monospace); }',
+    '.rf { --rf-ink: #131313; --rf-ink-60: rgba(19, 19, 19, .6); --rf-red: #e4441c; --rf-red-text: #cc3c18; --rf-coral: #e4441c; --rf-dark: #0c0c0c; --rf-col: 40rem; --rf-mono: var(--font--rm-mono, "Rm Mono", monospace); }',
 
     // grain: the site's own GRAIN_EFFECT style, under the content, half the home's strength
     '.rf .rf-grain { opacity: .03; z-index: -1; }',
@@ -5129,7 +5129,7 @@
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var logoSrc = brushLogoSrc();
-    var ACCENT = [243, 86, 46], CREAM = [248, 245, 238];
+    var ACCENT = [228, 68, 28], CREAM = [248, 245, 238];
     var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
     var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
     var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
@@ -5137,7 +5137,7 @@
 
     var ease = 'cubic-bezier(.625, .05, 0, 1)';
     var css = [
-      '.rdf { --rdf-black: #0c0c0c; --rdf-cream: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #f3562e; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
+      '.rdf { --rdf-black: #0c0c0c; --rdf-cream: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-pad: clamp(1rem, 3vw, 2.5rem); --rdf-mono: var(--font--rm-mono, "Rm Mono", "RM MONO", monospace); --rdf-display: IntegralNEW, "Arial Black", sans-serif;',
       '  position: relative; z-index: 0; height: 100vh; height: 100svh; min-height: 40rem; margin-top: -2rem; overflow: hidden; background: var(--rdf-black); color: var(--rdf-cream); font-family: var(--rdf-mono); font-size: 16px; line-height: normal; letter-spacing: normal; -webkit-font-smoothing: antialiased; }',
       '.rdf *, .rdf *::before, .rdf *::after { box-sizing: border-box; }',
       '.rdf a, .rdf a:hover, .rdf a:focus { color: inherit; text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles (size, coral hover) stay out
@@ -5181,7 +5181,7 @@
       '.rdf-lang a + a::before { content: "/"; margin-right: .7em; color: var(--rdf-grey); opacity: .5; }',
       // the build: an outline per box, the HTML it types, the caret
       '.rdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
-      '.rdf-frame rect { fill: none; stroke: rgba(243, 86, 46, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }',
+      '.rdf-frame rect { fill: none; stroke: rgba(228, 68, 28, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }',
       '.rdf-rev { position: relative; z-index: 1; will-change: clip-path; }',
       '.rdf-ch { transition: opacity .7s; }',
       '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 3; }',
