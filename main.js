@@ -3130,7 +3130,8 @@
       return isNaN(v) ? fallback : v;
     };
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
-    var pinScreens = ring ? param('pin', 'pin', 2.5) : 0; // home-extreme: screens of scroll the hero stays pinned while the ring tips over and turns
+    var pinScreens = ring ? param('pin', 'pin', 1.5) : 0; // home-extreme: screens of scroll the hero stays pinned while the dial tips over, turns and closes
+    if (ring && !/[?&]step=/.test(location.search)) stepEvery = 0; // the dial's five cannot loop at rest, so the clock stays off there unless asked for
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
     var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
@@ -3169,7 +3170,7 @@
     // (background tab) or the hero has scrolled away; every hold restarts the wait, so a step never lands right
     // after a hand has let go or the pointer has left.
     var autoStep = function () {
-      if (!stepNext && !ringApi) return;
+      if (!stepNext && !(ringApi && stepEvery > 0)) return;
       var zone = ring || qs('[data-' + kind + '-slider-collection]', slider) || slider, over = false;
       zone.addEventListener('pointerenter', function () { over = true; });
       zone.addEventListener('pointerleave', function () { over = false; });
@@ -3300,67 +3301,74 @@
       });
     };
 
-    // ---- home-extreme, the ring (Rimbo's roulette, from the drum lab): the slider root carries [data-ring] instead of
-    // Osmo's init attribute. The seven cards plus nine clones (made here, so dedupeClips turns them into canvases)
-    // sit on a full cylinder 22.5° apart, the axis behind the front card, the back half hidden: at rest it reads as
-    // the five-card arc of home-v4. The hero stays pinned for pinScreens screens of scroll: over the first third
-    // the ring tips about its axis until you look down on it, every card turning face-up and the ring shrinking to
-    // fit, the name of the card at the bottom fading in at its centre; the rest of the scroll turns it one full
-    // round. Steps (the clock) and drags turn it too; a drag settles on a card. ?pin=N sets the screens.
+    // ---- home-extreme, the dial (Rimbo's roulette from the drum lab; round 2: no copies, five cards): the slider
+    // root carries [data-ring] instead of Osmo's init attribute. The cards on the page (five) sit on a cylinder, the
+    // axis behind the front card. At rest they are 22.5° apart and read as the five-card arc of home-v4, the middle
+    // card in front. The hero stays pinned for pinScreens screens of scroll: over the first 35% the ring tips about
+    // its axis until you look down on it, every card turning face-up, the spacing opening to a full 360/N so the
+    // five fill the circle as a dial (the radius tightens with it), the name of the card at the bottom fading in at
+    // the centre; the next 50% turns it one full round, one name per notch; the last 15% closes it, the dial drawing
+    // into its middle and fading, so the next section is there when the pin lets go. Drags turn it: at rest the
+    // five cannot loop, so the drag is held to the five (a rubber band past the ends); once flat it goes round. The
+    // step clock is off here unless ?step=N asks for it (at rest it walks 1-2-3-4-5 and back). ?pin=N sets the screens.
     var ringApi = null;
     var buildRing = function () {
       var drum = qs('.spatial-gsap-slider__collection', ring) || ring.firstElementChild;
       var list = qs('.spatial-gsap-slider__list', ring) || drum;
       var originals = qsa('.spatial-gsap-slider__item', list);
       if (!drum || originals.length < 2) return null;
-      var N = 16, STEP = 360 / N;
-      for (var i = originals.length; i < N; i++) {
-        var c = originals[i % originals.length].cloneNode(true);
-        c.setAttribute('data-ring-clone', ''); c.setAttribute('aria-hidden', 'true');
-        list.appendChild(c);
-      }
-      var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) {
-        var k = i <= N / 2 ? i : i - N; // 0 = the front card, ±1 its neighbours, ±8 the back
-        return { el: el, k: k, a: k * STEP, name: (qs('[data-band-name]', el) || el).getAttribute('data-band-name') || '' };
-      });
+      var N = originals.length, REST = 22.5, FULL = 360 / N, mid = Math.floor(N / 2), rad = Math.PI / 180;
+      var items = originals.map(function (el, i) { return { el: el, k: i <= mid ? i : i - N, name: (qs('[data-band-name]', el) || el).getAttribute('data-band-name') || '' }; }); // 0 = the first card, in front at rest; the last ones sit to its left
       var label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label);
-      var bottomFade = qs('.band_fade.is-bottom', hero); // covers the clip edge at rest; it lifts while the ring lies flat, so the lower cards stay bright
-      var st = { steps: 0, scroll: 0, tip: 0, scale: 1, y: 0, R: 0, pitch: 0, drag: null, tween: null, front: -1 };
-      var measure = function () {
-        var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025;
-        st.pitch = w + gap; st.R = st.pitch / (2 * Math.sin(STEP / 2 * Math.PI / 180));
-      };
+      var bottomFade = qs('.band_fade.is-bottom', hero); // covers the clip edge at rest; it lifts while the dial lies flat, so the lower cards stay bright
+      var st = { steps: 0, scroll: 0, tip: 0, open: 0, scale: 1, y: 0, fade: 1, pitch: 0, w: 0, h: 0, tween: null, front: -1, dir: 1 };
+      var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
+      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; };
+      var spacing = function () { return REST + (FULL - REST) * st.open; };
       var render = function () {
-        var turn = st.steps + st.scroll;
+        var sp = spacing(), turn = st.steps + st.scroll, s = st.scale.toFixed(4);
+        var ang = (((-turn * sp) % 360) + 540) % 360 - 180; // wrapped to a half-turn either way, so a long turn never hands the browser a huge angle
+        var Rarc = st.pitch / (2 * Math.sin(REST / 2 * rad)), Rdial = st.w / (2 * Math.sin(Math.PI / N)) + st.h / 2 + st.pitch * 0.04; // the arc's cylinder; the dial just wide enough that the cards' inner corners clear each other
+        var R = Rarc + (Rdial - Rarc) * st.open;
         // written as strings: the order matters (a card turns about the axis first, then moves out to the cylinder), and GSAP would translate first
-        drum.style.transform = 'translate3d(0,' + st.y.toFixed(1) + 'px,' + (-st.R).toFixed(1) + 'px) rotateX(' + st.tip.toFixed(3) + 'deg) rotateY(' + (-turn * STEP).toFixed(3) + 'deg) scale3d(' + st.scale.toFixed(4) + ',' + st.scale.toFixed(4) + ',' + st.scale.toFixed(4) + ')';
-        items.forEach(function (it) { it.el.style.transform = 'rotateY(' + it.a + 'deg) translateZ(' + st.R.toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; });
+        drum.style.transform = 'translate3d(0,' + st.y.toFixed(1) + 'px,' + (-R).toFixed(1) + 'px) rotateX(' + st.tip.toFixed(3) + 'deg) rotateY(' + ang.toFixed(3) + 'deg) scale3d(' + s + ',' + s + ',' + s + ')';
+        // the fade sits on the cards, never on the drum: opacity below 1 flattens a preserve-3d element's children into its
+        // own plane, and the drum's plane is edge-on when the dial lies flat, so a faded drum painted nothing at all
+        items.forEach(function (it) { it.el.style.transform = 'rotateY(' + (it.k * sp).toFixed(3) + 'deg) translateZ(' + R.toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; it.el.style.opacity = st.fade.toFixed(3); });
         var front = ((Math.round(turn) % N) + N) % N;
         if (front !== st.front) { st.front = front; label.textContent = items[front].name; }
       };
       measure(); render();
       var rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
-      // drags: a pitch of pointer travel is one card; on release it settles on the nearest card, a flick adds a little
+      var lo = -mid, hi = N - 1 - mid, flat = function () { return st.open >= 0.5; };
+      var held = function (v) { if (flat()) return v; return v < lo ? lo + (v - lo) * 0.25 : v > hi ? hi + (v - hi) * 0.25 : v; }; // the rubber band at rest
+      // drags: a pitch of pointer travel is one card; on release it settles on the nearest card, a flick carries on a little
       var down = null;
       ring.addEventListener('pointerdown', function (e) { if (e.button) return; if (st.tween) st.tween.kill(); down = { x: e.clientX, steps: st.steps, t: performance.now(), v: 0, last: e.clientX }; ring.setPointerCapture(e.pointerId); });
-      ring.addEventListener('pointermove', function (e) { if (!down) return; var now = performance.now(); down.v = (e.clientX - down.last) / Math.max(1, now - down.t); down.last = e.clientX; down.t = now; st.steps = down.steps - (e.clientX - down.x) / st.pitch; render(); }); // v: px per ms
-      var up = function () { if (!down) return; var v = down.v; down = null; settle(-v * 150 / st.pitch); }; // a flick carries on a little: 150 px of travel per px/ms
+      ring.addEventListener('pointermove', function (e) { if (!down) return; var now = performance.now(); down.v = (e.clientX - down.last) / Math.max(1, now - down.t); down.last = e.clientX; down.t = now; st.steps = held(down.steps - (e.clientX - down.x) / st.pitch); render(); }); // v: px per ms
+      var up = function () { if (!down) return; var v = down.v; down = null; settle(-v * 150 / st.pitch); };
       ring.addEventListener('pointerup', up); ring.addEventListener('pointercancel', up);
-      var settle = function (extra) { var to = Math.round(st.steps + (extra || 0)); st.tween = gsap.to(st, { steps: to, duration: 0.8, ease: 'power3.out', onUpdate: render }); };
-      var ease3 = function (q) { q = Math.max(0, Math.min(1, q)); return 1 - Math.pow(1 - q, 3); };
+      var settle = function (extra) { var to = Math.round(st.steps + (extra || 0)); if (!flat()) to = Math.max(lo, Math.min(hi, to)); st.tween = gsap.to(st, { steps: to, duration: 0.8, ease: 'power3.out', onUpdate: render }); };
+      var ease3 = function (q) { q = clamp01(q); return 1 - Math.pow(1 - q, 3); };
       return {
         busy: function () { return !!down; },
-        step: function (n) { if (st.tween) st.tween.kill(); st.tween = gsap.to(st, { steps: Math.round(st.steps) + n, duration: 1, ease: 'power3.inOut', onUpdate: render }); },
-        state: function () { return { steps: st.steps, scroll: st.scroll, tip: st.tip, scale: st.scale, front: st.front }; },
+        state: function () { return { steps: st.steps, scroll: st.scroll, tip: st.tip, open: st.open, scale: st.scale, fade: st.fade, front: st.front, cards: N }; },
+        step: function (n) {
+          var cur = Math.round(st.steps), next = cur + n * st.dir;
+          if (!flat() && (next > hi || next < lo)) { st.dir = -st.dir; next = cur + n * st.dir; } // 1-2-3-4-5 and back
+          if (st.tween) st.tween.kill();
+          st.tween = gsap.to(st, { steps: next, duration: 1, ease: 'power3.inOut', onUpdate: render });
+        },
         scroll: function (q) { // q: 0..1 over the pinned distance
-          var screens = q * pinScreens, gone = Math.max(0, Math.min(1, screens / fadeFrac)); // the copy goes within fadeFrac of a screen, as on home-v4
+          var screens = q * pinScreens, gone = clamp01(screens / fadeFrac); // the copy goes within fadeFrac of a screen, as on home-v4
           if (copy) { copy.style.transition = 'none'; gsap.set(copy, { opacity: 1 - gone, filter: 'blur(' + (10 * gone).toFixed(1) + 'px)' }); }
-          if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - Math.max(0, Math.min(1, screens / 0.07)) }); }
-          var e = ease3(q / 0.35);
-          st.tip = 90 * e; st.scale = 1 - 0.6 * e; st.y = -window.innerHeight * 0.1 * e;
+          if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - clamp01(screens / 0.07) }); }
+          var e = ease3(q / 0.35), x = clamp01((q - 0.85) / 0.15); // e: the tip-over; x: the close
+          st.tip = 90 * e; st.open = e; st.y = -window.innerHeight * 0.08 * e;
+          st.scroll = (q > 0.35 ? Math.min(1, (q - 0.35) / 0.5) * N : 0) + x * 0.6; // one full round, then a little more as it closes
+          st.scale = (1 - 0.55 * e) * (1 - 0.5 * x); st.fade = 1 - x;
           if (bottomFade) gsap.set(bottomFade, { opacity: 1 - e });
-          st.scroll = q > 0.35 ? (q - 0.35) / 0.65 * N : 0; // one full round over the rest
-          gsap.set(label, { opacity: Math.max(0, Math.min(1, (q - 0.3) / 0.1)) });
+          gsap.set(label, { opacity: clamp01((q - 0.3) / 0.08) * (1 - x) });
           render();
         }
       };
