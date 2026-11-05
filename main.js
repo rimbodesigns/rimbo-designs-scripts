@@ -5521,6 +5521,7 @@
       '.rdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
       '.rdf-frame rect { fill: none; stroke: rgba(243, 86, 46, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }',
       '.rdf-rev { position: relative; z-index: 1; will-change: clip-path; }',
+      '.rdf-ch { transition: opacity .7s; }',
       '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 3; }',
       '.rdf-code { position: absolute; left: 1.6rem; top: 1.3rem; right: 1rem; z-index: 2; pointer-events: none; font-size: .64rem; line-height: 1.6; letter-spacing: .04em; white-space: pre-wrap; word-break: break-all; text-transform: none; color: var(--rdf-grey); transition: opacity .25s; }',
       '.rdf-code .t { color: var(--rdf-cream); } .rdf-code .k { color: #8fb3ff; } .rdf-code .s { color: var(--rdf-brand); }',
@@ -5628,43 +5629,43 @@
       sc.onload = scrambleReady;
       document.head.appendChild(sc);
     }
-    // ---- the small text writes itself in from an empty cell, left to right, a few loose glyphs running ahead of it
-    // (Rimbo, 5 Nov: it popped in whole and only then scrambled). Scrolling back it fades out. ?ftext=fade: a plain fade ----
-    var fadeOnly = /[?&]ftext=fade/.test(location.search);
-    var GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', AHEAD = 4;
-    var writeState = new Map();
+    // ---- the small text comes in like a film title: one slow move and a beat between the lines (Rimbo, 5 Nov: fading,
+    // typing and scrambling at once felt busy and quick). Every letter stands in its place from the start, a dim loose
+    // glyph that fades up and settles into the real letter in its own time; scrolling back it fades out.
+    // ?ftext=focus adds a soft focus pull, ?ftext=fade is a plain fade without the glyphs ----
+    var textMode = (/[?&]ftext=(fade|focus)/.exec(location.search) || [])[1] || '';
+    var GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', TITLE_FADE = 1.7, TITLE_SETTLE = 2.2, TITLE_BEAT = 0.2;
+    var writeState = new Map(), nextTitle = 0;
+    function glyph() { return GLYPHS[Math.floor(Math.random() * GLYPHS.length)]; }
     function splitChars(s, kid) {
       if (s.units) return;
       s.root = kid.classList.contains('rdf-swap') ? kid.firstElementChild : kid; // the swap's second line stays out of sight anyway
       s.units = [];
       var walk = document.createTreeWalker(s.root, NodeFilter.SHOW_TEXT), nodes = [], n;
-      while ((n = walk.nextNode())) if (n.nodeValue.trim()) nodes.push(n);
+      while ((n = walk.nextNode())) if (n.nodeValue.trim() && !n.parentNode.hasAttribute('data-rdf-clock')) nodes.push(n); // the clock rewrites itself
       nodes.forEach(function (node) {
-        if (node.parentNode.hasAttribute('data-rdf-clock')) { s.units.push({ el: node.parentNode }); return; } // the clock rewrites itself, so it comes in whole
         var frag = document.createDocumentFragment();
         Array.from(node.nodeValue).forEach(function (ch) {
-          if (!ch.trim()) { frag.appendChild(document.createTextNode(ch)); return; }
-          var el = document.createElement('span'); el.className = 'rdf-ch'; el.textContent = ch;
-          frag.appendChild(el); s.units.push({ el: el, ch: ch, loose: /[a-z0-9]/i.test(ch) });
+          if (!/[a-z0-9]/i.test(ch)) { frag.appendChild(document.createTextNode(ch)); return; }
+          var el = document.createElement('span'); el.className = 'rdf-ch'; el.textContent = glyph(); el.style.opacity = 0.45;
+          frag.appendChild(el); s.units.push({ el: el, ch: ch });
         });
         node.parentNode.replaceChild(frag, node);
       });
+      s.units.forEach(function (u, i) { u.at = 0.2 + Math.random() * 0.55 + 0.2 * i / s.units.length; }); // a loose order, drifting left to right
     }
     function joinChars(s) {
       if (!s.units) return;
-      s.units.forEach(function (u) { if (u.ch) u.el.replaceWith(u.ch); else u.el.style.visibility = ''; });
+      s.units.forEach(function (u) { u.el.replaceWith(u.ch); });
       s.root.normalize(); s.units = null;
     }
     function paintChars(s) {
-      var n = s.k * (s.units.length + AHEAD), now = performance.now(), roll = now - (s.rolled || 0) > 60;
+      var now = performance.now(), roll = now - (s.rolled || 0) > 130;
       if (roll) s.rolled = now;
-      s.units.forEach(function (u, i) {
-        u.el.style.visibility = i < n ? '' : 'hidden';
-        if (!u.ch) return;
-        var ahead = u.loose && i >= n - AHEAD && i < n;
-        if (ahead && (roll || !u.ahead)) u.el.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-        else if (!ahead && u.ahead) u.el.textContent = u.ch;
-        if (ahead !== !!u.ahead) { u.ahead = ahead; u.el.style.opacity = ahead ? 0.55 : ''; }
+      s.units.forEach(function (u) {
+        if (u.done) return;
+        if (s.k >= u.at) { u.done = true; u.el.textContent = u.ch; u.el.style.opacity = ''; }
+        else if (roll && Math.random() < 0.4) u.el.textContent = glyph();
       });
     }
     function writeSet(kid, on) {
@@ -5677,14 +5678,17 @@
       if (s.write) s.write.kill();
       if (first || !window.gsap) { s.k = on ? 1 : 0; kid.style.opacity = s.k; return; }
       if (!on) {
-        s.fade = gsap.to(kid, { opacity: 0, duration: 0.5, ease: 'power1.out', onComplete: function () { s.k = 0; joinChars(s); } });
+        s.fade = gsap.to(kid, { opacity: 0, duration: 0.7, ease: 'sine.inOut', onComplete: function () { s.k = 0; joinChars(s); } });
         return;
       }
-      s.fade = gsap.to(kid, { opacity: 1, duration: fadeOnly ? 1 : 0.3, ease: 'power1.out' });
-      if (fadeOnly || s.k >= 1) { s.k = 1; return; }
-      splitChars(s, kid); paintChars(s);
+      var t = performance.now() / 1000, delay = Math.max(0, nextTitle - t); // however fast the scroll, the lines come one after the other
+      nextTitle = t + delay + TITLE_BEAT;
+      s.fade = gsap.to(kid, { opacity: 1, duration: TITLE_FADE, delay: delay, ease: 'sine.inOut' });
+      if (textMode === 'focus') gsap.fromTo(kid, { filter: 'blur(3px)' }, { filter: 'blur(0px)', duration: TITLE_FADE, delay: delay, ease: 'sine.out', clearProps: 'filter' });
+      if (textMode === 'fade' || s.k >= 1) { s.k = 1; return; }
+      splitChars(s, kid);
       s.write = gsap.to(s, {
-        k: 1, duration: Math.min(1.5, 0.5 + s.units.length * 0.022), ease: 'sine.inOut',
+        k: 1, duration: TITLE_SETTLE, delay: delay, ease: 'none',
         onUpdate: function () { paintChars(s); }, onComplete: function () { joinChars(s); }
       });
     }
