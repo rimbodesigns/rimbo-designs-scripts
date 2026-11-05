@@ -3331,7 +3331,7 @@
       var lines = (hero.getAttribute('data-band-lines') || '').split('|').map(function (t) { return t.trim(); }).filter(Boolean);
       if (!lines.length) lines = originals.map(function (el) { var pn = qs('[data-band-name]', el) || el; return pn.getAttribute('data-ring-line') || pn.getAttribute('data-band-name') || ''; });
       for (var ci = originals.length; ci < N; ci++) { var cl = originals[ci % originals.length].cloneNode(true); cl.setAttribute('data-ring-clone', ''); cl.setAttribute('aria-hidden', 'true'); list.appendChild(cl); } // the works repeat round the dial; dedupeClips turns the copies into canvases
-      var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) { var panel = qs('[data-band-name]', el) || el; return { el: el, k: i <= mid ? i : i - N, name: panel.getAttribute('data-band-name') || '', fly: 0, gone: 0 }; }); // 0 = the first card, in front at rest; the last ones sit to its left; the line is what the dial says in its middle (data-ring-line on the panel, the name if there is none)
+      var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) { var panel = qs('[data-band-name]', el) || el; return { el: el, k: i <= mid ? i : i - N, name: panel.getAttribute('data-band-name') || '', fly: 0, tan: 0, gone: 0 }; }); // 0 = the first card, in front at rest; the last ones sit to its left; the line is what the dial says in its middle (data-ring-line on the panel, the name if there is none)
       var label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label);
       var bottomFade = qs('.band_fade.is-bottom', hero); // covers the clip edge at rest; it lifts while the dial lies flat, so the lower cards stay bright
       var st = { steps: 0, scroll: 0, tip: 0, open: 0, scale: 1, y: 0, dx: 0, fade: 1, pitch: 0, w: 0, h: 0, fit: 0.45, tween: null, front: -1, dir: 1, closing: false, text: '', blurOn: false };
@@ -3350,7 +3350,7 @@
         drum.style.transform = 'translate3d(' + st.dx.toFixed(1) + 'px,' + st.y.toFixed(1) + 'px,' + (-R).toFixed(1) + 'px) rotateX(' + st.tip.toFixed(3) + 'deg) rotateY(' + ang.toFixed(3) + 'deg) scale3d(' + s + ',' + s + ',' + s + ')';
         // the fade sits on the cards, never on the drum: opacity below 1 flattens a preserve-3d element's children into its
         // own plane, and the drum's plane is edge-on when the dial lies flat, so a faded drum painted nothing at all
-        items.forEach(function (it) { it.el.style.transform = 'rotateY(' + (it.k * sp).toFixed(3) + 'deg) translateZ(' + (R + it.fly).toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; it.el.style.opacity = Math.min(st.fade, 1 - it.gone).toFixed(3); });
+        items.forEach(function (it) { it.el.style.transform = 'rotateY(' + (it.k * sp).toFixed(3) + 'deg) translate3d(' + (-it.tan).toFixed(1) + 'px,0,' + (R + it.fly).toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; it.el.style.opacity = Math.min(st.fade, 1 - it.gone).toFixed(3); }); // a card's own x is the tangent of its travel, so a fling (tan) rides the spin
         var front = ((Math.round(turn) % N) + N) % N; st.front = front;
         // what the middle says: on the way round the lines take turns, each for an equal share of the round (five changes),
         // counted from the scroll alone so the first line is always first; as the dial closes, one word
@@ -3405,23 +3405,24 @@
           var screens = q * pinScreens, gone = clamp01(screens / fadeFrac); // the copy goes within fadeFrac of a screen, as on home-v4
           if (copy) { copy.style.transition = 'none'; gsap.set(copy, { opacity: 1 - gone, filter: 'blur(' + (10 * gone).toFixed(1) + 'px)' }); }
           if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - clamp01(screens / 0.07) }); }
-          var e = ease3(q / 0.35), x = clamp01((q - 0.85) / 0.15); // e: the tip-over; x: the close
+          var e = ease3(q / 0.35), x = clamp01((q - 0.75) / 0.25); // e: the tip-over; x: the way out (a quarter of the hold: Rimbo found it too fast)
           st.closing = x > 0;
           st.tip = 90 * e; st.open = e; st.y = -window.innerHeight * 0.08 * e;
-          st.scroll = (q > 0.35 ? Math.min(1, (q - 0.35) / 0.5) * N : 0); // one full round
+          st.scroll = (q > 0.35 ? Math.min(1, (q - 0.35) / 0.4) * N : 0); // one full round
           st.scale = 1 - (1 - st.fit) * e; st.fade = 1; st.dx = 0;
           // the way out (Rimbo: a fade-out after that is a let-down): the dial rolls off to the left still spinning, or the
           // cards shoot out one by one, or (the old way) it draws in and fades
           var W = window.innerWidth, xo = ease3(x);
-          if (ringOut === 'shoot') {
-            items.forEach(function (it, i) { var d = ((i * 7) % N) / N * 0.6, g = ease3(clamp01((x - d) / (1 - d))); it.fly = W * 1.4 * g; it.gone = g; });
+          if (ringOut === 'shoot') { // flung by the spin (Rimbo: "it has so much momentum, do something with that"): the drum keeps turning and each card, when its turn comes, accelerates out along its tangent
+            st.scroll += x * N * 0.35;
+            items.forEach(function (it, i) { var d = ((i * 7) % N) / N * 0.55, g = clamp01((x - d) / (1 - d)); g = g * g; it.fly = W * 0.9 * g; it.tan = W * 1.3 * g; it.gone = clamp01(g * 1.5); });
           } else if (ringOut === 'fade') {
             st.scale *= 1 - 0.5 * x; st.fade = 1 - x; st.scroll += x * 0.6;
           } else { // roll
             st.dx = -W * 1.15 * xo; st.scroll += x * N * 0.5; // half a round more on the way out
           }
           if (bottomFade) gsap.set(bottomFade, { opacity: 1 - e });
-          gsap.set(label, { opacity: clamp01((q - 0.3) / 0.08) * (1 - clamp01((x - 0.45) / 0.55)) }); // the closing word stays until the dial is nearly gone
+          gsap.set(label, { opacity: clamp01((q - 0.3) / 0.08) * (1 - clamp01((x - 0.7) / 0.3)) }); // the closing word sticks (Rimbo) and only goes with the last of the hold
           render();
         }
       };
