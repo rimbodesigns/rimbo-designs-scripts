@@ -1,0 +1,179 @@
+/* The ball: the brand's grainy circle (docs/brand.md), standing for the project.
+   Fade and shader come from prototype/brand/src.html: Deep Orange through Hot Edge and steel into beige,
+   mixed in OKLab so nothing goes grey. What's new here is what it does:
+   - its area follows the price, so it starts small at €0 and grows with every pick
+   - under the minimum it's cool (steel and beige), the orange comes in on the way to the minimum
+   - every pick floods it with orange and it fades back, reaching the minimum floods it all the way
+   - the pointer warms it up. Idle it drifts at 15 frames a second, like a print; moving, it runs smooth
+   Also makes the page's grain. Without WebGL2 there's no ball and nothing else changes. */
+(function () {
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // The page grain: a fine stipple, light and dark specks, drawn once into a tile
+  (function grain() {
+    var size = 256, c = document.createElement("canvas"); c.width = c.height = size;
+    var x = c.getContext("2d"), img = x.createImageData(size, size), d = img.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var n = Math.random(), light = n > .5, a = light ? (n - .5) * .2 : (n < .22 ? (.22 - n) * .75 : 0);
+      d[i] = light ? 248 : 12; d[i + 1] = light ? 245 : 12; d[i + 2] = light ? 238 : 12; d[i + 3] = a * 255;
+    }
+    x.putImageData(img, 0, 0);
+    var root = document.documentElement.style;
+    root.setProperty("--grain", "url(" + c.toDataURL("image/png") + ")");
+    root.setProperty("--grain-size", Math.round(size / Math.min(devicePixelRatio || 1, 2)) + "px"); // one tile pixel per screen pixel: a clean stipple
+  })();
+
+  var cv = document.getElementById("ball");
+  var gl = cv && cv.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+  if (!gl) { if (cv) cv.hidden = true; return; }
+
+  function oklab(hex) {
+    var c = [0, 2, 4].map(function (i) {
+      var v = parseInt(hex.substr(i, 2), 16) / 255;
+      return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4);
+    });
+    var l = Math.cbrt(.4122214708 * c[0] + .5363325363 * c[1] + .0514459929 * c[2]);
+    var m = Math.cbrt(.2119034982 * c[0] + .6806995451 * c[1] + .1073969566 * c[2]);
+    var s = Math.cbrt(.0883024619 * c[0] + .2817188376 * c[1] + .6299787005 * c[2]);
+    return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
+  }
+
+  // The brand's shader for one ball, with a see-through outside so the page and its grain show around it
+  var FRAG = "#version 300 es\n" +
+    "precision highp float;\n" +
+    "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
+    "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec2 tilt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
+    "out vec4 outColor;\n" +
+    "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
+    "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
+    "  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n" +
+    "float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n" +
+    "float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n" +
+    "vec3 fromLab(vec3 c) {\n" +
+    "  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n" +
+    "  l = l * l * l; m = m * m * m; s = s * s * s;\n" +
+    "  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n" +
+    "}\n" +
+    "vec3 ramp(float v) { vec3 c = stops[0]; for (int i = 0; i < 3; i++) c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); return fromLab(c); }\n" +
+    "void main() {\n" +
+    "  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n" +
+    "  vec2 l = (p - center) / R;\n" +
+    "  float r = length(l), aa = 1.2 / R;\n" +
+    "  if (r > 1.0 + aa) { outColor = vec4(0.0); return; }\n" +
+    "  vec2 gp = floor(p / grainScale);\n" +
+    "  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
+    "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n" +
+    "  float h = hash(vec2(seed));\n" +
+    "  float g = 0.31 * dot(l, tilt) + 0.6;\n" + // the ball sits in a corner: orange on the edge you see, beige towards the middle
+    "  vec2 drift = vec2(sin(t * 0.21 + h * 6.2831), cos(t * 0.17 + h * 12.566)) * 0.32;\n" +
+    "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
+    "  float f = fbm(l * 0.6 + w * 1.1 + h * 90.0);\n" +
+    "  float v = g + (f - 0.5) * 1.1 + bias - heat * 0.75;\n" +
+    "  float dp = length(p - ptr) / max(ptrR, 1.0);\n" +
+    "  v -= ptrAmt * 0.95 * exp(-dp * dp);\n" +
+    "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n" +
+    "  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
+    "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
+    "}";
+
+  function shader(type, src) { var o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; }
+  var prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, "#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }"));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FRAG));
+  gl.bindAttribLocation(prog, 0, "a"); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cv.hidden = true; return; }
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  var U = {};
+  ["res", "center", "R", "seed", "bias", "heat", "grainScale", "t", "ptr", "ptrR", "ptrAmt", "tilt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+  gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ["E4441C", "E4566A", "4B7888", "DACCAE"].map(oklab))));
+  gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
+  gl.uniform1f(U.seed, 14);
+
+  var MAX = 30000; // the price at which the ball is full size
+  var B = { R: 0, tR: 0, bias: .42, tBias: .42, heat: 0, kick: 0, cx: 0, cy: 0, min: 0, max: 0, value: 0, minimum: 1, seen: false };
+  var P = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
+  var dpr = 1, time = 0, last = 0, lastDraw = 0, onScreen = true;
+
+  function targets() {
+    B.tR = B.min + (B.max - B.min) * Math.sqrt(Math.min(B.value, MAX) / MAX); // area follows the price
+    B.tBias = .42 - .44 * Math.min(1, B.value / B.minimum);
+  }
+
+  // Wide: fixed, in the empty corner under the price card. Phone: at the top of the page, behind the title.
+  function layout() {
+    var wide = innerWidth > 860, side = document.querySelector(".calc_side");
+    cv.classList.toggle("is-top", !wide);
+    var w = wide ? innerWidth : document.documentElement.clientWidth, h = wide ? innerHeight : 420;
+    dpr = Math.min(devicePixelRatio || 1, 1.5);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    gl.viewport(0, 0, cv.width, cv.height);
+    if (wide) {
+      var r = side.getBoundingClientRect();
+      B.cx = Math.min(r.right + 40, w - 10); B.cy = h * .92; B.min = Math.max(96, h * .17); B.max = h * .72;
+    } else {
+      B.cx = w * .98; B.cy = 30; B.min = 62; B.max = 165;
+    }
+    gl.uniform2f(U.tilt, 1, wide ? 1 : -1); // wide: the ball is in the bottom corner, phone: the top one
+    targets();
+    if (reduce) { B.R = B.tR; B.bias = B.tBias; }
+  }
+
+  function draw() {
+    gl.uniform2f(U.res, cv.width, cv.height); gl.uniform2f(U.center, B.cx * dpr, B.cy * dpr);
+    gl.uniform1f(U.R, Math.max(B.R, 1) * dpr); gl.uniform1f(U.bias, B.bias); gl.uniform1f(U.heat, B.heat);
+    gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, time);
+    gl.uniform2f(U.ptr, P.x * dpr, P.y * dpr); gl.uniform1f(U.ptrR, Math.max(B.R * .55, 90) * dpr); gl.uniform1f(U.ptrAmt, P.amt);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  function ease(a, b, k, dt) { return a + (b - a) * (1 - Math.pow(1 - k, dt * 60)); }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (document.hidden || !onScreen) { last = now; return; }
+    var dt = Math.min((now - last) / 1000, .05); last = now;
+    time += dt;
+    B.R = ease(B.R, B.tR, .07, dt);
+    B.bias = ease(B.bias, B.tBias, .05, dt);
+    B.heat = ease(B.heat, B.kick, .16, dt);
+    B.kick *= Math.pow(.962, dt * 60);
+    P.x = ease(P.x, P.tx, .12, dt); P.y = ease(P.y, P.ty, .12, dt); P.amt = ease(P.amt, P.target, .06, dt);
+    var moving = Math.abs(B.tR - B.R) > .4 || Math.abs(B.tBias - B.bias) > .003 || B.heat > .004 || B.kick > .004 || Math.abs(P.target - P.amt) > .004 || P.target;
+    if (!moving && now - lastDraw < 66) return;
+    lastDraw = now;
+    draw();
+  }
+
+  if (matchMedia("(pointer: fine)").matches && !reduce) {
+    addEventListener("pointermove", function (e) {
+      if (cv.classList.contains("is-top")) return;
+      var d = Math.hypot(e.clientX - B.cx, e.clientY - B.cy);
+      if (d < B.R * 1.05) { if (!P.target) { P.x = e.clientX; P.y = e.clientY; } P.tx = e.clientX; P.ty = e.clientY; P.target = 1; }
+      else P.target = 0;
+    }, { passive: true });
+  }
+  if ("IntersectionObserver" in window) new IntersectionObserver(function (es) { onScreen = es[0].isIntersecting; }).observe(cv);
+  var rt = 0;
+  addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { layout(); draw(); }, 120); });
+
+  layout();
+  if (!reduce) requestAnimationFrame(function (t) { last = t; frame(t); });
+
+  // Called on every change of the scope. value = the big number, minimum = the project minimum.
+  window.calcBall = {
+    set: function (value, minimum) {
+      var d = value - B.value, first = !B.seen, crossed = B.value < minimum && value >= minimum;
+      B.value = value; B.minimum = minimum; B.seen = true;
+      targets();
+      if (reduce) { B.R = B.tR; B.bias = B.tBias; draw(); return; }
+      if (first) B.kick = .55;
+      else if (crossed) B.kick = 1;
+      else if (d > 0) B.kick = Math.max(B.kick, .3 + .45 * Math.min(1, d / 2000));
+      else if (d < 0) B.kick = Math.max(B.kick, .12);
+    }
+  };
+})();

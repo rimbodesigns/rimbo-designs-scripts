@@ -29,6 +29,11 @@
       makeEyebrow: "Personal link · only you see this view",
       makeName: "Project name",
       makeCta: "Create link",
+      makeCtaAlt: "Copies it for you",
+      applyCta: "Apply with this scope",
+      applyCtaAlt: "No sales call",
+      submit: "Send my application",
+      submitAlt: "I read every one",
       makeNeedName: "Give it a project name first.",
       needScope: "Pick something first.",
       makeDone: "Link copied to your clipboard.",
@@ -39,6 +44,7 @@
       recommended: "Recommended",
       reset: "Back to my recommendation",
       clientCta: "Email me your version",
+      clientCtaAlt: "Opens your email",
       clientCopy: "Or copy the link",
       clientDone: "Link copied. Paste it in your reply to me.",
       emailSubject: "{name}: my version",
@@ -125,7 +131,7 @@
     ]
   };
 
-  var state = { pages: { simple: 2, medium: 4, complex: 2, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
+  var state = { pages: { simple: 0, medium: 0, complex: 0, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
   CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.levels[t.start].hours; });
   // An item's price: fixed, or the chosen amount's hours × rate
   function priceOf(t) { return t.hourly ? t.hourly * state.hours[t.id] : t.price; }
@@ -355,7 +361,8 @@
     var root = $("groups");
     CONFIG.groups.forEach(function (g, gi) {
       var box = el("fieldset", "calc_step"), list = el("div");
-      box.appendChild(el("legend", "", String(gi + 3).padStart(2, "0") + " " + g.legend));
+      var legend = el("legend"); legend.appendChild(el("span", "calc_num", String(gi + 3).padStart(2, "0"))); legend.appendChild(document.createTextNode(g.legend));
+      box.appendChild(legend);
       box.appendChild(list);
       CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
         var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
@@ -421,6 +428,7 @@
     var r = calc(), reached = r.scope >= CONFIG.minimum;
     $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
     setTotal(eur(r.shown), instant === true);
+    if (window.calcBall) calcBall.set(r.shown, CONFIG.minimum);
 
     // Under the minimum: a bar that fills as the scope grows, gone once the minimum is reached
     $("meter").hidden = reached;
@@ -458,6 +466,16 @@
     $("made").hidden = true; // the scope changed: the copied link is no longer this version
   }
 
+  // The site's button markup (.btn); buttons.js adds the magnet, the label swap and the boil
+  function setBtn(b, label, alt) {
+    var inner = el("span", "btn_in"), swap = el("span", "btn_swap"), line = el("span", "btn_line");
+    line.appendChild(el("span", "btn_t", label));
+    swap.appendChild(line); inner.appendChild(swap);
+    b.textContent = ""; b.appendChild(inner);
+    b.classList.add("btn"); b.setAttribute("aria-label", label);
+    if (alt) b.setAttribute("data-btn-alt", alt);
+  }
+
   // A short pop-up at the bottom of the screen (copied, or what's missing)
   var toastT = 0;
   function toast(text, bad) {
@@ -482,12 +500,12 @@
       $("title").textContent = ""; $("title").appendChild(name);
       $("lede").textContent = ""; $("lede").appendChild(line);
       [name, line].forEach(function (f) { f.addEventListener("input", function () { f.removeAttribute("aria-invalid"); syncShare(); }); });
-      cta.textContent = C.makeCta;
+      setBtn(cta, C.makeCta, C.makeCtaAlt);
     } else {
       $("title").textContent = share.n || "Your project";
       $("lede").textContent = share.m || C.clientLede;
       document.title = (share.n || "Your project") + " · Rimbo Designs";
-      cta.textContent = C.clientCta;
+      setBtn(cta, C.clientCta, C.clientCtaAlt);
       markRecommended(share.r);
       $("reset").textContent = C.reset;
       $("copy-link").textContent = C.clientCopy; $("copy-link").hidden = false;
@@ -580,6 +598,8 @@
   function setupApply() {
     var C = CONFIG.copy;
     var cta = $("cta"), box = $("apply"), form = $("apply-form"), err = $("apply-error");
+    setBtn(cta, C.applyCta, C.applyCtaAlt);
+    setBtn($("apply-submit"), C.submit, C.submitAlt);
     $("apply-intro").textContent = C.intro;
     $("apply-fine").textContent = C.fine;
     $("optin-label").textContent = C.optIn;
@@ -645,7 +665,7 @@
   buildToggles();
   document.documentElement.setAttribute("data-mode", mode);
   if (share) applySnap(share.c || share.r);
-  else if (mode === "make") applySnap({ p: [0, 0, 0], b: 0, t: [] }); // a new lead starts from nothing
   if (mode === "public") setupApply(); else setupShare();
+  if (window.gsap && window.rdButtons) rdButtons();
   render();
 })();

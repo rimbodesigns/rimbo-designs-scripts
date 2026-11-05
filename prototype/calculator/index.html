@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Calculator</title>
-<link rel="stylesheet" href="calculator.css?v=11">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="calculator.css?v=13">
 </head>
 <body>
+<canvas class="calc_ball" id="ball" aria-hidden="true"></canvas>
 <main class="calc">
   <header class="calc_head">
-    <p class="calc_eyebrow" id="eyebrow">Draft prices · grain balls palette</p>
+    <p class="calc_eyebrow" id="eyebrow">Project calculator</p>
     <h1 class="calc_title" id="title">Build yours</h1>
     <p class="calc_lede" id="lede">Everything is built to the same standard. Pick what you need, switch off what you don't.</p>
   </header>
@@ -17,12 +19,12 @@
   <div class="calc_grid">
     <div class="calc_form">
       <fieldset class="calc_step">
-        <legend>01 Branding</legend>
+        <legend><span class="calc_num">01</span>Branding</legend>
         <div id="branding"></div>
       </fieldset>
 
       <fieldset class="calc_step">
-        <legend>02 Pages</legend>
+        <legend><span class="calc_num">02</span>Pages</legend>
         <div id="pages"></div>
       </fieldset>
 
@@ -151,6 +153,8 @@
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/ScrollTrigger.min.js"></script>
 <script src="odometer.js?v=3"></script>
-<script src="calculator.js?v=16"></script>
+<script src="ball.js?v=2"></script>
+<script src="buttons.js?v=1"></script>
+<script src="calculator.js?v=18"></script>
 </body>
 </html>
