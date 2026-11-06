@@ -5476,7 +5476,8 @@
   // Lenis stops while the menu is open.
   // =========================================================
   function rdNavFull() {
-    if (qs('body > .bold-nav-full')) return;
+    var wrapEl = qs('.bold-nav-wrap');
+    if (!wrapEl || qs('body > .bold-nav-full')) return; // a page without the component keeps its old nav
     var nl = /^\/nl(\/|$)/.test(location.pathname);
     var prefix = nl ? '/nl' : '';
     function clean(href) {
@@ -5496,9 +5497,6 @@
       }).join('');
     }
     var locales = qsa('.nav a[hreflang]'); // the old menu's Webflow locale links know the right URL for every page
-    var logoSrc = brushLogoSrc();
-    var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&amp;body=' +
-      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n"); // the footer's email
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // what is behind the menu right now: the first real background at the left edge, high, middle and low on the screen
@@ -5549,27 +5547,14 @@
     style.textContent = css;
     rdHead(style);
 
-    // The nav stays on screen while pages change, so it can't live in a page. The Designer's copy (.bold-nav-wrap) moves out
-    // of the page here, and Barba drops the copy in every page it fetches. A page without the component gets the same markup,
-    // and the same Webflow classes style it. The links and the language are filled in here on both: they differ per page
+    // The nav is the component Nav_full, nested in Fixed___NAV so it is on every page. It stays on screen while pages change, so
+    // it can't live in a page: it moves out here, and Barba drops the copy in every page it fetches. The links and the
+    // language are filled in here: they differ per page
     var lis = menuLinks();
-    var wrapEl = qs('.bold-nav-wrap');
-    var nav = wrapEl && qs('.bold-nav-full', wrapEl), bar = wrapEl && qs('.bold-nav-full__bar', wrapEl);
-    if (!nav || !bar) {
-      nav = document.createElement('nav');
-      nav.className = 'bold-nav-full';
-      nav.innerHTML =
-        '<div class="bold-nav-full__tile" aria-hidden="true"><div class="bold-nav__top"></div><ul class="bold-nav-full__ul"></ul><div class="bold-nav__mid"></div>' +
-          '<div class="bold-nav__bottom"><div class="bold-nav__lang" data-lang-toggle></div><p class="bold-nav__word bold-nav__time"><span data-nav-country>Netherlands</span> · <span data-nav-clock>--:--</span></p><a class="bold-nav__word bold-nav__mail" href="' + mail + '">hello@rimbodesigns.com</a></div></div>';
-      bar = document.createElement('div');
-      bar.className = 'bold-nav-full__bar';
-      bar.innerHTML =
-        '<a href="/" class="bold-nav-full__logo" aria-label="Rimbo Designs, home"><img class="bold-nav-full__logo-img" src="' + logoSrc + '" alt="" width="72"></a>' +
-        '<button data-navigation-toggle="toggle" class="bold-nav-full__hamburger" aria-label="Menu" aria-expanded="false"><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div><div class="bold-nav-full__hamburger-bar"></div></button>';
-    }
+    var nav = qs('.bold-nav-full', wrapEl), bar = qs('.bold-nav-full__bar', wrapEl);
     document.body.appendChild(nav);
     document.body.appendChild(bar);
-    if (wrapEl) wrapEl.parentNode.removeChild(wrapEl);
+    qsa('.bold-nav-wrap').forEach(function (el) { el.parentNode.removeChild(el); });
     nav.setAttribute('data-navigation-status', 'not-active');
     nav.setAttribute('aria-label', 'Main');
     bar.setAttribute('data-navigation-status', 'not-active');
@@ -5942,10 +5927,9 @@
       ? FOOTER_SCRIPT.replace(/\/main(\.min)?\.js.*$/, '/media/logo-f-brush.svg') : '/media/logo-f-brush.svg';
   }
   function rdFooter() {
-    // the footer is the component Footer_rdf in the Designer (rdf-* classes: all of its look and text). Pages without it yet
-    // get the same markup from here further down, and the same classes style it
+    // the footer is the component Footer_rdf in the Designer (rdf-* classes: all of its look and text); this only animates it
     var foot = qs('.rdf');
-    if (foot && foot.hasAttribute('data-rdf-on')) return;
+    if (!foot || foot.hasAttribute('data-rdf-on')) return;
     var nl = /^\/nl(\/|$)/.test(location.pathname), prefix = nl ? '/nl' : '';
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -6015,53 +5999,12 @@
     style.textContent = css;
     rdHead(style);
 
-    // ---- the markup (data-code: the HTML each box types first) ----
-    function escA(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-    var pages = [['service', 'Service', 'What I do'], ['work', 'Work', 'Live sites'], ['resources', 'Resources', 'Blog + guides'], ['contact', 'Contact', 'Say hello']];
-    // the email opens with a subject and a short start (Rimbo, 5 Nov: "open with a subject and a bit of text")
-    var mail = 'mailto:hello@rimbodesigns.com?subject=' + encodeURIComponent('New project') + '&body=' +
-      encodeURIComponent("Hi Rimbo,\n\nI'd like to talk about a website for ...\n\nMy website now: \nWhen I'd like to start: \n\nThanks,\n");
     // the language links: the old menu's Webflow locale links know the right URL for this page
     function localeHref(lang) {
       var a = qs('a[hreflang="' + lang + '"]:not(.rdf-lang-link)');
       if (a) return a.getAttribute('href');
       var bare = location.pathname.replace(/^\/nl(?=\/|$)/, '') || '/';
       return lang === 'nl' ? '/nl' + (bare === '/' ? '' : bare) : bare;
-    }
-    var html =
-      '<div class="rdf-drop"></div><div class="rdf-in"><div class="rdf-shade"></div>' +
-        '<div class="rdf-ruler" aria-hidden="true"><span class="rdf-width" data-rdf-width></span></div>' +
-        '<div class="rdf-grid">' +
-          '<a class="rdf-cell rdf-logo" href="/" aria-label="Rimbo Designs, home" data-code="' + escA('<a class="ft_logo" href="/"><svg viewBox="0 0 72 26">…</svg></a>') + '">' +
-            '<span class="rdf-logo-art" data-own><canvas aria-hidden="true"></canvas></span></a>' +
-          pages.map(function (pg) {
-            return '<a class="rdf-cell rdf-page" href="/' + pg[0] + '" data-code="' + escA('<a class="ft_link" href="/' + pg[0] + '">') + '">' +
-              '<span class="rdf-pt"><span class="rdf-pt-a">' + pg[1] + '</span><span class="rdf-pt-b" aria-hidden="true">' + pg[2] + '</span></span><span class="rdf-arrow" aria-hidden="true">→</span></a>';
-          }).join('') +
-          '<a class="rdf-cell rdf-mail" href="' + escA(mail) + '" data-swap data-code="' + escA('<a class="ft_mail" href="mailto:hello@rimbodesigns.com">') + '">' +
-            '<span class="rdf-label">Got a project?</span>' +
-            '<span class="rdf-swap"><span class="rdf-swap-a">hello@rimbodesigns.com →</span><span class="rdf-swap-b" aria-hidden="true">Opens your mail app →</span></span></a>' +
-          '<a class="rdf-cell rdf-where" href="/locations" data-swap data-code="' + escA('<a class="ft_locations" href="/locations">') + '">' +
-            '<span class="rdf-label">Based in</span>' +
-            '<span class="rdf-swap"><span class="rdf-swap-a">Netherlands · <span data-rdf-clock>--:--</span></span><span class="rdf-swap-b" aria-hidden="true">Where I work →</span></span></a>' +
-        '</div>' +
-        '<div class="rdf-base" data-code="' + escA('<div class="ft_base">') + '">' +
-          '<div class="rdf-base-l"><span data-rdf-year>© 2026 Rimbo Designs</span>' +
-            '<span class="rdf-lang" role="group" aria-label="Language"><a class="rdf-lang-link" href="/" hreflang="en">EN</a><span class="rdf-lang-sep">/</span><a class="rdf-lang-link" href="/nl" hreflang="nl">NL</a></span></div>' +
-          '<div class="rdf-socials" role="navigation" aria-label="Socials">' +
-            [['LinkedIn', 'https://www.linkedin.com/in/rimbout-bobeldijk-9836ba168/'], ['Instagram', 'https://www.instagram.com/rimbodesigns_/'],
-             ['YouTube', 'https://www.youtube.com/channel/UCc4hdQHoJp6KBOb2187392Q'], ['Twitter', 'https://twitter.com/rimbodesigns']].map(function (s) {
-              return '<a class="rdf-soc" href="' + s[1] + '" target="_blank" rel="noopener"><span>' + s[0] + '</span><span class="rdf-soc-arrow" aria-hidden="true">↗</span></a>';
-            }).join('') +
-          '</div></div>' +
-      '</div>';
-
-    var main = byId('MainWrap'), wrap = main ? main.parentNode : document.body;
-    if (!foot) {
-      foot = document.createElement('footer');
-      foot.className = 'rdf';
-      foot.innerHTML = html;
-      if (main) main.insertAdjacentElement('afterend', foot); else document.body.appendChild(foot);
     }
     foot.setAttribute('data-rdf-on', '');
     if (light) foot.classList.add('is-light');
@@ -7150,8 +7093,11 @@
     run('post cards', rdPostCards);
     // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
     var stagingHost = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname);
-    if (path === '/resources' && stagingHost) run('old footer out', rdOldFooterOut);
-    if (qs('.rdf') || document.documentElement.classList.contains('rf') || (path === '/resources' && stagingHost) || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
+    // pages that keep the old footer for now: posts the refresh didn't touch (Dutch, live) and Resources on live
+    var oldFooter = (path.indexOf('/post/') === 0 && !document.documentElement.classList.contains('rf')) || (path === '/resources' && !stagingHost);
+    if (oldFooter) qsa('.rdf').forEach(function (el) { el.parentNode.removeChild(el); });
+    else if (path === '/resources') run('old footer out', rdOldFooterOut);
+    run('footer', rdFooter);
     run('location showcase', rdLocShow);
     // city pages: the balls and the wall are far down the page, so their WebGL and slider start when they come near
     var later = function (sel, name, fn) {
