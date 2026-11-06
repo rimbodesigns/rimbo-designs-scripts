@@ -5998,7 +5998,6 @@
       '.rdf-code .t { color: var(--rdf-fg); } .rdf-code .k { color: var(--rdf-key); } .rdf-code .s { color: var(--rdf-str); }',
       '.rdf-code .cur { display: inline-block; width: .55em; height: 1.05em; margin-left: .1em; vertical-align: -.15em; background: var(--rdf-brand); animation: rdf-blink 1s steps(1) infinite; }',
       '@keyframes rdf-blink { 50% { opacity: 0; } }',
-      '.rdf-code.is-hover { opacity: 1 !important; transform: none !important; }',
       // hover: two strokes from the top-left corner, meeting bottom right
       '.rdf-draw { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }',
       '.rdf-draw path { fill: none; stroke: var(--rdf-brand); stroke-width: 1; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .45s cubic-bezier(.4, 0, .6, 1); }',
@@ -6233,6 +6232,7 @@
         var cw = logoCell.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         var ch = logoCell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - M * 1.6;
         S = Math.max(1, Math.min(cw / VB.w, (window.innerWidth > 800 ? ch : 9e9) / VB.h, 820 / VB.w)); // 820 px at most: on a big screen it got far too large
+        if (window.innerWidth > 800) S *= 0.65; // it doesn't have to fill its cell (Rimbo: 30 to 40% smaller)
         W = Math.round(VB.w * S) + M * 2; H = Math.round(VB.h * S) + M * 2;
         dpr = Math.min(2, window.devicePixelRatio || 1);
         cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
@@ -6340,8 +6340,9 @@
     rdOn(window, 'resize', function () { if (!rulerOn) return; clearTimeout(rulerTimer); rulerTimer = setTimeout(function () { sizeLabel(true); }, 120); });
 
     // ---- hover (mouse only): the HTML types back in (not on the email and Based in, they swap) + an orange outline ----
-    // one hover state for the whole cell, and only once the footer is built. A pointer already resting on a cell while the
-    // footer scrolls in gets it the moment the build is done (it used to get the lighter ground without its outline)
+    // one hover state for the whole cell, and only once the footer has stopped moving: the cells slide until p is 1, and a hover
+    // that started earlier flipped on and off under a resting pointer (Rimbo: it shifts). A pointer already resting on a cell gets
+    // it the moment the footer lands. The HTML is typed by the build only, not on hover
     var done = false, over = null;
     if (canHover) {
       qsa('.rdf-cell', foot).forEach(function (cell) {
@@ -6360,20 +6361,6 @@
         cell.addEventListener('mouseenter', function () { over = cell; if (done) cell.rdfOn(); });
         cell.addEventListener('mouseleave', function () { over = null; cell.rdfOff(); });
       });
-      boxes.forEach(function (b) {
-        if (!b.el.classList.contains('rdf-cell') || b.el.hasAttribute('data-swap')) return;
-        var raf = 0, cellOn = b.el.rdfOn, cellOff = b.el.rdfOff;
-        b.el.rdfOn = function () {
-          cellOn();
-          var t0 = performance.now(); cancelAnimationFrame(raf); b.code.classList.add('is-hover');
-          (function step() {
-            var k = Math.min(1, (performance.now() - t0) / 420);
-            renderCode(b.code, b.chars, Math.round(b.chars.length * k), true);
-            if (k < 1) raf = requestAnimationFrame(step);
-          })();
-        };
-        b.el.rdfOff = function () { cellOff(); cancelAnimationFrame(raf); b.code.classList.remove('is-hover'); };
-      });
     }
 
     var isBig = function (k) { return k.classList.contains('rdf-pt') || k.tagName === 'I'; };
@@ -6391,11 +6378,9 @@
         b.rect.style.strokeDashoffset = (1 - smooth(0.08 + o, 0.32 + o, p)).toFixed(4);
         b.rect.style.stroke = rgba(ACCENT, (1 - settle) * 0.8);
         var kc = smooth(0.12 + o, 0.36 + o, p), kf = smooth(0.44 + o, 0.54 + o, p);
-        if (!b.code.classList.contains('is-hover')) {
-          renderCode(b.code, b.chars, Math.round(b.chars.length * kc), kc > 0 && kf < 1);
-          b.code.style.opacity = (1 - kf).toFixed(3);
-          b.code.style.transform = 'translate3d(0,' + (-kf * 8).toFixed(1) + 'px,0)';
-        }
+        renderCode(b.code, b.chars, Math.round(b.chars.length * kc), kc > 0 && kf < 1);
+        b.code.style.opacity = (1 - kf).toFixed(3);
+        b.code.style.transform = 'translate3d(0,' + (-kf * 8).toFixed(1) + 'px,0)';
         var typed = null;
         b.kids.forEach(function (k, j) {
           var t0 = 0.5 + o + j * 0.03;
@@ -6414,7 +6399,8 @@
           b.caret.style.top = typed.a.y + 'px'; b.caret.style.height = typed.a.h + 'px';
         } else b.caret.style.opacity = 0;
       });
-      if ((p > 0.9) !== done) { done = p > 0.9; if (over) over[done ? 'rdfOn' : 'rdfOff'](); }
+      var landed = p > (done ? 0.97 : 0.995); // it stays on through a tiny scroll
+      if (landed !== done) { done = landed; if (over) over[done ? 'rdfOn' : 'rdfOff'](); }
     }
 
     // ---- the engine: the footer rises at half the scroll speed, so the page seems to slide off it ----
