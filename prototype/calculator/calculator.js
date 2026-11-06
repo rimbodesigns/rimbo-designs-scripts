@@ -56,7 +56,7 @@
     },
 
     // No fixed build fee (2026-11-05): strategy, design system, QA and launch grow with the project,
-    // so they sit inside the page prices (the old €2,000 base, spread over the pages). The minimum
+    // so they sit inside the page prices (the old €2,000 base, spread over the pages, then trimmed to €400 / €800 / €2,000). The minimum
     // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
     priorityPct: 0.25,       // priority start: jump the queue
@@ -75,13 +75,13 @@
     pages: [
       { id: "simple",  label: "Simple pages",  hint: "Contact, thank-you, a plain text page", price: 400,  max: 20,
         info: "A page with one job and a few sections. Same design standard as the rest, with light animation." },
-      { id: "medium",  label: "Medium pages",  hint: "Services, about, a case study",         price: 900,  max: 20,
+      { id: "medium",  label: "Medium pages",  hint: "Services, about, team",                 price: 800,  max: 20,
         info: "A page with several sections, some interaction and animation. Most pages of a site are medium." },
-      { id: "complex", label: "Complex pages", hint: "Home, a scroll story, heavy animation",  price: 2100, max: 10,
+      { id: "complex", label: "Complex pages", hint: "Home, a scroll story, heavy animation",  price: 2000, max: 10,
         info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." },
-      // A CMS template is scoped like a medium page (Rimbo, 2026-11-05)
-      { id: "cms",     label: "CMS templates", hint: "Blog post, case study, team member",    price: 900,  max: 10,
-        info: "One design for a type of content, like a blog post or a case study. You add as many as you like in Webflow. The overview page that lists them counts as a normal page. The content itself is yours to write." }
+      // One design for a type of content; a little under a medium page (Rimbo, 2026-11-06)
+      { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 750,  max: 10,
+        info: "One design for a type of content, like blog posts, news or case studies. You add as many as you like in Webflow. The overview page that lists them counts as a normal page. The content itself is yours to write." }
     ],
 
     // Branding: one switch that opens the parts. Turning it on the first time selects the preset.
@@ -106,8 +106,8 @@
       { id: "motion", legend: "Motion and feel" },
       { id: "more",   legend: "Add what you need", line: "Extras" }
     ],
-    // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250 and transitions
-    // to a medium page's €900, automations €500 (Rimbo, 2026-11-05)
+    // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250, transitions
+    // to €900, automations €500 (Rimbo, 2026-11-05)
     toggles: [
       { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site. Search and AI search are the same work, so they come together." },
       { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. Privacy-friendly by default. With Google Analytics you also need cookie consent." },
