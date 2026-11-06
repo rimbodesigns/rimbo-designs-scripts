@@ -57,6 +57,8 @@
   }
   function rdHead(el) {
     document.head.appendChild(el);
+    var scope = scopeNow();
+    if (scope) scope.styles.push(el);
     rdUndo(function () { el.remove(); });
   }
   function scopedObserver(Native) {
@@ -165,6 +167,7 @@
   var pageStyles = [];         // the <style> tags from that page's head and footer code, which live outside .page-wrapper
   var scrollMemory = {};       // where you were on each address, for the back button
   var linkHash = '';           // the #anchor of the link being followed
+  var PAGE_HTML_CLASSES = ['rf', 'loc-in']; // classes on <html> that belong to one page
 
   var hasScrollTrigger = typeof window.ScrollTrigger !== 'undefined';
   var rmMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -209,6 +212,8 @@
   // After the enter animation is done
   function initAfterEnterFunctions(next) {
     nextPage = next || document;
+    // Finsweet's slider dots build once, on load. Here, because they search the whole document a moment after being asked
+    if (window.fsAttributes && fsAttributes.sliderdots && fsAttributes.sliderdots.init) run('slider dots', function () { fsAttributes.sliderdots.init(); });
     if (window.lenis) window.lenis.resize();
     if (hasScrollTrigger) ScrollTrigger.refresh();
   }
@@ -223,14 +228,158 @@
     return tl;
   }
 
-  function runPageLeaveAnimation(current) {
+  // Osmo's 3D cube: the two pages are two faces of one cube, it backs away from the camera and rolls over.
+  // The moves are Osmo's. Added for this site: the new page starts inside startCube() first, the faces get the page
+  // colour (ours sits on the body, not on the page), the cube stays below the menu, and the old page's pins hold their place
+  var flipCubeDirection = false;
+  var cubeX = flipCubeDirection ? 1 : -1;
+  var CUBE_BACKDROP = 'var(--color--black, #131313)';
+
+  function runPageLeaveAnimation(current, next, data) {
+    return new Promise(function (resolve) {
+      // Webflow.destroy() ran in beforeEnter; its engine needs a frame to notice before it can start again (see restartWebflow)
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () {
+          var started = startCube(data);
+          var parent = current.parentElement || document.body;
+          var scene = prepareForTransition(parent, current, next, started.scrollY);
+          var cube = scene.cube, stage = scene.stage;
+
+          var tl = gsap.timeline({
+            onComplete: function () {
+              parent.insertBefore(next, stage);
+              stage.remove();
+              gsap.set(next, { clearProps: 'all' });
+              playVideos(started.nextVideos);
+              finishCube(started);
+              resolve();
+            }
+          });
+
+          tl.to(cube, { z: -window.innerHeight * 0.8, duration: 0.8, ease: 'power2.inOut' }, '<');
+          tl.to(cube, { rotateX: 90 * cubeX, duration: 1.2, ease: 'osmo' }, '<0.1');
+          tl.to(cube, { z: -window.innerHeight * 0.5, duration: 1.2, ease: 'osmo', overwrite: 'auto' }, '<0.7');
+        });
+      });
+    });
+  }
+
+  function runPageEnterAnimation() {
+    return Promise.resolve(); // on the cube the new page arrives with the leave
+  }
+
+  function prepareForTransition(parent, current, next, scrollY) {
+    var stage = document.createElement('div');
+    var cube = document.createElement('div');
+    var wrapper = document.createElement('div');
+    var viewportHeight = window.innerHeight;
+    var cubeDepth = viewportHeight * 0.5;
+    var face = getComputedStyle(document.body).backgroundColor;
+
+    stage.className = 'page-transition__stage';
+    cube.className = 'page-transition__cube';
+    wrapper.className = 'page-transition__wrapper';
+
+    parent.insertBefore(stage, current);
+    stage.appendChild(cube);
+    cube.appendChild(wrapper);
+    wrapper.appendChild(current);
+    cube.appendChild(next);
+
+    window.scrollTo(0, 0);
+
+    gsap.set(stage, {
+      position: 'fixed', inset: 0, width: '100%', height: viewportHeight,
+      perspective: '100vw', perspectiveOrigin: '50% ' + cubeDepth + 'px',
+      overflow: 'hidden', zIndex: 999, background: CUBE_BACKDROP
+    });
+    gsap.set(cube, {
+      position: 'absolute', inset: 0, width: '100%', height: viewportHeight,
+      transformStyle: 'preserve-3d', transformOrigin: '50% 50%', willChange: 'transform',
+      z: -cubeDepth, force3D: true
+    });
+    gsap.set(wrapper, {
+      position: 'absolute', inset: 0, width: '100%', height: viewportHeight, overflow: 'hidden',
+      transformStyle: 'preserve-3d', transform: 'rotateX(0deg) translate3d(0, 0, ' + cubeDepth + 'px)',
+      willChange: 'transform', backgroundColor: face
+    });
+    gsap.set(current, {
+      position: 'absolute', top: -scrollY, left: 0, width: '100%', minHeight: viewportHeight,
+      backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', willChange: 'transform', force3D: true
+    });
+    gsap.set(next, {
+      position: 'absolute', inset: 0, width: '100%', height: viewportHeight, overflow: 'hidden',
+      backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transformOrigin: '50% 50%',
+      transform: 'rotateX(' + (-90 * cubeX) + 'deg) translate3d(0, 0, ' + (cubeDepth + 0.5) + 'px)',
+      autoAlpha: 1, willChange: 'transform', force3D: true, backgroundColor: face
+    });
+
+    stage.offsetHeight;
+    return { stage: stage, cube: cube, wrapper: wrapper };
+  }
+
+  // Starts the new page before the cube is built, all in one go so nothing paints in between. For that moment the old
+  // page is out of the document: the page functions search the whole document, and they measure the new page in its
+  // real place in the flow. Then it comes straight back, with its own CSS still on, for its last two seconds on screen
+  function startCube(data) {
+    var current = data.current.container, next = data.next.container;
+    var parent = current.parentNode, sibling = current.nextSibling;
+    var root = document.documentElement;
+    var doc = barba.dom.toDocument(data.next.html);
+    var scrollY = window.scrollY;
+    var oldVideos = playingVideos(current);
+    var old = leavePage();
+    holdPins(old, scrollY);
+    var stale = syncHead(doc);
+    current.remove();
+    resetPage(next);
+    openPage();
+    initBeforeEnterFunctions(next, doc);
+    if (window.lenis) window.lenis.resize();
+    if (hasScrollTrigger) ScrollTrigger.refresh();
+    var nextClasses = PAGE_HTML_CLASSES.filter(function (name) { return root.classList.contains(name); });
+    if (old) old.htmlClasses.forEach(function (name) { root.classList.add(name); });
+    parent.insertBefore(current, sibling);
+    playVideos(oldVideos);
+    return { old: old, stale: stale, nextClasses: nextClasses, nextVideos: playingVideos(next), scrollY: scrollY };
+  }
+
+  // The cube has landed: the old page and its CSS go
+  function finishCube(started) {
+    started.stale.forEach(function (el) { el.remove(); });
+    closePage(started.old);
+    var root = document.documentElement;
+    PAGE_HTML_CLASSES.forEach(function (name) { root.classList.toggle(name, started.nextClasses.indexOf(name) > -1); });
+  }
+
+  // A pinned section is fixed to the screen. On a cube face "the screen" becomes the page, so it moves down by the scroll
+  function holdPins(scope, scrollY) {
+    if (!scope) return;
+    scope.triggers.forEach(function (trigger) {
+      if (trigger.pin && trigger.isActive) gsap.set(trigger.pin, { top: (parseFloat(getComputedStyle(trigger.pin).top) || 0) + scrollY });
+    });
+  }
+
+  // Moving a video in the document pauses it
+  function playingVideos(root) {
+    return qsa('video', root).filter(function (video) { return !video.paused; });
+  }
+  function playVideos(videos) {
+    videos.forEach(function (video) {
+      var playing = video.play();
+      if (playing && playing.catch) playing.catch(function () {});
+    });
+  }
+
+  // The plain fade: for the back and forward buttons, anchors and reduced motion, where the page has to land somewhere else than its top
+  function runFadeLeave(current) {
     var tl = gsap.timeline({ onComplete: function () { current.remove(); } });
     if (reducedMotion) return tl.set(current, { autoAlpha: 0 }); // immediate swap
     tl.to(current, { autoAlpha: 0, duration: 0.4, ease: 'osmo' });
     return tl;
   }
 
-  function runPageEnterAnimation(next, data) {
+  function runFadeEnter(next, data) {
     var tl = gsap.timeline();
 
     if (reducedMotion) { // immediate swap
@@ -247,14 +396,14 @@
     return new Promise(function (resolve) { tl.call(resolve, null, 'pageReady'); });
   }
 
-  // The moment between two pages: old page out, new page in place and running. Happens once per navigation
+  // The fade's moment between two pages: old page out, new page in place and running
   function swapPage(data) {
     var next = data.next.container;
     var doc = barba.dom.toDocument(data.next.html);
     if (linkHash && !location.hash) history.replaceState(history.state, '', location.href + linkHash); // Barba drops the anchor from the address
     if (data.current.container) data.current.container.remove();
-    closePage();
-    syncHead(doc);
+    closePage(leavePage());
+    syncHead(doc).forEach(function (el) { el.remove(); });
     resetPage(next);
     openPage();
     initBeforeEnterFunctions(next, doc);
@@ -292,7 +441,7 @@
     barba.hooks.beforeEnter(function (data) {
       if (!data.current.container) return;
       // The new page waits on top, out of the flow, until swapPage() puts it in place
-      gsap.set(data.next.container, { position: 'fixed', top: 0, left: 0, right: 0 });
+      gsap.set(data.next.container, { position: 'fixed', top: 0, left: 0, right: 0, autoAlpha: 0 });
       if (window.lenis) window.lenis.stop();
       if (window.Webflow) Webflow.destroy(); // stopped here, started again in swapPage(): see restartWebflow()
       applyThemeFrom(data.next.container);
@@ -331,8 +480,14 @@
           initOnceFunctions();
           return runPageOnceAnimation(data.next.container);
         },
-        leave: function (data) { return runPageLeaveAnimation(data.current.container); },
-        enter: function (data) { return runPageEnterAnimation(data.next.container, data); }
+        leave: function (data) { return runFadeLeave(data.current.container); },
+        enter: function (data) { return runFadeEnter(data.next.container, data); }
+      }, {
+        name: 'cube',
+        sync: true,
+        custom: function (data) { return data.trigger !== 'back' && data.trigger !== 'forward' && data.trigger !== 'popstate' && !linkHash && !reducedMotion; },
+        leave: function (data) { return runPageLeaveAnimation(data.current.container, data.next.container, data); },
+        enter: function () { return runPageEnterAnimation(); }
       }]
     });
   }
@@ -367,7 +522,7 @@
 
   function openPage() {
     if (!barbaOn) return;
-    pageScope = { dead: false, undo: [], gsap: gsap.context(function () {}) };
+    pageScope = { dead: false, undo: [], styles: [], gsap: gsap.context(function () {}) };
   }
 
   // Runs code as part of the page on screen, so it can be cleaned up when the page leaves
@@ -378,19 +533,29 @@
     try { return pageScope.gsap.add(fn); } finally { zone = before; }
   }
 
-  // Stops everything the old page started. Its elements are gone by now; what is left is what would keep running without them
-  function closePage() {
+  // Closing a page has two halves, because on the cube the old page stays on screen while the new one starts.
+  // leavePage(): the new page can start now. The old page's scroll animations hold still and what it left outside itself goes
+  function leavePage() {
     var scope = pageScope;
-    if (!scope) return;
+    if (!scope) return null;
     pageScope = null;
+    scope.triggers = hasScrollTrigger ? ScrollTrigger.getAll() : [];
+    scope.triggers.forEach(function (trigger) { trigger.disable(false); });
+    scope.htmlClasses = PAGE_HTML_CLASSES.filter(function (name) { return document.documentElement.classList.contains(name); });
+    document.documentElement.classList.remove.apply(document.documentElement.classList, PAGE_HTML_CLASSES);
+    scope.styles.forEach(function (el) { el.removeAttribute('id'); }); // a new page checks by id whether its CSS is there: this copy is on its way out
+    qsa('[data-scroll-ruler-init]').forEach(function (el) { el.remove(); });
+    qsa('.bold-nav-full__bar').forEach(function (el) { gsap.killTweensOf(el); gsap.set(el, { clearProps: 'opacity' }); }); // the band hides it during its opening
+    return scope;
+  }
+
+  // closePage(): the old page is gone. Stops everything it started
+  function closePage(scope) {
+    if (!scope) return;
     scope.dead = true;
     scope.undo.forEach(function (fn) { try { fn(); } catch (err) { console.error('[rimbo-designs] cleanup:', err); } });
     scope.gsap.revert(); // also lets go of SplitText: its autoSplit would otherwise rebuild the old page's reveals on the next resize
-    if (hasScrollTrigger) ScrollTrigger.getAll().forEach(function (trigger) { trigger.kill(); });
-    // what pages leave outside themselves
-    document.documentElement.classList.remove('rf', 'loc-in');
-    qsa('[data-scroll-ruler-init]').forEach(function (el) { el.remove(); });
-    qsa('.bold-nav-full__bar').forEach(function (el) { gsap.killTweensOf(el); gsap.set(el, { clearProps: 'opacity' }); }); // the band hides it during its opening
+    scope.triggers.forEach(function (trigger) { trigger.kill(); });
     // animations started later, from a click or a timer: gsap.context only knows the first round. Whatever only moves
     // elements that are gone goes too, timelines with their callbacks included
     gsap.globalTimeline.getChildren(false, true, true).forEach(function (animation) {
@@ -412,9 +577,10 @@
     qsa(details, doc.head).forEach(function (el) { document.head.appendChild(document.importNode(el, true)); });
 
     var wanted = qsa('head style, body > style', doc).map(function (el) { return el.textContent; });
+    var stale = [];
     pageStyles = pageStyles.filter(function (el) {
       var i = wanted.indexOf(el.textContent);
-      if (i < 0) { el.remove(); return false; }
+      if (i < 0) { stale.push(el); return false; }
       wanted.splice(i, 1);
       return true;
     });
@@ -424,6 +590,7 @@
       rdHead(style);
       pageStyles.push(style);
     });
+    return stale; // the old page's own CSS: the caller removes it once that page has left the screen
   }
 
   // Plugins a page loads for itself. Webflow's own files stay out: one copy runs the whole site
@@ -489,8 +656,6 @@
       if (ix2) ix2.init();
       document.dispatchEvent(new Event('readystatechange')); // Webflow's "page load" interactions wait for this one
     });
-    // Finsweet's slider dots build once, on load
-    if (window.fsAttributes && fsAttributes.sliderdots && fsAttributes.sliderdots.init) run('slider dots', function () { fsAttributes.sliderdots.init(); });
   }
 
   function resetPage(container) {
@@ -5624,8 +5789,8 @@
     var SPEC = [{ seed: 14, bias: 0.5, flow: 0.6 }, { seed: 23, bias: -0.04, flow: 1 }, { seed: 37, bias: -0.44, flow: 1.5 }];
     var time = 0, last = 0, lastDraw = 0, onScreen = false, running = false;
     function draw(b) {
-      var box = b.card.getBoundingClientRect();
-      if (!box.width) return;
+      var box = { width: b.card.offsetWidth, height: b.card.offsetHeight }; // its own size: on the page transition's cube the size on screen changes every frame
+      if (!box.width || !box.height) return;
       var dpr = Math.min(window.devicePixelRatio || 1, 1.5), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
       if (b.cv.width !== W || b.cv.height !== H) { b.cv.width = W; b.cv.height = H; }
       if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
@@ -6764,9 +6929,9 @@
     // o: cx, cy, R in the canvas's css pixels; t, seed, bias; px, py, pr, amt for the warm spot under the mouse
     function drawBall(cv, o) {
       if (!gl) return;
-      const box = cv.getBoundingClientRect();
-      if (!box.width) return;
-      const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
+      const boxW = cv.clientWidth, boxH = cv.clientHeight; // its own size: on the page transition's cube the size on screen shrinks to nothing
+      if (!boxW || !boxH) return;
+      const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(boxW * dpr), H = Math.round(boxH * dpr);
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
       if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
       gl.viewport(0, 0, W, H);
