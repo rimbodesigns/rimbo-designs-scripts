@@ -233,7 +233,10 @@
   // colour (ours sits on the body, not on the page), the cube stays below the menu, and the old page's pins hold their place
   var flipCubeDirection = false;
   var cubeX = flipCubeDirection ? 1 : -1;
-  var CUBE_BACKDROP = 'var(--color--black, #131313)';
+  // The void around the cube: the brand fade (docs/brand.md), orange through steel into beige and back, mixed in OKLab so it
+  // never turns grey, with the grain on top. A cone, so the colour sits at the edges, the only part the cube leaves open
+  var CUBE_VOID = 'conic-gradient(from 0deg in oklab, #E4441C, #E4566A 13%, #4B7888 32%, #DACCAE 50%, #4B7888 68%, #E4566A 87%, #E4441C)';
+  var CUBE_GRAIN = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'240\' height=\'240\'%3E%3Cfilter id=\'g\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'.9\' numOctaves=\'2\' stitchTiles=\'stitch\'/%3E%3CfeColorMatrix values=\'0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.6 -.55\'/%3E%3C/filter%3E%3Crect width=\'240\' height=\'240\' filter=\'url(%23g)\'/%3E%3C/svg%3E")';
 
   function runPageLeaveAnimation(current, next, data) {
     return new Promise(function (resolve) {
@@ -244,6 +247,9 @@
           var parent = current.parentElement || document.body;
           var scene = prepareForTransition(parent, current, next, started.scrollY);
           var cube = scene.cube, stage = scene.stage;
+          // an open menu stops being a menu here: it is the old page's face now and folds away with it. The swoosh is for closing it by hand
+          if (rdNavFull.handOver) rdNavFull.handOver(scene.wrapper);
+          if (window.lenis) window.lenis.stop();
 
           var tl = gsap.timeline({
             onComplete: function () {
@@ -256,7 +262,8 @@
             }
           });
 
-          tl.to(cube, { z: -window.innerHeight * 0.8, duration: 0.8, ease: 'power2.inOut' }, '<');
+          tl.fromTo(scene.colour, { rotate: -40 }, { rotate: 150, duration: 2.1, ease: 'none' }, 0);
+          tl.to(cube, { z: -window.innerHeight * 0.8, duration: 0.8, ease: 'power2.inOut' }, 0);
           tl.to(cube, { rotateX: 90 * cubeX, duration: 1.2, ease: 'osmo' }, '<0.1');
           tl.to(cube, { z: -window.innerHeight * 0.5, duration: 1.2, ease: 'osmo', overwrite: 'auto' }, '<0.7');
         });
@@ -276,11 +283,15 @@
     var cubeDepth = viewportHeight * 0.5;
     var face = getComputedStyle(document.body).backgroundColor;
 
+    var colour = document.createElement('div');
+    var grain = document.createElement('div');
     stage.className = 'page-transition__stage';
     cube.className = 'page-transition__cube';
     wrapper.className = 'page-transition__wrapper';
 
     parent.insertBefore(stage, current);
+    stage.appendChild(colour);
+    stage.appendChild(grain);
     stage.appendChild(cube);
     cube.appendChild(wrapper);
     wrapper.appendChild(current);
@@ -291,8 +302,15 @@
     gsap.set(stage, {
       position: 'fixed', inset: 0, width: '100%', height: viewportHeight,
       perspective: '100vw', perspectiveOrigin: '50% ' + cubeDepth + 'px',
-      overflow: 'hidden', zIndex: 999, background: CUBE_BACKDROP
+      overflow: 'hidden', zIndex: 999, backgroundColor: 'var(--color--brand, #E4441C)'
     });
+    colour.style.background = CUBE_VOID;
+    gsap.set(colour, {
+      position: 'absolute', left: '50%', top: '50%', width: '180vmax', height: '180vmax',
+      xPercent: -50, yPercent: -50, filter: 'blur(5vmax)', willChange: 'transform'
+    });
+    grain.style.backgroundImage = CUBE_GRAIN;
+    gsap.set(grain, { position: 'absolute', inset: 0, opacity: 0.55, mixBlendMode: 'overlay' });
     gsap.set(cube, {
       position: 'absolute', inset: 0, width: '100%', height: viewportHeight,
       transformStyle: 'preserve-3d', transformOrigin: '50% 50%', willChange: 'transform',
@@ -315,7 +333,7 @@
     });
 
     stage.offsetHeight;
-    return { stage: stage, cube: cube, wrapper: wrapper };
+    return { stage: stage, cube: cube, wrapper: wrapper, colour: colour };
   }
 
   // Starts the new page before the cube is built, all in one go so nothing paints in between. For that moment the old
@@ -373,6 +391,8 @@
 
   // The plain fade: for the back and forward buttons, anchors and reduced motion, where the page has to land somewhere else than its top
   function runFadeLeave(current) {
+    if (rdNavFull.close) rdNavFull.close(true);
+    if (window.lenis) window.lenis.stop();
     var tl = gsap.timeline({ onComplete: function () { current.remove(); } });
     if (reducedMotion) return tl.set(current, { autoAlpha: 0 }); // immediate swap
     tl.to(current, { autoAlpha: 0, duration: 0.4, ease: 'osmo' });
@@ -434,7 +454,6 @@
 
     barba.hooks.beforeLeave(function (data) {
       scrollMemory[data.current.url.href] = window.scrollY;
-      if (rdNavFull.close) rdNavFull.close();
     });
 
     // beforeEnter and afterEnter also fire on the first load, where there is nothing to swap: that is the check on current
@@ -5653,7 +5672,29 @@
     }
 
     btn.addEventListener('click', function () { set(!isOpen); });
-    rdNavFull.close = function () { set(false); }; // a link in the menu was clicked: the page changes underneath
+    // A link in the menu was clicked: the page changes underneath, so it goes at once, without the swoosh
+    rdNavFull.close = function () {
+      if (!isOpen) return;
+      var calm = reduce;
+      reduce = true;
+      set(false);
+      reduce = calm;
+      edge.p = 0; draw();              // ready to swoosh open from the top next time
+      gsap.set(links, { rotate: 4 });
+    };
+    // The cube's old face takes a copy of the open menu, so the menu rolls away as part of the page
+    rdNavFull.handOver = function (face) {
+      if (!isOpen) return;
+      var copy = nav.cloneNode(true);
+      copy.removeAttribute('aria-label');
+      copy.setAttribute('aria-hidden', 'true');
+      copy.style.position = 'absolute';
+      qs('.bold-nav-full__tile', copy).style.setProperty('--nf-bg', '#0c0c0c'); // solid: a blurred glass can't turn in 3D
+      qs('.bold-nav-full__tile', copy).style.backdropFilter = 'none';
+      qs('.bold-nav-full__tile', copy).style.webkitBackdropFilter = 'none';
+      face.appendChild(copy);
+      rdNavFull.close();
+    };
 
     // Barba: the page under the menu may have changed since it last opened
     function readPage() {
