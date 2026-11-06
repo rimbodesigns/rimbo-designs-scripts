@@ -5954,7 +5954,7 @@
     // light one stays experimental), so it only runs on the Groningen page. data-footer="light" or "dark" on any element of a
     // page picks one, ?ftheme= tries it out
     var themeEl = qs('[data-footer]');
-    var theme = (/[?&]ftheme=(light|dark)/.exec(location.search) || [])[1] || (themeEl && themeEl.getAttribute('data-footer')) || (/-in-groningen\/?$/.test(location.pathname) ? 'light' : 'dark');
+    var theme = (/[?&]ftheme=(light|dark)/.exec(location.search) || [])[1] || (themeEl && themeEl.getAttribute('data-footer')) || (/-groningen\/?$/.test(location.pathname) ? 'light' : 'dark');
     var light = theme === 'light';
     var ACCENT = light ? [75, 120, 136] : [228, 68, 28], LOGO_FILL = light ? [19, 19, 19] : [248, 245, 238];
     var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
