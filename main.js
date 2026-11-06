@@ -6505,7 +6505,7 @@
       .wall_cc-c.is--tr { transform: translate(var(--out), calc(var(--out) * -1)); }
       .wall_cc-c.is--bl { transform: translate(calc(var(--out) * -1), var(--out)); }
       .wall_cc-c.is--br { transform: translate(var(--out), var(--out)); }
-      .centered-slider-bullet.active .wall_face-open { color: #f8f5ee; }
+      .centered-slider-bullet.active .wall_face-open { color: var(--_wall-of-love---wall-text); }
       .centered-slider-bullet:focus-visible, .centered-slider-button:focus-visible { outline: 1px solid var(--color--brand); outline-offset: 2px; }
     `;
     document.head.appendChild(style);
