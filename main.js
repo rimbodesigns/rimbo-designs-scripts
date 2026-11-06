@@ -5317,7 +5317,7 @@
         a.addEventListener('click', function (e) {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; // new tab / window keeps the plain link
           e.preventDefault();
-          if (history.replaceState) history.replaceState(null, '', '#' + h.id);
+          if (history.replaceState) history.replaceState(history.state, '', '#' + h.id);
           postJumpTo(h);
         });
         var li = document.createElement('li');
