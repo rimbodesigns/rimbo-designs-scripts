@@ -4766,7 +4766,7 @@
   var LABEL_MAX = 26; // characters, about what fits in the margin next to the text
   function scrollRulerLabel(text) {
     var STOP = /^(a|an|the|to|of|for|and|or|in|on|at|by|with|from|your|you|is|are|should|can|de|het|een|van|voor|en|op|met|je|jouw|zijn)$/i;
-    var t = text.replace(/\s+/g, ' ').trim();
+    var t = text.replace(/\s+/g, ' ').trim().replace(/^\d+[:.)]\s+/, '');
     t = t.replace(/^\S+,\s+/, function (lead) { return /\s/.test(lead.trim()) ? lead : ''; }); // a lone "So," in front goes
     // only what comes before a colon, question mark, comma, dash or bracket, or a full stop that ends
     // a sentence (not the one in "vs." or "2.0")
@@ -4943,14 +4943,14 @@
     new MutationObserver(makeRoom).observe(labelWrap, { subtree: true, attributes: true, attributeFilter: ['data-scroll-ruler-status'] });
 
     // On screen only while the article is: in once its top is in view, out once its end has passed
-    // 60% down, as the ruler reaches its end, so it never stays over the newsletter or footer
+    // 78% down, just before the last label (about 81% down) would reach the CTA card under the article
     var st = null;
     function setOut(out) { root.classList.toggle('is-out', out); root.inert = out; }
     if (typeof ScrollTrigger !== 'undefined') {
       st = ScrollTrigger.create({
         trigger: box,
         start: 'top bottom',
-        end: 'bottom 60%',
+        end: 'bottom 78%',
         onToggle: function (self) { setOut(!self.isActive); }
       });
     } else {
@@ -5181,7 +5181,7 @@
 
     // no back-to-top button
     '.rf .back-to-top { display: none !important; }',
-    '.rf .richtextstyling h2[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }',
+    '.rf .richtextstyling h2[tabindex="-1"]:focus { outline: none; }',
 
     // end of the page: one project block, then keep reading (the dark post cards from rdPostCards)
     '.rf .lead_mag { display: none; }',
@@ -5204,7 +5204,8 @@
     '.rf .btn.rf-kr-all:hover { color: #f8f5ee; }',
     '.rf .btn.rf-kr-all.is-hover { box-shadow: 0 .5rem 1.4rem rgba(19, 19, 19, .28); }',
     '.rf .rf-hide { display: none !important; }',
-    '@media (min-width: 992px) { .rf .blog_section .blog_list.rf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rf .blog_section .blog_list.rf-two .blog_container { width: 100%; } }',
+    '.rf .blog_section .blog_list.rf-two .blog_container { width: 100%; }',
+    '@media (min-width: 992px) { .rf .blog_section .blog_list.rf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }',
     '.rf .blog_section .btn-animate-chars { display: none; }', // "See All Resources": the header row has "All articles"
     '@media (max-width: 767px) {' +
       ' .rf .blog_section .padding-section-large { padding-top: 5rem; }' +
@@ -5315,7 +5316,7 @@
         var a = document.createElement('a');
         a.href = '#' + h.id;
         var label = document.createElement('span');
-        label.textContent = text.split(/:\s/)[0]; // the whole heading, up to a colon: there is room for it here
+        label.textContent = text.replace(/^\d+[:.)]\s+/, '').split(/:\s/)[0]; // the whole heading, up to a colon: there is room for it here
         a.appendChild(label);
         a.addEventListener('click', function (e) {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; // new tab / window keeps the plain link
@@ -5398,7 +5399,8 @@
         '@media (prefers-reduced-motion: reduce) { ' + x + ' .blog_content { transition: none; } }'
       ];
     }
-    return POST_CARD_SCOPES.map(rules).reduce(function (all, r) { return all.concat(r); }, []).join('\n');
+    return POST_CARD_SCOPES.map(rules).reduce(function (all, r) { return all.concat(r); }, [])
+      .concat(['@media (max-width: 479px) { .blog_highlight .blog_list { row-gap: 1.5rem; } }']).join('\n');
   })();
 
   function rdPostCards() {
@@ -5558,7 +5560,7 @@
         ' .bold-nav-full__tile { justify-content: flex-start; }' +
         ' .bold-nav-full__tile::before { content: ""; flex: 1 1 0; }' +
         ' .bold-nav-full__ul { flex: none; gap: 1.5vw; }' +
-        ' .bold-nav-full__link { font-size: min(14.5vw, 9vh); }' +
+        ' .bold-nav-full__link { font-size: min(13vw, 9vh); }' +
         ' .bold-nav__mid { flex: 1 1 0; display: flex; align-items: center; justify-content: center; }' +
         ' .bold-nav__bottom { position: relative; flex: none; grid-template-columns: 1fr; justify-items: center; gap: .75em; padding-bottom: 1.75rem; }' +
         ' .bold-nav__time, .bold-nav__mail, .bold-nav__lang { grid-column: 1; justify-self: center; }' +
