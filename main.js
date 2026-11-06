@@ -3906,7 +3906,8 @@
       if (!lines.length) lines = originals.map(function (el) { var pn = qs('[data-band-name]', el) || el; return pn.getAttribute('data-ring-line') || pn.getAttribute('data-band-name') || ''; });
       for (var ci = originals.length; ci < N; ci++) { var cl = originals[ci % originals.length].cloneNode(true); cl.setAttribute('data-ring-clone', ''); cl.setAttribute('aria-hidden', 'true'); list.appendChild(cl); } // the works repeat round the dial; dedupeClips turns the copies into canvases
       var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) { var panel = qs('[data-band-name]', el) || el; return { el: el, k: i <= mid ? i : i - N, name: panel.getAttribute('data-band-name') || '', fly: 0, tan: 0, gone: 0 }; }); // 0 = the first card, in front at rest; the last ones sit to its left; the line is what the dial says in its middle (data-ring-line on the panel, the name if there is none)
-      var label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label);
+      var label = qs('.band_ring-name', hero); // Designer: band_ring-name, the script only writes in it
+      if (!label) { label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label); }
       var bottomFade = qs('.band_fade.is-bottom', hero); // covers the clip edge at rest; it lifts while the dial lies flat, so the lower cards stay bright
       var st = { steps: 0, scroll: 0, tip: 0, open: 0, scale: 1, y: 0, dx: 0, fade: 1, pitch: 0, w: 0, h: 0, fit: 0.45, tween: null, front: -1, dir: 1, closing: false, text: '', blurOn: false };
       var persp = parseFloat(getComputedStyle(ring).perspective) || 2400; // the ring root is the camera
