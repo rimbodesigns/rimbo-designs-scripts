@@ -7124,6 +7124,42 @@
     return location.pathname.replace(/\/+$/, '').replace(/^\/nl(?=\/|$)/, '') || '/';
   }
 
+  // =========================================================
+  // FAQ — the accordion on the dark pages (Home V4, Extreme): Designer classes faq_* (section [data-faq] > ul.faq_list >
+  // li.faq_item > .faq_top (question + icon) + .faq_bottom (answers)). The questions and answers stay in the HTML, so search
+  // engines read them; this opens one item at a time (click, Enter or Space; the other items close), rotates the icon by the
+  // data-accordion-status attribute (the open-state rules sit in the page head), and adds FAQPage structured data from the
+  // DOM. The same design as the city pages' FAQ, which keeps its rich-text version in the template code.
+  // =========================================================
+  function rdFaq() {
+    var sec = qs('[data-faq]');
+    if (!sec) return;
+    var items = qsa('.faq_item', sec);
+    if (!items.length) return;
+    var set = function (li, open) {
+      li.setAttribute('data-accordion-status', open ? 'active' : 'not-active');
+      var top = qs('.faq_top', li);
+      if (top) top.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    var toggle = function (li) {
+      var open = li.getAttribute('data-accordion-status') === 'active';
+      items.forEach(function (o) { set(o, false); });
+      if (!open) set(li, true);
+    };
+    rdOn(sec, 'click', function (e) {
+      var top = e.target.closest && e.target.closest('.faq_top');
+      if (top && !e.target.closest('a')) toggle(top.parentNode);
+    });
+    rdOn(sec, 'keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('faq_top')) { e.preventDefault(); toggle(e.target.parentNode); }
+    });
+    var ld = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: items.map(function (li) {
+      var q = qs('.faq_q', li);
+      return { '@type': 'Question', name: q ? q.textContent.trim() : '', acceptedAnswer: { '@type': 'Answer', text: qsa('.faq_p', li).map(function (p) { return p.textContent.trim(); }).join(' ') } };
+    }) };
+    var s = document.createElement('script'); s.type = 'application/ld+json'; s.textContent = JSON.stringify(ld); rdHead(s);
+  }
+
   // What runs on which page. Runs on every page, first load or swap
   function initPageFunctions() {
     var path = pagePath();
@@ -7150,6 +7186,7 @@
     };
     later('.loc_steps', 'location balls', rdLocBalls);
     if (qs('.loc_page')) later('.wall_section', 'wall of love', rdWall); else run('wall of love', rdWall);
+    run('faq', rdFaq);
 
     if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
     else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
