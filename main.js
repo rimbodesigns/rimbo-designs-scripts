@@ -1104,16 +1104,9 @@
   // SERVICE — /service and every /locations/… page (was Slater 35312 SERVICE.js)
   // =========================================================
   function rdService() {
-    // the new /locations/… template: the whole hero card comes in (the text is not split letter by letter).
-    // The template head hides the card until html.loc-in is set, so it can't flash before this runs.
-    var card = qs('.loc_hero');
-    if (card && !byId('DARK_section')) {
-      document.documentElement.classList.add('loc-in');
-      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        gsap.from(card, { y: 40, opacity: 0, duration: 1.1, delay: 0.1, ease: 'expo.out', clearProps: 'transform,opacity' });
-      }
-      return;
-    }
+    // the new /locations/… template: the hero card comes in by CSS alone (keyframes in the template head), so it never
+    // waits for this script: on a phone that wait was most of the 10 s to the first real content
+    if (qs('.loc_hero') && !byId('DARK_section')) return;
     // each step only when its element is on the page: the new /locations/… template is one hero panel
     // (#HeroTitle + #text_local) without the dark section, so its text comes in right after the title
     var dark = byId('DARK_section'), first = byId('First_content'), special = byId('Special_text');
@@ -5852,7 +5845,7 @@
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           var v = en.target;
-          if (en.isIntersecting && !reduced) {
+          if (en.isIntersecting && !reduced && (awake || v === lead)) {
             var src = v.getAttribute('data-src'); // a clip only downloads once its card is on screen
             if (src && v.getAttribute('src') !== src) v.setAttribute('src', src);
             v.playbackRate = parseFloat(v.getAttribute('data-rate')) || 1;
@@ -5867,7 +5860,7 @@
 
     // The drum stands still with its first card in the middle until it is really in view; only then the clock runs,
     // so the first step comes a full 5 s after the visitor arrives. Leaving stops the clock
-    var started = false, onScreen = false, clips = null, next = null, clock = null;
+    var started = false, onScreen = false, clips = null, next = null, clock = null, lead = null, awake = false;
     function step() {
       if (!document.hidden && slider.getAttribute('data-spatial-slider-drag-status') !== 'grabbing') next.click();
     }
@@ -5876,8 +5869,12 @@
       else if (!onScreen && clock) { clearInterval(clock); clock = null; }
     }
     function start() {
+      lead = qs('video', sec);
       if (started || !window.Draggable || !window.InertiaPlugin || !window.CustomEase) return;
       started = true;
+      var wake = function () { if (awake) return; awake = true; if (clips) { clips.disconnect(); clips = watchClips(); } };
+      rdOn(window, 'scroll', wake, { passive: true, once: true });
+      rdOn(sec, 'pointerdown', wake, { once: true });
       qsa('video[data-poster]', sec).forEach(function (v) { v.setAttribute('poster', v.getAttribute('data-poster')); });
       next = document.createElement('button'); // Osmo wires every control it finds, so a timer can press Next like a visitor
       next.type = 'button'; next.tabIndex = -1;
@@ -6495,7 +6492,7 @@
     faces.className = 'wall_faces'; ul.className = 'centered-slider-bullet__list'; ul.setAttribute('role', 'tablist');
     qsa('[data-centered-slider="slide"]', wrapper).forEach(function (slide) {
       var li = document.createElement('li'), btn = document.createElement('button'), photo = qs('img', slide), who = qs('.slide-demo__eyebrow', slide), name = who ? who.textContent.trim() : '';
-      li.className = 'centered-slider-bullet__item';
+      li.className = 'centered-slider-bullet__item'; li.setAttribute('role', 'presentation'); // a tablist holds tabs, not list items
       btn.type = 'button'; btn.className = 'centered-slider-bullet'; btn.setAttribute('role', 'tab'); btn.setAttribute('aria-label', name);
       btn.setAttribute('data-centered-slider', 'bullet');
       if (photo) {
@@ -7104,8 +7101,15 @@
     // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
     if (document.documentElement.classList.contains('rf') || path === '/home-v4' || path === '/home-v4-landing' || path === '/locations' || path.indexOf('/locations/') === 0 || (/[?&]footer=new/.test(location.search) && /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname))) run('footer', rdFooter);
     run('location showcase', rdLocShow);
-    run('location balls', rdLocBalls);
-    run('wall of love', rdWall);
+    // city pages: the balls and the wall are far down the page, so their WebGL and slider start when they come near
+    var later = function (sel, name, fn) {
+      var el = qs(sel);
+      if (!el) return;
+      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); run(name, fn); } }, { rootMargin: '100% 0px' });
+      io.observe(el);
+    };
+    later('.loc_steps', 'location balls', rdLocBalls);
+    if (qs('.loc_page')) later('.wall_section', 'wall of love', rdWall); else run('wall of love', rdWall);
 
     if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
     else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
