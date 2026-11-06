@@ -406,6 +406,62 @@
     odometer(n, text);
   }
 
+  // Open and close with ease: height, the spacing around it and a fade, with GSAP. A quick second click
+  // picks up from where it is. On the first paint, with reduced motion or without GSAP it just switches.
+  var FOLD = ["height", "paddingTop", "paddingBottom", "marginTop", "marginBottom"], ready = false;
+  function eased() { return ready && window.gsap && !reduceMotion; }
+  function fold(box) { var cs = getComputedStyle(box), o = {}; FOLD.forEach(function (k) { o[k] = parseFloat(cs[k]) || 0; }); return o; }
+  function reveal(box, show) {
+    if (box.dataset.show === String(show)) return;
+    box.dataset.show = show;
+    if (!eased()) { box.hidden = !show; return; }
+    var kids = Array.from(box.children), from = {}, to;
+    if (box.hidden) FOLD.forEach(function (k) { from[k] = 0; }); else from = fold(box);
+    gsap.killTweensOf(box); gsap.killTweensOf(kids);
+    box.hidden = false;
+    if (show) {
+      FOLD.forEach(function (k) { box.style[k] = ""; });
+      to = fold(box);
+      to.duration = .6; to.ease = "expo.out";
+      gsap.fromTo(kids, { autoAlpha: 0, y: -6 }, { autoAlpha: 1, y: 0, duration: .45, ease: "power3.out", stagger: .035, delay: .05, clearProps: "all" });
+    } else {
+      to = {}; FOLD.forEach(function (k) { to[k] = 0; });
+      to.duration = .42; to.ease = "power3.inOut";
+      gsap.to(kids, { autoAlpha: 0, duration: .2, ease: "power2.out" });
+    }
+    box.style.overflow = "hidden";
+    to.onUpdate = queueWire;
+    to.onComplete = function () {
+      box.hidden = !show;
+      gsap.set(box, { clearProps: FOLD.join(",") + ",overflow" });
+      gsap.set(kids, { clearProps: "all" });
+      queueWire();
+    };
+    gsap.fromTo(box, from, to);
+  }
+
+  // The lines in the price card: new ones fade in and the card eases to its new height
+  function fillLines(ul, lines) {
+    var had = Array.from(ul.children).map(function (li) { return li.firstChild.textContent; });
+    var before = ul.hidden ? 0 : ul.offsetHeight;
+    if (window.gsap) gsap.killTweensOf(ul);
+    ul.style.height = ""; ul.style.overflow = "";
+    ul.innerHTML = "";
+    var fresh = [];
+    lines.forEach(function (x) {
+      var li = el("li");
+      li.appendChild(el("span", "", x[0])); li.appendChild(el("span", "", eur(x[1])));
+      ul.appendChild(li);
+      if (had.indexOf(x[0]) < 0) fresh.push(li);
+    });
+    if (!eased() || !before) return;
+    if (fresh.length) gsap.from(fresh, { autoAlpha: 0, duration: .45, ease: "power2.out", clearProps: "all" });
+    var after = ul.offsetHeight;
+    if (after === before) return;
+    ul.style.overflow = "hidden";
+    gsap.fromTo(ul, { height: before }, { height: after, duration: .55, ease: "expo.out", onUpdate: queueWire, clearProps: "height,overflow" });
+  }
+
   function render(instant) {
     CONFIG.pages.forEach(function (p) { $("n-" + p.id).textContent = state.pages[p.id]; });
 
@@ -413,7 +469,7 @@
       var id = s.dataset.id;
       s.setAttribute("aria-checked", String(id === "brand" ? state.brandOn : !!state.toggles[id]));
     });
-    var subs = $("brand-subs"); subs.hidden = !state.brandOn;
+    reveal($("brand-subs"), state.brandOn);
     var parentSwitch = document.querySelector('.calc_toggle[data-id="brand"]');
     parentSwitch.setAttribute("aria-expanded", String(state.brandOn));
     $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum())
@@ -422,7 +478,7 @@
     CONFIG.toggles.forEach(function (t) {
       if (!t.hourly) return;
       var on = !!state.toggles[t.id];
-      $("hours-" + t.id).hidden = !on;
+      reveal($("hours-" + t.id), on);
       $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
       $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
     });
@@ -433,24 +489,19 @@
     if (window.calcBall) calcBall.set(r.shown, CONFIG.minimum);
 
     // Under the minimum: a bar that fills as the scope grows, gone once the minimum is reached
-    $("meter").hidden = reached;
+    reveal($("meter"), !reached);
     $("meter-fill").style.width = Math.min(100, r.scope / CONFIG.minimum * 100) + "%";
     $("meter-text").textContent = CONFIG.copy.underMinimum.replace("{min}", eur(CONFIG.minimum));
 
     var ul = $("lines");
-    ul.hidden = !r.lines.length;
-    ul.innerHTML = "";
-    r.lines.forEach(function (x) {
-      var li = el("li");
-      li.appendChild(el("span", "", x[0])); li.appendChild(el("span", "", eur(x[1])));
-      ul.appendChild(li);
-    });
+    if (r.lines.length) fillLines(ul, r.lines);
+    reveal(ul, !!r.lines.length);
 
     current = { scope: scopeText(eur(r.total) + (reached ? "" : ", the minimum")), range: eur(r.total) };
     $("scope-summary").textContent = current.scope;
     $("f-selections").value = current.scope.split("\nEstimate:")[0];
     $("f-range").value = current.range;
-    $("start-over").hidden = mode === "client" || !picked(); // the lead has "Back to my recommendation"
+    reveal($("start-over"), mode !== "client" && picked()); // the lead has "Back to my recommendation"
     if (mode !== "public") syncShare();
     queueWire();
   }
@@ -465,7 +516,7 @@
   function syncShare() {
     var o = shareData();
     history.replaceState(null, "", location.pathname + (mode === "make" ? "?make" : "") + shareHash(o));
-    if (mode === "client") $("reset").hidden = !o.c;
+    if (mode === "client") reveal($("reset"), !!o.c);
     $("made").hidden = true; // the scope changed: the copied link is no longer this version
   }
 
@@ -689,4 +740,5 @@
   setupStartOver();
   if (window.gsap && window.rdButtons) rdButtons();
   render();
+  ready = true;
 })();
