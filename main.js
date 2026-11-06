@@ -6998,7 +6998,7 @@
       return c;
     });
     // the active face grows, so its rounding is drawn smaller: on screen it stays exactly the Designer's value
-    function rounding(i) { return [photos[i], cols[i]].filter(Boolean); }
+    function setRound(i, r) { [photos[i], cols[i]].forEach(function (e) { if (e) e.style.borderRadius = r; }); }
     var marker = new Corners(host);
 
     function lift(i) { return -Math.round(bullets[i].offsetWidth * .07); }
@@ -7015,8 +7015,8 @@
       current = i;
       var up = { scale: LIFT, y: lift(i) }, wide = 'circle(150% at 50% 50%)', small = round / LIFT + 'px', full = round + 'px';
       if (instant || calm) {
-        if (from > -1) { gsap.set(bullets[from], { scale: 1, y: 0 }); if (cols[from]) gsap.set(cols[from], { clipPath: 'circle(0% at 50% 50%)' }); if (rounding(from).length) gsap.set(rounding(from), { borderRadius: full }); }
-        gsap.set(bullets[i], up); if (cols[i]) gsap.set(cols[i], { clipPath: wide }); if (rounding(i).length) gsap.set(rounding(i), { borderRadius: small });
+        if (from > -1) { gsap.set(bullets[from], { scale: 1, y: 0 }); if (cols[from]) gsap.set(cols[from], { clipPath: 'circle(0% at 50% 50%)' }); setRound(from, full); }
+        gsap.set(bullets[i], up); if (cols[i]) gsap.set(cols[i], { clipPath: wide }); setRound(i, small);
         marker.set(faceBox(i));
         return;
       }
@@ -7027,8 +7027,8 @@
       // in: it arrives from the old face's side, a beat later, the photo rises to meet it
       gsap.fromTo(bullets[i], { scale: .92 }, { scale: LIFT, y: up.y, duration: .85, delay: .1, ease: 'back.out(2.2)', overwrite: true });
       if (cols[i]) gsap.fromTo(cols[i], { clipPath: 'circle(0% at ' + enter + ' 50%)' }, { clipPath: 'circle(150% at ' + enter + ' 50%)', duration: .8, delay: .16, ease: 'power2.out', overwrite: true });
-      if (from > -1 && rounding(from).length) gsap.to(rounding(from), { borderRadius: full, duration: .7, ease: EASE });
-      if (rounding(i).length) gsap.to(rounding(i), { borderRadius: small, duration: .85, delay: .1, ease: EASE });
+      if (from > -1) setRound(from, full);
+      setRound(i, small);
       marker.travel(faceBox(i), dir);
       if (balls[i]) balls[i].stir = 1;
     }
