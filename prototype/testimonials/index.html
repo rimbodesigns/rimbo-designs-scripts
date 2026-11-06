@@ -56,21 +56,21 @@
   /* the orange corners: four real pieces, so they can travel, spread and boil (wall.js) */
   .ts_c { position: absolute; left: 0; top: 0; z-index: 3; width: var(--c); height: var(--c); pointer-events: none; }
   .ts_c i { display: block; width: 100%; height: 100%; border: 0 solid var(--brand); }
-  .ts_c.is--tl i { border-width: 1.5px 0 0 1.5px; transform-origin: 0 0; }
-  .ts_c.is--tr i { border-width: 1.5px 1.5px 0 0; transform-origin: 100% 0; }
-  .ts_c.is--bl i { border-width: 0 0 1.5px 1.5px; transform-origin: 0 100%; }
-  .ts_c.is--br i { border-width: 0 1.5px 1.5px 0; transform-origin: 100% 100%; }
+  .ts_c.is--tl i { border-width: 1px 0 0 1px; border-top-left-radius: var(--cr); transform-origin: 0 0; }
+  .ts_c.is--tr i { border-width: 1px 1px 0 0; border-top-right-radius: var(--cr); transform-origin: 100% 0; }
+  .ts_c.is--bl i { border-width: 0 0 1px 1px; border-bottom-left-radius: var(--cr); transform-origin: 0 100%; }
+  .ts_c.is--br i { border-width: 0 1px 1px 0; border-bottom-right-radius: var(--cr); transform-origin: 100% 100%; }
 
   /* the card's own corners: --k is how close the card is to the middle (wall.js), so they fade and close as it lands */
   .ts_cc { position: absolute; inset: -.5em; z-index: 2; pointer-events: none; opacity: var(--k, 0); --out: calc((1 - var(--k, 0)) * 1em); }
-  .ts_cc b { position: absolute; width: 1em; height: 1em; border: 0 solid var(--brand); }
-  .ts_cc b:nth-child(1) { left: 0; top: 0; border-width: 1.5px 0 0 1.5px; transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
-  .ts_cc b:nth-child(2) { right: 0; top: 0; border-width: 1.5px 1.5px 0 0; transform: translate(var(--out), calc(var(--out) * -1)); }
-  .ts_cc b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 1.5px 1.5px; transform: translate(calc(var(--out) * -1), var(--out)); }
-  .ts_cc b:nth-child(4) { right: 0; bottom: 0; border-width: 0 1.5px 1.5px 0; transform: translate(var(--out), var(--out)); }
+  .ts_cc b { position: absolute; width: 1.25em; height: 1.25em; border: 0 solid var(--brand); }
+  .ts_cc b:nth-child(1) { left: 0; top: 0; border-width: 1.5px 0 0 1.5px; border-top-left-radius: .75em; transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
+  .ts_cc b:nth-child(2) { right: 0; top: 0; border-width: 1.5px 1.5px 0 0; border-top-right-radius: .75em; transform: translate(var(--out), calc(var(--out) * -1)); }
+  .ts_cc b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 1.5px 1.5px; border-bottom-left-radius: .75em; transform: translate(calc(var(--out) * -1), var(--out)); }
+  .ts_cc b:nth-child(4) { right: 0; bottom: 0; border-width: 0 1.5px 1.5px 0; border-bottom-right-radius: .75em; transform: translate(var(--out), var(--out)); }
   html.no-corners .ts_cc { display: none; }
 
-  .centered-slider-bullet__list { --c: .5em; }
+  .centered-slider-bullet__list { --c: .75em; --cr: .5em; }
 
   .slide-demo__description { margin: 0; font-size: 1em; line-height: 1.5; color: var(--fg); }
   .slide-demo__details { display: flex; gap: .875em; align-items: center; width: 100%; padding-top: 1.25em; border-top: 1px dashed var(--dash); }
@@ -121,7 +121,7 @@
 
   @media screen and (max-width: 767px) {
     .centered-slider-content { display: block; }
-    .centered-slider-bullet__list { gap: clamp(.5em, 2.4vw, 1.25em); --c: .5em; }
+    .centered-slider-bullet__list { gap: clamp(.5em, 2.4vw, 1.25em); --c: .5em; --cr: .35em; }
     .centered-slider-bullet__item { flex: 1 1 0; min-width: 0; max-width: 2.5em; }
     .centered-slider-bullet { width: 100%; height: auto; aspect-ratio: 1; }
   }
