@@ -5968,13 +5968,15 @@
       '.rdf-prev { position: relative; z-index: 2 !important; }',
       '.rdf::before { content: ""; position: absolute; left: 0; right: 0; top: 0; z-index: 6; height: clamp(9rem, 34vh, 18rem); pointer-events: none; border-top: 1px solid var(--rdf-edge); opacity: var(--rdf-drop-k, 1); background: linear-gradient(to bottom, rgba(var(--rdf-drop), var(--rdf-drop-a)), rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .62)) 16%, rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .36)) 36%, rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .16)) 58%, rgba(var(--rdf-drop), calc(var(--rdf-drop-a) * .05)) 80%, rgba(var(--rdf-drop), 0)); }',
       '.rdf .rdf-grain.grain { position: absolute; inset: 0; z-index: 7; pointer-events: none; }',
-      '.rdf-in { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 5.5rem var(--rdf-pad) 1.6rem; will-change: transform; }',
+      '.rdf-in { position: absolute; inset: 0; display: flex; flex-direction: column; padding: calc(5rem + 12px - 1.4rem) var(--rdf-pad) 1.6rem; will-change: transform; }', // the long ticks start at 5rem: the field above the ruler is as tall as the nav bar
       '.rdf-in::after { content: ""; position: absolute; inset: 0; background: var(--rdf-bg); opacity: var(--rdf-shade, 0); pointer-events: none; z-index: 5; }',
       '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
       '.rdf-v { position: absolute; border-left: 1px dashed var(--rdf-dash); }',
       '.rdf-h { position: absolute; border-top: 1px dashed var(--rdf-dash); }',
-      '.rdf-ruler { position: relative; height: 1.4rem; background: repeating-linear-gradient(90deg, var(--rdf-hair) 0 1px, transparent 1px 10px) bottom / 100% 6px no-repeat, repeating-linear-gradient(90deg, var(--rdf-dash) 0 1px, transparent 1px 100px) bottom / 100% 12px no-repeat; }',
-      '.rdf-ruler span { position: absolute; left: 50%; top: -.6rem; transform: translateX(-50%); padding: 0 .6rem; font-size: .58rem; letter-spacing: .18em; color: var(--rdf-grey); white-space: nowrap; }',
+      '.rdf-ruler { position: relative; height: 1.4rem; }',
+      '.rdf-ruler svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; shape-rendering: crispEdges; }',
+      '.rdf-ruler path { fill: none; stroke-width: 1; stroke: var(--rdf-hair); } .rdf-ruler path + path { stroke: var(--rdf-dash); }',
+      '.rdf-ruler span { position: absolute; left: 50%; top: calc(-1.1rem - 12px); transform: translate(-50%, -50%); padding: 0 .6rem; font-size: .58rem; letter-spacing: .18em; color: var(--rdf-grey); white-space: nowrap; }', // the middle of its field, on the line of the nav's logo and burger
       '.rdf-grid { flex: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)) auto; }',
       '.rdf-cell { position: relative; display: flex; flex-direction: column; justify-content: center; gap: .9rem; padding: 1.4rem 1.6rem; transition: background-color .4s ' + ease + '; }',
       '.rdf-cell.is-drawn { background-color: var(--rdf-lift); }',
@@ -6004,11 +6006,11 @@
       '.rdf-lang a { opacity: .6; transition: opacity .3s; } .rdf-lang a.is-on { color: var(--rdf-fg) !important; opacity: 1; } .rdf-lang a:hover { opacity: 1; }',
       '.rdf-lang a + a::before { content: "/"; margin-right: .7em; color: var(--rdf-grey); opacity: .5; }',
       // the build: an outline per box, the HTML it types, the caret
-      '.rdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
+      '.rdf-frame { position: absolute; inset: 0; z-index: 6; width: 100%; height: 100%; overflow: visible; pointer-events: none; }', // above the shade: the orange line starts at its full colour
       '.rdf-frame rect { fill: none; stroke: rgba(228, 68, 28, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }',
       '.rdf-rev { position: relative; z-index: 1; will-change: clip-path; }',
       '.rdf-ch { transition: opacity .7s; }',
-      '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 3; }',
+      '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 6; }',
       '.rdf-code { position: absolute; left: 1.6rem; top: 1.3rem; right: 1rem; z-index: 2; pointer-events: none; font-size: .64rem; line-height: 1.6; letter-spacing: .04em; white-space: pre-wrap; word-break: break-all; text-transform: none; color: var(--rdf-grey); transition: opacity .25s; }',
       '.rdf-code .t { color: var(--rdf-fg); } .rdf-code .k { color: var(--rdf-key); } .rdf-code .s { color: var(--rdf-str); }',
       '.rdf-code .cur { display: inline-block; width: .55em; height: 1.05em; margin-left: .1em; vertical-align: -.15em; background: var(--rdf-brand); animation: rdf-blink 1s steps(1) infinite; }',
@@ -6051,7 +6053,7 @@
     }
     var html =
       '<div class="rdf-in">' +
-        '<div class="rdf-ruler" aria-hidden="true"><span data-rdf-width></span></div>' +
+        '<div class="rdf-ruler" aria-hidden="true"><svg><path></path><path></path></svg><span data-rdf-width></span></div>' +
         '<div class="rdf-grid">' +
           '<a class="rdf-cell rdf-logo" href="' + (prefix || '/') + '" aria-label="Rimbo Designs, home" data-code="' + escA('<a class="ft_logo" href="/"><svg viewBox="0 0 72 26">…</svg></a>') + '">' +
             '<span class="rdf-logo-art" data-own><canvas aria-hidden="true"></canvas></span></a>' +
@@ -6290,18 +6292,37 @@
     var guideWrap = document.createElement('div'); guideWrap.className = 'rdf-lines'; guideWrap.setAttribute('aria-hidden', 'true');
     inner.insertBefore(guideWrap, inner.firstChild);
     var vs = [], hs = [], last = -1;
+    var ruler = qs('.rdf-ruler', foot), rulerLabel = qs('[data-rdf-width]', foot), rulerOn = false, rulerTimer = 0;
+    // where an element sits inside root, read from the page's layout and not from the screen: on the cube the footer gets its
+    // first measure while the page is turned on its side, which put every guide line tens of thousands of pixels off the
+    // screen, and nothing measured again (Rimbo: the outlines were gone)
+    function boxIn(el, root) {
+      var x = 0, y = 0, n = el;
+      while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+      return { l: x, t: y, r: x + el.offsetWidth, b: y + el.offsetHeight, w: el.offsetWidth, h: el.offsetHeight };
+    }
+    // the ruler reads the grid: a long tick on every column, so every guide line stands on one at any screen width
+    function drawRuler(xs) {
+      var left = boxIn(ruler, inner).l, h = ruler.offsetHeight, col = (ruler.offsetWidth - 1) / 12, per = Math.max(2, Math.round(col / 10));
+      var tick = function (x, len) { return 'M' + (x + 0.5) + ' ' + h + 'v-' + len; }, small = '', big = '';
+      for (var c = 0; c <= 12; c++) {
+        var at = Math.round(c * col), guide = xs.filter(function (x) { return Math.abs(x - left - at) < 3; })[0];
+        big += tick(guide === undefined ? at : guide - left, 12);
+        for (var m = 1; c < 12 && m < per; m++) small += tick(Math.round((c + m / per) * col), 6);
+      }
+      var paths = qsa('path', ruler);
+      paths[0].setAttribute('d', small); paths[1].setAttribute('d', big);
+    }
     function layout() {
-      var ir = inner.getBoundingClientRect(), xs = [], ys = [];
+      var xs = [], ys = [];
       var addU = function (arr, val) { val = Math.round(val); if (!arr.some(function (a) { return Math.abs(a - val) < 3; })) arr.push(val); };
       qsa('.rdf-cell, .rdf-base, .rdf-base-l, .rdf-soc', foot).forEach(function (el) {
-        var r = el.getBoundingClientRect();
-        addU(xs, r.left - ir.left); addU(xs, r.right - ir.left - 1); addU(ys, r.top - ir.top); addU(ys, r.bottom - ir.top - 1);
+        var r = boxIn(el, inner);
+        addU(xs, r.l); addU(xs, r.r - 1); addU(ys, r.t); addU(ys, r.b - 1);
       });
       guideWrap.textContent = ''; vs = []; hs = [];
       var W = inner.clientWidth, H = inner.clientHeight;
-      var rects = qsa('.rdf-cell, .rdf-base-l, .rdf-soc', foot).map(function (el) {
-        var r = el.getBoundingClientRect(); return { l: r.left - ir.left, r: r.right - ir.left, t: r.top - ir.top, b: r.bottom - ir.top };
-      });
+      var rects = qsa('.rdf-cell, .rdf-base-l, .rdf-soc', foot).map(function (el) { return boxIn(el, inner); });
       var segs = function (from, to, blocks) {
         var out = [[from, to]];
         blocks.forEach(function (bl) {
@@ -6328,9 +6349,9 @@
         });
       });
       boxes.forEach(function (b) {
-        var br = b.el.getBoundingClientRect();
-        b.at = b.kids.map(function (k) { var r = k.getBoundingClientRect(); return { x: r.left - br.left, y: r.top - br.top, w: r.width, h: r.height }; });
+        b.at = b.kids.map(function (k) { var r = boxIn(k, b.el); return { x: r.l, y: r.t, w: r.w, h: r.h }; });
       });
+      drawRuler(xs);
       last = -1;
     }
     var relayT = 0;
@@ -6345,7 +6366,6 @@
     layout();
 
     // ---- the ruler: the screen width scrambles in (digits only) once it has drawn, and again on a resize ----
-    var ruler = qs('.rdf-ruler', foot), rulerLabel = qs('[data-rdf-width]', foot), rulerOn = false, rulerTimer = 0;
     function sizeLabel(animate) {
       var t = window.innerWidth + ' PX';
       if (animate && scrambleOK) gsap.to(rulerLabel, { duration: 0.9, overwrite: true, scrambleText: { text: t, chars: '0123456789', speed: 0.6 } });
@@ -6384,7 +6404,7 @@
       logo.paint(p);
       vs.forEach(function (l, i) { l.style.clipPath = 'inset(0 0 ' + cut(smooth(0.02 + i * 0.03, 0.36 + i * 0.03, p)) + ' 0)'; });
       hs.forEach(function (l, i) { l.style.clipPath = 'inset(0 ' + cut(smooth(0.04 + i * 0.025, 0.38 + i * 0.025, p)) + ' 0 0)'; });
-      ruler.style.clipPath = 'inset(-1.5rem ' + cut(smooth(0.04, 0.3, p)) + ' 0 0)'; // -1.5rem: room for the width label above the ticks
+      ruler.style.clipPath = 'inset(-5rem ' + cut(smooth(0.04, 0.3, p)) + ' 0 0)'; // -5rem: room for the width label above the ticks
       if (p > 0.2 && !rulerOn) { rulerOn = true; rulerLabel.style.opacity = 1; sizeLabel(true); }
       else if (p < 0.05 && rulerOn) { rulerOn = false; rulerLabel.style.opacity = 0; if (window.gsap) gsap.killTweensOf(rulerLabel); rulerLabel.textContent = ''; }
       var settle = smooth(0.74, 0.88, p);
