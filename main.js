@@ -6479,10 +6479,12 @@
   // Wall of love (testimonials; lab: prototype/testimonials). Osmo's Centered Looping Slider with three things on top: the brand
   // balls move by themselves (the calculator's shader), the colour and corners swoon from face to face, and each card's fade and
   // corners read where the card really is, every frame, so they can't run ahead of it (Rimbo: the timed version "crashed").
-  // In the Designer: section.wall_section > [data-centered-slider="wrapper"] > .centered-slider-row > list > slides. To add a
-  // person, duplicate a slide: the row of faces and the arrows are built here from the slides. A slide with data-wall-open is a
-  // quote still to come: it shows on webflow.io only and never on the live site.
-  // Needs Draggable, InertiaPlugin and CustomEase in the page's head code, like the Osmo sliders on the hero.
+  // Everything you can see lives in the Designer: section.wall_section, the faces (.wall_faces, classes wall_face, wall_c), the
+  // cards, each card's .wall_fx (.wall_ball sets the ball's size, wall_cc-c are the corners) and the arrows. Corner rule: outer
+  // radius = the object's radius + the gap, so 4px photo + 4px gap = 8px corner. Knobs on the wrapper: data-wall-lift (how much the
+  // active face grows) and data-wall-gap (px between face and corners). A slide or face with data-wall-open is a quote still to
+  // come: it shows on webflow.io only, never on the live site. Pages whose copy has no faces or arrows yet get them built here, from
+  // the slides, with the same classes. What stays in code is only what moves.
   function rdWall() {
     var wrapper = qs('[data-centered-slider="wrapper"]');
     if (!wrapper) return;
@@ -6493,78 +6495,51 @@
 
     if (location.hostname.indexOf('webflow.io') === -1) qsa('[data-wall-open]', wrapper).forEach(function (s) { s.parentNode.removeChild(s); });
 
+    // only what the Designer can't hold: the moving parts
     var style = document.createElement('style');
     style.textContent = `
-      .wall_section { --ball: 5.75; --c: .75em; --cr: .5em; }
-      .wall_faces, .wall_arrows { display: flex; justify-content: center; align-items: center; padding: 0 1rem; }
-      .centered-slider-bullet__list { display: flex; flex-flow: row nowrap; justify-content: center; align-items: center; gap: 1.5em; position: relative; margin: 0; padding: 0; list-style: none; }
-      .centered-slider-bullet__item { font-size: 16px; } /* the site's li is 18px */
-      .centered-slider-bullet { display: block; position: relative; width: 2.5em; height: 2.5em; padding: 0; border: 0; border-radius: .25em; background: transparent; font: inherit; cursor: pointer; }
-      .centered-slider-bullet:focus { outline: none; }
-      .centered-slider-bullet img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: .25em; filter: grayscale(1); opacity: .6; transition: opacity .4s cubic-bezier(.625, .05, 0, 1); }
-      .centered-slider-bullet:hover img, .centered-slider-bullet:focus-visible img { opacity: 1; }
-      .centered-slider-bullet img.wall_col { position: absolute; inset: 0; filter: none; opacity: 1; clip-path: circle(0% at 50% 50%); }
-      .centered-slider-bullet.is--open span { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; font-family: var(--font--rm-mono), monospace; font-size: .875em; color: #a4a4a4; border: 1px dashed rgba(248, 245, 238, .22); border-radius: .25em; transition: color .4s cubic-bezier(.625, .05, 0, 1); }
-      .centered-slider-bullet.is--open:hover span, .centered-slider-bullet.is--open.active span { color: #f8f5ee; }
-      .wall_c { position: absolute; left: 0; top: 0; z-index: 3; width: var(--c); height: var(--c); pointer-events: none; }
-      .wall_c i { display: block; width: 100%; height: 100%; border: 0 solid var(--color--brand); }
-      .wall_c.is--tl i { border-width: 1px 0 0 1px; border-top-left-radius: var(--cr); }
-      .wall_c.is--tr i { border-width: 1px 1px 0 0; border-top-right-radius: var(--cr); }
-      .wall_c.is--bl i { border-width: 0 0 1px 1px; border-bottom-left-radius: var(--cr); }
-      .wall_c.is--br i { border-width: 0 1px 1px 0; border-bottom-right-radius: var(--cr); }
-      .wall_cc { position: absolute; inset: -.5em; z-index: 2; pointer-events: none; opacity: var(--k, 0); --out: calc((1 - var(--k, 0)) * 1em); }
-      .wall_cc b { position: absolute; width: 1.25em; height: 1.25em; border: 0 solid var(--color--brand); }
-      .wall_cc b:nth-child(1) { left: 0; top: 0; border-width: 1.5px 0 0 1.5px; border-top-left-radius: .75em; transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
-      .wall_cc b:nth-child(2) { right: 0; top: 0; border-width: 1.5px 1.5px 0 0; border-top-right-radius: .75em; transform: translate(var(--out), calc(var(--out) * -1)); }
-      .wall_cc b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 1.5px 1.5px; border-bottom-left-radius: .75em; transform: translate(calc(var(--out) * -1), var(--out)); }
-      .wall_cc b:nth-child(4) { right: 0; bottom: 0; border-width: 0 1.5px 1.5px 0; border-bottom-right-radius: .75em; transform: translate(var(--out), var(--out)); }
-      .wall_ball { position: absolute; right: 0; bottom: 0; width: calc(var(--ball) * 1em + 12px); height: calc(var(--ball) * 1em + 12px); overflow: hidden; border-bottom-right-radius: .25em; pointer-events: none; }
+      .wall_col { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; clip-path: circle(0% at 50% 50%); }
       .wall_ball canvas { display: block; width: 100%; height: 100%; }
-      .centered-slider-slide__inner > :not(.wall_ball):not(.wall_cc) { position: relative; z-index: 1; }
-      .centered-slider-buttons { display: flex; gap: .5em; justify-content: center; align-items: center; }
-      .centered-slider-button { display: flex; justify-content: center; align-items: center; width: 3em; height: 3em; padding: 0; font: inherit; color: inherit; cursor: pointer; background-color: transparent; border: 1px solid rgba(248, 245, 238, .22); border-radius: .3em; transition: border-color .3s, background-color .3s, color .3s; }
-      .centered-slider-button:hover { background-color: #f8f5ee; border-color: #f8f5ee; color: #0c0c0c; }
-      .centered-slider-button:focus-visible { outline: 1px solid var(--color--brand); outline-offset: 2px; }
-      .centered-slider-button.is--prev { transform: rotate(-180deg); }
-      .slider-button-arrow { width: 1.25em; }
-      @media screen and (max-width: 767px) {
-        .wall_section { --c: .5em; --cr: .35em; }
-        .wall_faces { display: block; }
-        .centered-slider-bullet__list { gap: clamp(.5em, 2.4vw, 1.25em); }
-        .centered-slider-bullet__item { flex: 1 1 0; min-width: 0; max-width: 2.5em; }
-        .centered-slider-bullet { width: 100%; height: auto; aspect-ratio: 1; }
-      }
-      @media screen and (max-width: 479px) { .wall_section { --ball: 4.75; } }
-      @media (prefers-reduced-motion: reduce) { .centered-slider-bullet img { transition: none; } }
+      .wall_cc { opacity: var(--k, 0); --out: calc((1 - var(--k, 0)) * 16px); }
+      .wall_cc-c.is--tl { transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
+      .wall_cc-c.is--tr { transform: translate(var(--out), calc(var(--out) * -1)); }
+      .wall_cc-c.is--bl { transform: translate(calc(var(--out) * -1), var(--out)); }
+      .wall_cc-c.is--br { transform: translate(var(--out), var(--out)); }
+      .centered-slider-bullet.active .wall_face-open { color: #f8f5ee; }
+      .centered-slider-bullet:focus-visible, .centered-slider-button:focus-visible { outline: 1px solid var(--color--brand); outline-offset: 2px; }
     `;
-    rdHead(style);
+    document.head.appendChild(style);
 
-    // the faces and the arrows, built from the slides
-    var faces = document.createElement('div'), ul = document.createElement('ul');
-    faces.className = 'wall_faces'; ul.className = 'centered-slider-bullet__list'; ul.setAttribute('role', 'tablist');
-    qsa('[data-centered-slider="slide"]', wrapper).forEach(function (slide) {
-      var li = document.createElement('li'), btn = document.createElement('button'), photo = qs('img', slide), who = qs('.slide-demo__eyebrow', slide), name = who ? who.textContent.trim() : '';
-      li.className = 'centered-slider-bullet__item'; li.setAttribute('role', 'presentation'); // a tablist holds tabs, not list items
-      btn.type = 'button'; btn.className = 'centered-slider-bullet'; btn.setAttribute('role', 'tab'); btn.setAttribute('aria-label', name);
-      btn.setAttribute('data-centered-slider', 'bullet');
-      if (photo) {
-        var img = document.createElement('img');
-        img.src = photo.currentSrc || photo.src; img.alt = ''; img.draggable = false;
-        btn.appendChild(img);
-      } else {
-        var mark = document.createElement('span');
-        mark.textContent = name.charAt(0); mark.setAttribute('aria-hidden', 'true');
-        btn.classList.add('is--open'); btn.appendChild(mark);
-      }
-      li.appendChild(btn); ul.appendChild(li);
+    function el(cls, html) { var d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
+    // a copy of the wall without faces or arrows in the Designer: built from its slides, with the Designer's classes
+    if (!qs('.wall_faces', wrapper)) {
+      var faces = el('wall_faces'), facesIn = el('wall_faces-in'), ul = document.createElement('ul');
+      ul.className = 'centered-slider-bullet__list'; ul.setAttribute('role', 'tablist');
+      qsa('[data-centered-slider="slide"]', wrapper).forEach(function (slide) {
+        var li = document.createElement('li'), btn = el('centered-slider-bullet'), photo = qs('img', slide), who = qs('.slide-demo__eyebrow', slide), name = who ? who.textContent.trim() : '';
+        li.className = 'centered-slider-bullet__item';
+        btn.setAttribute('role', 'tab'); btn.setAttribute('tabindex', '0'); btn.setAttribute('aria-label', name); btn.setAttribute('data-centered-slider', 'bullet');
+        if (photo) {
+          var img = document.createElement('img');
+          img.className = 'wall_face'; img.src = photo.currentSrc || photo.src; img.alt = ''; img.draggable = false;
+          btn.appendChild(img);
+        } else btn.appendChild(el('wall_face-open', name.charAt(0)));
+        li.appendChild(btn); ul.appendChild(li);
+      });
+      facesIn.appendChild(ul); faces.appendChild(facesIn);
+      wrapper.insertBefore(faces, wrapper.firstChild);
+    }
+    if (!qs('.wall_arrows', wrapper)) {
+      var arrow = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="slider-button-arrow"><path d="M14 19L21 12L14 5" stroke="currentColor" stroke-miterlimit="10"></path><path d="M21 12H2" stroke="currentColor" stroke-miterlimit="10"></path></svg>';
+      wrapper.appendChild(el('wall_arrows', '<div class="centered-slider-buttons"><div role="button" tabindex="0" aria-label="previous slide" data-centered-slider="prev-button" class="centered-slider-button is--prev">' + arrow + '</div><div role="button" tabindex="0" aria-label="next slide" data-centered-slider="next-button" class="centered-slider-button">' + arrow + '</div></div>'));
+    }
+    qsa('.centered-slider-slide__inner', wrapper).forEach(function (card) {
+      if (!qs('.wall_fx', card)) card.appendChild(el('wall_fx', '<div class="wall_ball"></div><div class="wall_cc"><div class="wall_cc-c is--tl"></div><div class="wall_cc-c is--tr"></div><div class="wall_cc-c is--bl"></div><div class="wall_cc-c is--br"></div></div>'));
     });
-    faces.appendChild(ul);
-    wrapper.insertBefore(faces, wrapper.firstChild);
-    var arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24" fill="none" class="slider-button-arrow"><path d="M14 19L21 12L14 5" stroke="currentColor" stroke-miterlimit="10"></path><path d="M21 12H2" stroke="currentColor" stroke-miterlimit="10"></path></svg>';
-    var arrows = document.createElement('div');
-    arrows.className = 'wall_arrows';
-    arrows.innerHTML = '<div class="centered-slider-buttons"><button type="button" aria-label="previous slide" data-centered-slider="prev-button" class="centered-slider-button is--prev">' + arrow + '</button><button type="button" aria-label="next slide" data-centered-slider="next-button" class="centered-slider-button">' + arrow + '</button></div>';
-    wrapper.appendChild(arrows);
+    // the bullets and arrows are plain blocks in the Designer: they answer the keyboard here
+    qsa('[data-centered-slider="bullet"], [data-centered-slider="prev-button"], [data-centered-slider="next-button"]', wrapper).forEach(function (b) {
+      b.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); } });
+    });
 
     /* ---------- Osmo's slider, as it comes, but for the card ease ---------- */
     function initSliders() {
@@ -6989,9 +6964,9 @@
 
     /* ---------- corners ---------- */
     function Corners(host) {
-      var els = ['tl', 'tr', 'bl', 'br'].map(function (k) {
-        var c = document.createElement('div'), i = document.createElement('i');
-        c.className = 'wall_c is--' + k; c.setAttribute('aria-hidden', 'true'); c.appendChild(i); host.appendChild(c);
+      var els = qsa('.wall_c', host);
+      if (els.length !== 4) els = ['tl', 'tr', 'bl', 'br'].map(function (k) {
+        var c = el('wall_c is--' + k); c.setAttribute('aria-hidden', 'true'); host.appendChild(c);
         return c;
       });
       function spots(r) {   // where each corner sits for a box {l, t, r, b}
@@ -7009,22 +6984,28 @@
     }
 
     /* ---------- faces ---------- */
-    var list = document.querySelector('.centered-slider-bullet__list');
-    var row = document.querySelector('.centered-slider-row');
-    var bullets = Array.prototype.slice.call(list.querySelectorAll('[data-centered-slider="bullet"]'));
-    var cols = bullets.map(function (b) {
-      var img = b.querySelector('img');
+    var list = qs('.centered-slider-bullet__list', wrapper), host = qs('.wall_faces-in', wrapper);
+    var row = qs('.centered-slider-row', wrapper);
+    var bullets = qsa('[data-centered-slider="bullet"]', wrapper);
+    var LIFT = parseFloat(wrapper.getAttribute('data-wall-lift')) || 1.15, GAP = parseFloat(wrapper.getAttribute('data-wall-gap'));
+    if (isNaN(GAP)) GAP = 4;
+    var photos = bullets.map(function (b) { return qs('.wall_face', b); });
+    var round = photos.filter(Boolean).length ? parseFloat(getComputedStyle(photos.filter(Boolean)[0]).borderTopLeftRadius) || 0 : 0;
+    var cols = photos.map(function (img) {
       if (!img) return null;
-      var c = img.cloneNode(); c.alt = ''; c.className = 'wall_col'; b.appendChild(c);
+      var c = img.cloneNode(); c.alt = ''; c.className = 'wall_col'; c.removeAttribute('srcset'); c.src = img.currentSrc || img.src; c.style.borderRadius = round + 'px';
+      img.parentNode.appendChild(c);
       return c;
     });
-    var LIFT = 1.16;
-    var marker = new Corners(list);
+    // the active face grows, so its rounding is drawn smaller: on screen it stays exactly the Designer's value
+    function rounding(i) { return [photos[i], cols[i]].filter(Boolean); }
+    var marker = new Corners(host);
 
+    function lift(i) { return -Math.round(bullets[i].offsetWidth * .07); }
     function faceBox(i) {
-      var li = bullets[i].parentNode, w = bullets[i].offsetWidth, pad = w * .12, half = w * LIFT / 2 + pad;
-      var x = li.offsetLeft + w / 2, y = li.offsetTop + bullets[i].offsetHeight / 2 - w * .07;
-      return { l: x - half, t: y - half, r: x + half, b: y + half };
+      var li = bullets[i].parentNode, w = bullets[i].offsetWidth, h = bullets[i].offsetHeight, size = Math.round(w * LIFT + GAP * 2);
+      var l = Math.round(li.offsetLeft + w / 2 - size / 2), t = Math.round(li.offsetTop + h / 2 + lift(i) - size / 2);
+      return { l: l, t: t, r: l + size, b: t + size };
     }
 
     var current = -1, ready = performance.now() + 400, lockUntil = 0;
@@ -7032,10 +7013,10 @@
       if (i === current) return;
       var from = current, dir = i > from ? 1 : -1;
       current = i;
-      var up = { scale: LIFT, y: -bullets[i].offsetWidth * .07 }, wide = 'circle(150% at 50% 50%)';
+      var up = { scale: LIFT, y: lift(i) }, wide = 'circle(150% at 50% 50%)', small = round / LIFT + 'px', full = round + 'px';
       if (instant || calm) {
-        if (from > -1) { gsap.set(bullets[from], { scale: 1, y: 0 }); if (cols[from]) gsap.set(cols[from], { clipPath: 'circle(0% at 50% 50%)' }); }
-        gsap.set(bullets[i], up); if (cols[i]) gsap.set(cols[i], { clipPath: wide });
+        if (from > -1) { gsap.set(bullets[from], { scale: 1, y: 0 }); if (cols[from]) gsap.set(cols[from], { clipPath: 'circle(0% at 50% 50%)' }); if (rounding(from).length) gsap.set(rounding(from), { borderRadius: full }); }
+        gsap.set(bullets[i], up); if (cols[i]) gsap.set(cols[i], { clipPath: wide }); if (rounding(i).length) gsap.set(rounding(i), { borderRadius: small });
         marker.set(faceBox(i));
         return;
       }
@@ -7046,6 +7027,8 @@
       // in: it arrives from the old face's side, a beat later, the photo rises to meet it
       gsap.fromTo(bullets[i], { scale: .92 }, { scale: LIFT, y: up.y, duration: .85, delay: .1, ease: 'back.out(2.2)', overwrite: true });
       if (cols[i]) gsap.fromTo(cols[i], { clipPath: 'circle(0% at ' + enter + ' 50%)' }, { clipPath: 'circle(150% at ' + enter + ' 50%)', duration: .8, delay: .16, ease: 'power2.out', overwrite: true });
+      if (from > -1 && rounding(from).length) gsap.to(rounding(from), { borderRadius: full, duration: .7, ease: EASE });
+      if (rounding(i).length) gsap.to(rounding(i), { borderRadius: small, duration: .85, delay: .1, ease: EASE });
       marker.travel(faceBox(i), dir);
       if (balls[i]) balls[i].stir = 1;
     }
@@ -7066,15 +7049,13 @@
     var FLOW = 1;   // the calculator's pace
     // [px past the right edge, px past the bottom edge, seed, colour bias]: each ball its own crop and mix
     var SPOTS = [[6, 10, 14, -.08], [2, 14, 5, -.06], [0, 8, 23, -.1], [8, 6, 2, -.08], [4, 12, 31, -.06], [10, 10, 6, -.1], [2, 6, 19, -.08], [6, 14, 41, -.06], [0, 12, 7, -.1]];
-    balls = Array.prototype.map.call(document.querySelectorAll('.centered-slider-slide__inner'), function (card, i) {
-      var w = document.createElement('div'), c = document.createElement('canvas'), s = SPOTS[i % SPOTS.length];
-      w.className = 'wall_ball'; w.setAttribute('aria-hidden', 'true'); w.appendChild(c); card.insertBefore(w, card.firstChild);
-      var cc = document.createElement('div');
-      cc.className = 'wall_cc'; cc.setAttribute('aria-hidden', 'true'); cc.innerHTML = '<b></b><b></b><b></b><b></b>'; card.appendChild(cc);
+    balls = Array.prototype.map.call(qsa('.centered-slider-slide__inner', wrapper), function (card, i) {
+      var c = document.createElement('canvas'), s = SPOTS[i % SPOTS.length];
+      qs('.wall_ball', card).appendChild(c);
       return { canvas: c, card: card, slide: card.parentNode, dx: s[0], dy: s[1], seed: s[2], bias: s[3], t: i * 11, float: i * 2.3, stir: 0, amt: 0, want: 0, px: 0, py: 0, tx: 0, ty: 0, s: 0, r: 0 };
     });
     function measure(b) {
-      b.s = b.canvas.getBoundingClientRect().width;
+      b.s = b.canvas.getBoundingClientRect().width;  // .wall_ball's size in the Designer sets the ball
       b.r = b.s - 12;     // the box leaves room for the ball to float
       b.cx = b.s + b.dx; b.cy = b.s + b.dy;
     }
