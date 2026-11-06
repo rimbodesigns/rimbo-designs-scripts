@@ -346,11 +346,14 @@
     initBeforeEnterFunctions(next, doc);
     if (window.lenis) window.lenis.resize();
     if (hasScrollTrigger) ScrollTrigger.refresh();
+    // while both pages are on screen each keeps its classes on its own face: on <html> the post CSS would reach the other page too
     var nextClasses = PAGE_HTML_CLASSES.filter(function (name) { return root.classList.contains(name); });
-    if (old) old.htmlClasses.forEach(function (name) { root.classList.add(name); });
+    root.classList.remove.apply(root.classList, PAGE_HTML_CLASSES);
+    nextClasses.forEach(function (name) { next.classList.add(name); });
+    if (old) old.htmlClasses.forEach(function (name) { current.classList.add(name); });
     parent.insertBefore(current, sibling);
     playVideos(oldVideos);
-    return { old: old, stale: stale, nextClasses: nextClasses, nextVideos: playingVideos(next), scrollY: scrollY };
+    return { old: old, stale: stale, next: next, nextClasses: nextClasses, nextVideos: playingVideos(next), scrollY: scrollY };
   }
 
   // The cube has landed: the old page and its CSS go
@@ -358,7 +361,10 @@
     started.stale.forEach(function (el) { el.remove(); });
     closePage(started.old);
     var root = document.documentElement;
-    PAGE_HTML_CLASSES.forEach(function (name) { root.classList.toggle(name, started.nextClasses.indexOf(name) > -1); });
+    PAGE_HTML_CLASSES.forEach(function (name) {
+      started.next.classList.remove(name);
+      root.classList.toggle(name, started.nextClasses.indexOf(name) > -1);
+    });
   }
 
   // A pinned section is fixed to the screen. On a cube face "the screen" becomes the page, so it moves down by the scroll
@@ -431,6 +437,7 @@
     gsap.registerPlugin(CustomEase);
     CustomEase.create('osmo', '0.625, 0.05, 0, 1');
     history.scrollRestoration = 'manual';
+    if (hasScrollTrigger) ScrollTrigger.clearScrollMemory('manual'); // or ScrollTrigger puts 'auto' back, and Back snaps the old page before it fades
 
     // Barba finds a page by attributes. Our pages don't carry them (40 pages to edit by hand, and every new one to
     // remember), so they are set here: on the page on screen now, and on every page Barba fetches
@@ -554,7 +561,9 @@
     scope.htmlClasses = PAGE_HTML_CLASSES.filter(function (name) { return document.documentElement.classList.contains(name); });
     document.documentElement.classList.remove.apply(document.documentElement.classList, PAGE_HTML_CLASSES);
     scope.styles.forEach(function (el) { el.removeAttribute('id'); }); // a new page checks by id whether its CSS is there: this copy is on its way out
-    qsa('[data-scroll-ruler-init]').forEach(function (el) { el.remove(); });
+    // the ruler fades off (its own is-out), out of the new page's way now and gone with the old page in closePage()
+    scope.rulers = qsa('[data-scroll-ruler-init]');
+    scope.rulers.forEach(function (el) { el.removeAttribute('data-scroll-ruler-init'); el.classList.add('is-out'); });
     qsa('.bold-nav-full__bar').forEach(function (el) { gsap.killTweensOf(el); gsap.set(el, { clearProps: 'opacity' }); }); // the band hides it during its opening
     return scope;
   }
@@ -563,6 +572,7 @@
   function closePage(scope) {
     if (!scope) return;
     scope.dead = true;
+    scope.rulers.forEach(function (el) { el.remove(); });
     scope.undo.forEach(function (fn) { try { fn(); } catch (err) { console.error('[rimbo-designs] cleanup:', err); } });
     scope.gsap.revert(); // also lets go of SplitText: its autoSplit would otherwise rebuild the old page's reveals on the next resize
     scope.triggers.forEach(function (trigger) { trigger.kill(); });
@@ -5648,7 +5658,11 @@
       }
     }
 
-    btn.addEventListener('click', function () { set(!isOpen); });
+    btn.addEventListener('click', function () {
+      // mid-transition both pages are in the document: the menu would read two sets of links, and the landing restarts the scroll behind it
+      if (!isOpen && window.barba && barba.transitions && barba.transitions.isRunning) return;
+      set(!isOpen);
+    });
     // A link in the menu was clicked: the page changes underneath, so it goes at once, without the swoosh
     rdNavFull.close = function () {
       if (!isOpen) return;
@@ -5675,16 +5689,16 @@
 
     // Barba: the page under the menu may have changed since it last opened
     function readPage() {
+      qsa('.nav a[hreflang]').forEach(function (a) { // each page knows its own address in the other language
+        var mine = qs('.bold-nav__lang a[hreflang="' + a.getAttribute('hreflang') + '"]', nav);
+        if (mine) mine.setAttribute('href', a.getAttribute('href'));
+      });
       var fresh = menuLinks();
       if (fresh === lis) return;
       lis = fresh;
       qs('.bold-nav-full__ul', nav).innerHTML = lis;
       links = qsa('.bold-nav-full__link', nav);
       gsap.set(links, { yPercent: 110, rotate: 4 });
-      qsa('.nav a[hreflang]').forEach(function (a) { // each page knows its own address in the other language
-        var mine = qs('.bold-nav__lang a[hreflang="' + a.getAttribute('hreflang') + '"]', nav);
-        if (mine) mine.setAttribute('href', a.getAttribute('href'));
-      });
     }
 
     rdOn(document, 'keydown', function (e) { if (e.key === 'Escape' && isOpen) set(false); });
