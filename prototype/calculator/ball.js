@@ -41,7 +41,7 @@
   // The brand's shader for one ball, with a see-through outside so the page and its grain show around it
   var FRAG = "#version 300 es\n" +
     "precision highp float;\n" +
-    "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
+    "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float grainT; uniform float t;\n" +
     "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
     "out vec4 outColor;\n" +
     "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
@@ -61,7 +61,7 @@
     "  float r = length(l), aa = 1.2 / R;\n" +
     "  if (r > 1.0 + aa) { outColor = vec4(0.0); return; }\n" +
     "  vec2 gp = floor(p / grainScale);\n" +
-    "  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
+    "  float g1 = hash(gp + seed + grainT), g2 = noise(gp * 0.9 + seed * 3.0 + grainT);\n" +
     "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n" +
     "  float h = hash(vec2(seed));\n" +
     "  float ang = h * 6.2831 + t * 0.16;\n" + // the colours turn around inside the ball, wherever it's cropped
@@ -88,7 +88,7 @@
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   var U = {};
-  ["res", "center", "R", "seed", "bias", "heat", "grainScale", "t", "ptr", "ptrR", "ptrAmt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+  ["res", "center", "R", "seed", "bias", "heat", "grainScale", "grainT", "t", "ptr", "ptrR", "ptrAmt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
   gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ["E4441C", "E4566A", "4B7888", "DACCAE"].map(oklab))));
   gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
   gl.uniform1f(U.seed, 14);
@@ -129,6 +129,7 @@
     gl.uniform2f(U.res, cv.width, cv.height); gl.uniform2f(U.center, (B.cx + fx) * dpr, (B.cy + fy) * dpr);
     gl.uniform1f(U.R, Math.max(B.R * breath, 1) * dpr); gl.uniform1f(U.bias, B.bias); gl.uniform1f(U.heat, B.heat);
     gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, time);
+    gl.uniform1f(U.grainT, reduce ? 0 : Math.floor(float * 11) % 64 * 1.7); // the grain flickers like film, 11 frames a second
     gl.uniform2f(U.ptr, P.x * dpr, P.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(B.R * .4, 80), 200) * dpr); gl.uniform1f(U.ptrAmt, P.amt);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 3);

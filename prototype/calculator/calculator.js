@@ -59,17 +59,16 @@
       views: [["public", "Public"], ["make", "Your view"], ["client", "Client view"]]
     },
 
-    // No fixed build fee (2026-11-05): strategy, design system, QA and launch grow with the project,
+    // No fixed build fee (2026-11-05): design system, QA and launch grow with the project,
     // so they sit inside the page prices (the old €2,000 base, spread over the pages, then trimmed to €400 / €800 / €2,000). The minimum
     // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
     priorityPct: 0.25,       // priority start: jump the queue
     totalLabel: { below: "Your project", reached: "Your project" }, // the number starts at €0; the bar shows the minimum
     included: {
-      line: "Every price includes strategy, the design system, QA and launch.",
+      line: "Every price includes the design system, QA and launch.",
       title: "Included in every price",
-      text: "Getting to know your brand, and the strategy behind the site.\n" +
-        "A design system: colours, type, spacing and components, so every page fits and new ones are quick to add.\n" +
+      text: "A design system: colours, type, spacing and components, so every page fits and new ones are quick to add.\n" +
         "Navigation, footer and the motion that runs through the whole site.\n" +
         "QA on every page: checked on phone, tablet and desktop, in Chrome, Safari, Firefox and Edge.\n" +
         "Launch: domain, forms and a final speed check."
@@ -91,7 +90,10 @@
     // Branding: one switch that opens the parts. Turning it on the first time selects the preset.
     brand: {
       label: "Branding",
-      info: "Getting to know your brand is part of every project. Switch this on if you also need the brand itself made, then pick the parts.",
+      info: "Switch this on if you also need the brand itself made, then pick the parts.",
+      // Every project starts here, even with an existing brand: on, greyed out, can't be switched off
+      foundation: { id: "foundation", label: "Brand foundation", price: 500, tag: "Every project",
+        info: "At least two calls, even if you already have a brand. Your mission and vision, where the website should go, and how much freedom I have to evolve the brand." },
       preset: ["logo", "colour", "type"],
       items: [
         { id: "logo",   label: "Logo",                  price: 500, info: "A logo and its versions (full, icon, one colour), ready for web and print." },
@@ -227,6 +229,7 @@
     // One line per section, so the card stays short however much is on (the switches already show what's picked)
     var out = [];
     function line(label, sum) { if (sum) out.push([label, sum]); }
+    line(CONFIG.brand.foundation.label, CONFIG.brand.foundation.price); // only here once something is picked: the page starts at €0
     line(CONFIG.brand.label, state.brandOn ? brandSum() : 0);
     line("Pages", CONFIG.pages.reduce(function (a, p) { return a + state.pages[p.id] * p.price; }, 0));
     CONFIG.groups.forEach(function (g) {
@@ -344,8 +347,22 @@
     return item;
   }
 
+  // The locked row: looks like a switch that's on, but it's no control, so it can't be focused or clicked
+  function makeFixed(t) {
+    var item = el("div", "calc_item"), row = el("div", "calc_item_row is-fixed"), label = el("span", "calc_fixed");
+    label.appendChild(el("span", "calc_switch")); label.appendChild(el("span", "calc_label", t.label));
+    row.appendChild(label);
+    row.appendChild(addInfo(t.id, t.label, t.info, row));
+    var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", t.tag));
+    row.appendChild(tag);
+    var price = el("span", "calc_price", eur(t.price)); row.appendChild(price);
+    item.appendChild(row);
+    return item;
+  }
+
   function buildBranding() {
     var B = CONFIG.brand, root = $("branding");
+    root.appendChild(makeFixed(B.foundation));
     var from = Math.min.apply(null, B.items.map(function (t) { return t.price; }));
     var parent = makeItem({ id: "brand", label: B.label, info: B.info }, "from " + eur(from), function () {
       state.brandOn = !state.brandOn;
@@ -451,7 +468,7 @@
     var had = Array.from(ul.children).map(function (li) { return li.firstChild.textContent; });
     var before = ul.hidden ? 0 : ul.offsetHeight;
     if (window.gsap) gsap.killTweensOf(ul);
-    ul.style.height = ""; ul.style.overflow = "";
+    FOLD.forEach(function (k) { ul.style[k] = ""; }); ul.style.overflow = ""; // also when this cuts a running reveal() short
     ul.innerHTML = "";
     var fresh = [];
     lines.forEach(function (x) {
@@ -658,7 +675,7 @@
   function scopeText(total) {
     var pages = CONFIG.pages.slice().reverse().filter(function (p) { return state.pages[p.id]; })
       .map(function (p) { return state.pages[p.id] + " " + p.id; });
-    var b = state.brandOn ? CONFIG.brand.items.filter(function (t) { return state.toggles[t.id]; }).map(function (t) { return t.label.toLowerCase(); }) : [];
+    var b = [CONFIG.brand.foundation.label.toLowerCase()].concat(state.brandOn ? CONFIG.brand.items.filter(function (t) { return state.toggles[t.id]; }).map(function (t) { return t.label.toLowerCase(); }) : []);
     var tg = CONFIG.toggles.filter(function (t) { return state.toggles[t.id]; })
       .map(function (t) { return t.label + (t.hourly ? " (" + levelOf(t).label.toLowerCase() + ")" : ""); });
     return "Pages: " + (pages.join(", ") || "none") + "\n" +
