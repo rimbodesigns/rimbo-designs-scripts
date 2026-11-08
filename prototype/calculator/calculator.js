@@ -50,7 +50,8 @@
       reset: "Back to my recommendation",
       clientCta: "Email me your version",
       clientCtaAlt: "Opens your email",
-      clientCopy: "Or copy the link",
+      clientCopy: "Copy the link",
+      clientCopyAlt: "Paste it in your reply",
       clientDone: "Link copied. Paste it in your reply to me.",
       emailSubject: "{name}: my version",
       emailBody: "Hi Rimbo,\n\nHere's my version of the scope:\n{link}\n",
@@ -119,15 +120,15 @@
     // Everything else, in groups after Branding and Pages (numbered 03, 04, …).
     // Within a group: ranked by how often it is needed (the big builds last).
     groups: [
-      { id: "search", legend: "Search and analytics" },
       { id: "motion", legend: "Motion and feel" },
-      { id: "more",   legend: "Add what you need", line: "Extras" }
+      { id: "more",   legend: "Add what you need", line: "Extras" },
+      { id: "search", legend: "Search and analytics" }
     ],
     // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250, transitions
     // to €900, automations €500 (Rimbo, 2026-11-05)
     toggles: [
       { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site. Search and AI search are the same work, so they come together." },
-      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. Privacy-friendly by default. With Google Analytics you also need cookie consent." },
+      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  brings: "consent", info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. It needs cookie consent, so that switches on with it. Or skip this and use Webflow Analyze, from about €10 a month." },
       { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks. In the look of your site." },
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
         info: "So you can write and publish pages and posts that get found. What you get:\nA recorded tutorial you can watch again.\nA one-on-one call about your own site.\nA checklist template for every new page or post." },
@@ -240,9 +241,9 @@
     // One line per section, so the card stays short however much is on (the switches already show what's picked)
     var out = [];
     function line(label, sum) { if (sum) out.push([label, sum]); }
-    line(CONFIG.brand.foundation.label, CONFIG.brand.foundation.price); // only here once something is picked: the page starts at €0
-    line(CONFIG.brand.label, state.brandOn ? brandSum() : 0);
-    line("Pages", CONFIG.pages.reduce(function (a, p) { return a + state.pages[p.id] * p.price; }, 0));
+    // Branding includes the foundation; this only runs once something is picked, so the page still starts at €0
+    line(CONFIG.brand.label, CONFIG.brand.foundation.price + (state.brandOn ? brandSum() : 0));
+    line("Website", CONFIG.pages.reduce(function (a, p) { return a + state.pages[p.id] * p.price; }, 0));
     CONFIG.groups.forEach(function (g) {
       line(g.line || g.legend, CONFIG.toggles.reduce(function (a, t) { return a + (t.group === g.id && !t.pct && state.toggles[t.id] ? priceOf(t) : 0); }, 0));
     });
@@ -412,7 +413,11 @@
       box.appendChild(list);
       CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
         var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
-        list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
+        list.appendChild(makeItem(t, priceText, function () {
+          state.toggles[t.id] = !state.toggles[t.id];
+          if (state.toggles[t.id] && t.brings) state.toggles[t.brings] = true; // analytics needs cookie consent: separate rows, on together
+          render();
+        }));
         if (t.hourly) list.appendChild(makeHours(t));
       });
       root.appendChild(box);
@@ -627,7 +632,7 @@
       setBtn(cta, C.clientCta, C.clientCtaAlt);
       markRecommended(share.r);
       $("reset").textContent = C.reset;
-      $("copy-link").textContent = C.clientCopy; $("copy-link").hidden = false;
+      setBtn($("copy-link"), C.clientCopy, C.clientCopyAlt); $("copy-link").hidden = false;
       $("reset").addEventListener("click", function () { applySnap(share.r); render(); });
     }
 

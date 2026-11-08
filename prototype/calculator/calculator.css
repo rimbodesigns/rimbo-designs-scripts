@@ -178,12 +178,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--accent); color: var(--on-accent); box-shadow: 0 0 1.2rem var(--glow); cursor: pointer; text-decoration: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   font: 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; transition: box-shadow .6s cubic-bezier(.16, 1, .3, 1); }
 .btn.is-hover { z-index: 1; box-shadow: 0 0 2.2rem var(--glow-on), 0 0 .6rem var(--glow-on); }
+/* The ghost one: same button, no fill */
+.btn.is-secondary { background: transparent; border-color: var(--field-line); color: var(--text); box-shadow: none; transition: border-color .35s; }
+.btn.is-secondary.is-hover { border-color: var(--text); box-shadow: none; }
+#copy-link { margin-top: 8px; }
 .btn_in { display: inline-flex; max-width: 100%; }
 .btn_swap { position: relative; display: inline-block; overflow: hidden; }
 .btn_line { display: flex; align-items: center; justify-content: center; gap: .7em; padding: .15em 0; }
 .btn_line.is-alt { position: absolute; inset: 0; }
 .btn_arrow { display: inline-block; }
 .calc_cta { display: flex; width: 100%; }
+.calc_cta[hidden] { display: none; }
 .calc_cta .btn_in, .calc_cta .btn_swap { width: 100%; }
 .calc_fine { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
 /* What every price includes: one line with its (i), above the button */
