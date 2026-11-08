@@ -46,6 +46,7 @@
       clientEyebrow: "Scoped by Rimbo",
       clientLede: "This is what I'd build for you. Switch things on or off and the price follows.",
       recommended: "Recommended",
+      optional: "Optional",
       reset: "Back to my recommendation",
       clientCta: "Email me your version",
       clientCtaAlt: "Opens your email",
@@ -102,7 +103,7 @@
       preset: ["identity", "logo"],
       items: [
         // Colour and type aren't sold apart: picking colours isn't the work, finding the visual language is (Rimbo, 2026-11-08)
-        { id: "identity", label: "Brand identity system", hint: "Stylescapes and rounds on colour, type and style", price: 1200,
+        { id: "identity", label: "Brand identity", price: 1200,
           info: "The whole visual language of your brand, not just some colours and fonts.\n" +
             "01::Stylescapes::Three directions side by side: A, B and C.\n" +
             "02::Rounds::We take the best one through a few rounds of colour, typography and style.\n" +
@@ -354,10 +355,7 @@
     var sw = el("button", "calc_toggle");
     sw.type = "button"; sw.setAttribute("role", "switch"); sw.dataset.id = t.id;
     sw.appendChild(el("span", "calc_switch"));
-    var text = el("span", "calc_stack");
-    text.appendChild(el("span", "calc_label", t.label));
-    if (t.hint) text.appendChild(el("span", "calc_hint", t.hint));
-    sw.appendChild(text);
+    sw.appendChild(el("span", "calc_label", t.label));
     sw.addEventListener("click", onToggle);
     var price = el("span", "calc_price", priceText); price.id = "price-" + t.id;
     sw.setAttribute("aria-describedby", price.id);
@@ -387,8 +385,7 @@
   function buildBranding() {
     var B = CONFIG.brand, root = $("branding");
     root.appendChild(makeFixed(B.foundation));
-    var from = Math.min.apply(null, B.items.map(function (t) { return t.price; }));
-    var parent = makeItem({ id: "brand", label: B.label, info: B.info }, "from " + eur(from), function () {
+    var parent = makeItem({ id: "brand", label: B.label, info: B.info }, "", function () {
       state.brandOn = !state.brandOn;
       if (state.brandOn && !state.brandTouched) { B.preset.forEach(function (id) { state.toggles[id] = true; }); state.brandTouched = true; }
       render();
@@ -519,8 +516,10 @@
     reveal($("brand-subs"), state.brandOn);
     var parentSwitch = document.querySelector('.calc_toggle[data-id="brand"]');
     parentSwitch.setAttribute("aria-expanded", String(state.brandOn));
-    $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum())
-      : "from " + eur(Math.min.apply(null, CONFIG.brand.items.map(function (t) { return t.price; })));
+    // Branding row: its total when on. Off it has no price yet: the parts open with the switch
+    var brandOff = mode !== "client" ? CONFIG.copy.recommended : share.r.b ? "" : CONFIG.copy.optional;
+    $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum()) : brandOff;
+    $("price-brand").classList.toggle("is-word", !state.brandOn);
 
     CONFIG.toggles.forEach(function (t) {
       if (!t.hourly) return;
@@ -529,6 +528,8 @@
       $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
       $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
     });
+
+    recTags.forEach(function (t) { t.el.hidden = t.on(); });
 
     var r = calc(), reached = r.scope >= CONFIG.minimum;
     $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
@@ -676,19 +677,25 @@
     $("made-link").addEventListener("focus", function () { this.select(); });
   }
 
-  // The lead's view: Rimbo's pick is marked on each item
+  // The lead's view: what's switched on when the page opens is Rimbo's pick, so nothing needs a label.
+  // A dim "Recommended" only appears on something of his that they've switched off or changed.
+  var recTags = [];
   function markRecommended(r) {
     var C = CONFIG.copy;
     CONFIG.pages.forEach(function (p, i) {
       var n = Math.round(+r.p[i]) || 0;
-      if (n) $("n-" + p.id).closest(".calc_row").querySelector(".calc_hint").appendChild(el("span", "calc_rec_hint", " · " + C.recommended.toLowerCase() + ": " + n));
+      if (!n) return;
+      var tag = el("span", "calc_rec_hint", " · " + C.recommended.toLowerCase() + ": " + n);
+      $("n-" + p.id).closest(".calc_row").querySelector(".calc_hint").appendChild(tag);
+      recTags.push({ el: tag, on: function () { return state.pages[p.id] === n; } });
     });
     var on = (r.t || []).filter(function (id) { return byId[id] && (r.b || !isBrandPart(id)); });
     if (r.b) on.push("brand");
     on.forEach(function (id) {
       var price = $("price-" + id); if (!price) return;
-      var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", C.recommended));
+      var tag = el("span", "calc_rec", C.recommended);
       price.parentNode.insertBefore(tag, price);
+      recTags.push({ el: tag, on: function () { return id === "brand" ? state.brandOn : !!state.toggles[id]; } });
     });
   }
 

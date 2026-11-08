@@ -37,7 +37,7 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 
 .calc { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
 .calc_eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
-.calc_eyebrow::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--on); }
+.calc_eyebrow::before { content: ""; flex: none; width: 6px; height: 6px; background: var(--on); }
 .calc_title { margin: 0 0 12px; font: 900 clamp(2rem, 5vw, 3.4rem)/.95 var(--head); text-transform: uppercase; }
 .calc_lede { margin: 0 0 40px; max-width: 42ch; color: var(--muted); }
 
@@ -46,7 +46,6 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_step legend { padding: 0 8px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .calc_num { margin-right: .5em; color: var(--on-text); }
 .calc_label { font-size: 15px; }
-.calc_stack { display: block; min-width: 0; }
 .calc_hint { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; color: var(--muted); }
 
 /* One item = its row + its info box; the line sits under the item */
@@ -94,7 +93,6 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_fixed { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 12px 0; color: var(--text); }
 .calc_tick { flex: none; display: flex; align-items: center; width: 38px; height: 22px; color: var(--on-text); }
 .calc_item_row.is-fixed { cursor: default; }
-.calc_item_row.is-fixed .calc_rec::before { display: none; }
 
 /* Branding: the parts sit close under the one switch, a little smaller, on a thin line */
 .calc_subs { margin: 0 0 10px 18px; padding-left: 14px; border-left: 1px solid var(--line); }
@@ -236,11 +234,12 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 .calc_reset:hover { color: var(--muted); }
 .calc_reset[hidden] { display: none; }
 /* Lead view: Rimbo's pick */
-.calc_rec { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 12px; flex: none;
-  font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.calc_rec::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--on); }
-.calc_rec + .calc_price { margin-left: 0; }
-.calc_rec_hint { color: var(--text); }
+.calc_rec { margin-left: auto; padding-left: 12px; flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
+.calc_rec[hidden] { display: none; }
+.calc_rec:not([hidden]) + .calc_price { margin-left: 0; }
+.calc_rec_hint[hidden] { display: none; }
+.calc_price.is-word { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; }
+.calc_toggle[aria-checked="true"] ~ .calc_price.is-word { opacity: 1; }
 
 /* Apply step */
 .calc_apply { margin-top: 48px; padding: 28px 24px 28px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); scroll-margin-top: 24px; }
@@ -303,8 +302,8 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
   .calc_submit { width: 100%; }
   .calc_subs { margin-left: 10px; padding-left: 12px; }
 }
-/* Phone: the tag keeps its orange dot, the word goes */
+/* Phone: "Every project" goes, the tick says enough */
 @media (max-width: 560px) {
   .calc_lede { max-width: 15.5em; }
-  .calc_rec_word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .is-fixed .calc_rec_word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
