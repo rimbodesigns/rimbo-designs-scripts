@@ -89,10 +89,8 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_item_row { cursor: pointer; }
 .is-lit .calc_label { color: var(--text); }
 
-/* Brand foundation: part of every project, so a tick in the switch's place: nothing to choose */
-.calc_fixed { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 12px 0; color: var(--text); }
-.calc_tick { flex: none; display: flex; align-items: center; width: 38px; height: 22px; color: var(--on-text); }
-.calc_item_row.is-fixed { cursor: default; }
+/* Brand foundation: part of every project, so no switch: it starts flush left */
+.calc_item_row.is-fixed { cursor: default; min-height: 47px; }
 
 /* Branding: the parts sit close under the one switch, a little smaller, on a thin line */
 .calc_subs { margin: 0 0 10px 18px; padding-left: 14px; border-left: 1px solid var(--line); }
@@ -127,7 +125,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Frosted, so the ball shows through when it grows behind the card */
 .calc_result { padding: 28px 24px 24px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
 .calc_result .calc_eyebrow::before { display: none; }
-.calc_range { margin: 0 0 12px; font: 900 clamp(1.5rem, 3vw, 2rem)/1.25 var(--head); font-variant-numeric: tabular-nums; }
+/* The price, with EXCL. VAT quietly on the same line */
+.calc_price_row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.calc_vat { flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
+.calc_range { margin: 0; font: 900 clamp(1.5rem, 3vw, 2rem)/1.25 var(--head); font-variant-numeric: tabular-nums; }
 /* Under the minimum: how far the scope is towards it */
 .calc_meter { margin: -4px 0 16px; }
 .calc_meter[hidden] { display: none; }
@@ -147,8 +148,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_lines li span:last-child { color: var(--text); font: 13px/1.45 var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 
 /* Tip card under the price card, the same frosted card, joined to its item by the dashed line.
-   Sticky: on a short window it slides up over the price card instead of falling off the screen. */
-.calc_tip { position: sticky; bottom: 16px; z-index: 2; padding: 24px 24px 26px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
+   When it doesn't fit, the whole column moves up (fitSide in calculator.js). */
+.calc_tip { position: relative; padding: 24px 24px 26px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
 .calc_tip[hidden] { display: none; }
 .calc_tip.is-in { animation: calc-tip-in .28s ease-out; }
 @keyframes calc-tip-in { from { opacity: 0; } to { opacity: 1; } }
@@ -178,21 +179,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--accent); color: var(--on-accent); box-shadow: 0 0 1.2rem var(--glow); cursor: pointer; text-decoration: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   font: 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; transition: box-shadow .6s cubic-bezier(.16, 1, .3, 1); }
 .btn.is-hover { z-index: 1; box-shadow: 0 0 2.2rem var(--glow-on), 0 0 .6rem var(--glow-on); }
-/* The ghost one: same button, no fill */
-.btn.is-secondary { background: transparent; border-color: var(--field-line); color: var(--text); box-shadow: none; transition: border-color .35s; }
-.btn.is-secondary.is-hover { border-color: var(--text); box-shadow: none; }
-#copy-link { margin-top: 8px; }
 .btn_in { display: inline-flex; max-width: 100%; }
 .btn_swap { position: relative; display: inline-block; overflow: hidden; }
 .btn_line { display: flex; align-items: center; justify-content: center; gap: .7em; padding: .15em 0; }
 .btn_line.is-alt { position: absolute; inset: 0; }
 .btn_arrow { display: inline-block; }
 .calc_cta { display: flex; width: 100%; }
-.calc_cta[hidden] { display: none; }
 .calc_cta .btn_in, .calc_cta .btn_swap { width: 100%; }
 .calc_fine { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
-/* What every price includes: one line with its (i), above the button */
-.calc_included { margin: 0 0 20px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+/* What every page includes: one line with its (i), closing the Website box */
+.calc_included { margin: 0; padding: 14px 0 2px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; color: var(--muted); }
 .calc_included .calc_label { font-size: 13px; }
 .calc_included .calc_info { vertical-align: -3px; margin-left: 2px; }
 .calc_included.is-lit .calc_label { color: var(--text); }
@@ -239,12 +235,10 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 .calc_reset:hover { color: var(--muted); }
 .calc_reset[hidden] { display: none; }
 /* Lead view: Rimbo's pick */
-.calc_rec { margin-left: auto; padding-left: 12px; flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
+/* The quiet word next to the (i); the price always stays far right */
+.calc_rec { flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
 .calc_rec[hidden] { display: none; }
-.calc_rec:not([hidden]) + .calc_price { margin-left: 0; }
 .calc_rec_hint[hidden] { display: none; }
-.calc_price.is-word { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; }
-.calc_toggle[aria-checked="true"] ~ .calc_price.is-word { opacity: 1; }
 
 /* Apply step */
 .calc_apply { margin-top: 48px; padding: 28px 24px 28px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); scroll-margin-top: 24px; }

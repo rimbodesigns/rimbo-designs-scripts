@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Calculator</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="calculator.css?v=22">
+<link rel="stylesheet" href="calculator.css?v=25">
 </head>
 <body>
 <canvas class="calc_ball" id="ball" aria-hidden="true"></canvas>
@@ -26,6 +26,7 @@
       <fieldset class="calc_step">
         <legend><span class="calc_num">02</span>Website</legend>
         <div id="pages"></div>
+        <p class="calc_included" id="included"></p>
       </fieldset>
 
       <!-- 03, 04, …: the add-on groups, built from CONFIG.groups in calculator.js -->
@@ -35,13 +36,15 @@
     <div class="calc_side">
     <aside class="calc_result" aria-live="polite">
       <p class="calc_eyebrow" id="total-label">Your project</p>
-      <p class="calc_range"><span id="total" data-odometer-element>&nbsp;</span></p>
+      <div class="calc_price_row">
+        <p class="calc_range"><span id="total" data-odometer-element>&nbsp;</span></p>
+        <span class="calc_vat">Excl. VAT</span>
+      </div>
       <div class="calc_meter" id="meter" hidden>
         <div class="calc_meter_bar"><span id="meter-fill"></span></div>
         <p class="calc_meter_text" id="meter-text"></p>
       </div>
       <ul class="calc_lines" id="lines"></ul>
-      <p class="calc_included" id="included"></p>
       <button class="calc_cta" id="cta" type="button" aria-controls="apply" aria-expanded="false">Apply with this scope</button>
       <!-- Personal links only: the copied link, and a way back to Rimbo's pick -->
       <div class="calc_made" id="made" hidden>
@@ -51,10 +54,8 @@
         </div>
         <a class="calc_link" id="made-open" href="#" target="_blank" rel="noopener" hidden></a>
       </div>
-      <button class="calc_cta is-secondary" id="copy-link" type="button" hidden></button>
       <button class="calc_reset" id="reset" type="button" hidden></button>
       <button class="calc_reset" id="start-over" type="button" hidden></button>
-      <p class="calc_fine">Excl. VAT. An estimate; the proposal confirms the price.</p>
     </aside>
 
     <!-- Tip card: filled by the (i) buttons; hover previews, click pins -->
@@ -156,6 +157,6 @@
 <script src="odometer.js?v=3"></script>
 <script src="ball.js?v=7"></script>
 <script src="buttons.js?v=1"></script>
-<script src="calculator.js?v=29"></script>
+<script src="calculator.js?v=32"></script>
 </body>
 </html>

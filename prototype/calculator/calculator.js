@@ -7,7 +7,6 @@
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
     submitUrl: "",                 // PLACEHOLDER: MailerLite / email endpoint. Empty = log to the console only.
     previewLead: { v: 1, n: "Sample project", m: "", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
-    replyTo: "hello@rimbodesigns.com", // where a lead's version goes (the address in the site footer)
     underBudgetAutoMessage: true,  // true: "under €3k" sees the kind message instead of a reply promise. false: always the normal confirmation (reply by hand).
     showNewsletterOptIn: false,    // OPEN DECISION: rare-update checkbox, unticked by default. See apply-flow.md §5.3.
     dfsUrl: "https://digitalfengshui.com", // PLACEHOLDER: Digital Feng Shui link
@@ -48,16 +47,11 @@
       recommended: "Recommended",
       optional: "Optional",
       reset: "Back to my recommendation",
-      clientCta: "Email me your version",
-      clientCtaAlt: "Opens your email",
-      clientCopy: "Copy the link",
-      clientCopyAlt: "Paste it in your reply",
+      clientCta: "Copy the link",
+      clientCtaAlt: "Paste it in your reply",
       clientDone: "Link copied. Paste it in your reply to me.",
-      emailSubject: "{name}: my version",
-      emailBody: "Hi Rimbo,\n\nHere's my version of the scope:\n{link}\n",
       copyFailed: "Couldn't copy. Copy the link under the button.",
       previewLink: "Links work once this is on your own site.",
-      previewMail: "On your own site this opens their email with the link in it.",
       views: [["public", "Public"], ["make", "Your view"], ["client", "Client view"]]
     },
 
@@ -68,8 +62,8 @@
     priorityPct: 0.25,       // priority start: jump the queue
     totalLabel: { below: "Your project", reached: "Your project" }, // the number starts at €0; the bar shows the minimum
     included: {
-      line: "Every price includes the design system, QA and launch.",
-      title: "Included in every price",
+      line: "Every page includes the design system, QA and launch.",
+      title: "Included in every page",
       text: "A design system: colours, type, spacing and components, so every page fits and new ones are quick to add.\n" +
         "Navigation, footer and the motion that runs through the whole site.\n" +
         "QA on every page: checked on phone, tablet and desktop, in Chrome, Safari, Firefox and Edge.\n" +
@@ -93,7 +87,7 @@
     brand: {
       label: "Branding",
       info: "Switch this on if you also need the brand itself made, then pick the parts.",
-      // Every project starts here, even with an existing brand: a tick, no switch
+      // Every project starts here, even with an existing brand: no switch
       foundation: { id: "foundation", label: "Brand foundation", price: 500, tag: "Every project",
         // A line "01::Name::Text" shows as a numbered step in the tip card
         info: "Every project starts here, even if your brand already exists.\n" +
@@ -280,7 +274,7 @@
       info[k].btn.setAttribute("aria-expanded", String(k === key));
       info[k].row.classList.toggle("is-lit", k === key);
     });
-    if (!key) { box.hidden = true; drawWire(); return; }
+    if (!key) { box.hidden = true; fitSide(); drawWire(); return; }
     if (box.hidden || box.dataset.key !== key) {
       $("tip-title").textContent = info[key].label;
       var tt = $("tip-text"); tt.textContent = "";
@@ -298,13 +292,35 @@
       box.classList.remove("is-in"); void box.offsetWidth; box.classList.add("is-in");
     }
     box.hidden = false;
+    fitSide();
     drawWire();
+  }
+
+  // If the tip doesn't fit under the price card, the whole column eases up into the empty space above it, so
+  // nothing gets covered. Only as far as needed, and back when the tip closes.
+  function fitSide() {
+    if (!window.gsap || reduceMotion || matchMedia("(max-width: 860px)").matches) return;
+    var side = document.querySelector(".calc_side"), y = gsap.getProperty(side, "y") || 0, shift = 0;
+    if (!$("tip").hidden) {
+      var r = side.getBoundingClientRect();
+      shift = Math.min(0, Math.max(innerHeight - 16 - (r.bottom - y), 16 - (r.top - y)));
+    }
+    // A window too short for both: the tip scrolls inside itself
+    var box = $("tip"); box.style.maxHeight = ""; box.style.overflowY = "";
+    if (!box.hidden) {
+      var room = innerHeight - 32 - (side.offsetHeight - box.offsetHeight);
+      if (room < box.offsetHeight) { box.style.maxHeight = Math.max(room, 160) + "px"; box.style.overflowY = "auto"; }
+      if (room < box.scrollHeight) { var r2 = side.getBoundingClientRect(); shift = Math.min(0, Math.max(innerHeight - 16 - (r2.bottom - y), 16 - (r2.top - y))); }
+    }
+    if (Math.abs(shift - (side._fit === undefined ? 0 : side._fit)) < 1) return;
+    side._fit = shift;
+    gsap.to(side, { y: shift, duration: .55, ease: "expo.out", overwrite: "auto", onUpdate: queueWire, onComplete: function () { if (!shift) gsap.set(side, { clearProps: "transform" }); } });
   }
 
   // The dashed line: from the right edge of the item's box, at the "i", to the tip card's title
   function drawWire() {
     var svg = $("wire"), key = tip.hover || tip.pinned, box = $("tip");
-    var step = key && info[key].row.closest(".calc_step"); // the price card's own (i) sits right above the tip: no line
+    var step = key && info[key].row.closest(".calc_step");
     if (!key || !step || box.hidden || matchMedia("(max-width: 860px)").matches) { svg.classList.remove("is-on"); return; }
     var b = info[key].btn.getBoundingClientRect(), s = step.getBoundingClientRect(), t = box.getBoundingClientRect();
     var x1 = Math.round(s.right) + .5, y1 = Math.round(b.top + b.height / 2) + .5;
@@ -316,7 +332,7 @@
   }
   var wireFrame = 0;
   function queueWire() { if (!wireFrame) wireFrame = requestAnimationFrame(function () { wireFrame = 0; drawWire(); }); }
-  addEventListener("scroll", queueWire, { passive: true });
+  addEventListener("scroll", function () { queueWire(); if (!$("tip").hidden) fitSide(); }, { passive: true });
   addEventListener("resize", queueWire);
   if (window.ResizeObserver) new ResizeObserver(queueWire).observe(document.querySelector(".calc_grid"));
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && (tip.pinned || tip.hover)) { tip.pinned = tip.hover = null; showTip(); } });
@@ -368,17 +384,14 @@
     return item;
   }
 
-  // The row that's part of every project: a tick instead of a switch, because there's nothing to choose
+  // The row that's part of every project: no switch, because there's nothing to choose. It starts flush left
   function makeFixed(t) {
-    var item = el("div", "calc_item"), row = el("div", "calc_item_row is-fixed"), label = el("span", "calc_fixed");
-    var tick = el("span", "calc_tick");
-    tick.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>';
-    label.appendChild(tick); label.appendChild(el("span", "calc_label", t.label));
-    row.appendChild(label);
+    var item = el("div", "calc_item"), row = el("div", "calc_item_row is-fixed");
+    row.appendChild(el("span", "calc_label", t.label));
     row.appendChild(addInfo(t.id, t.label, t.info, row));
     var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", t.tag));
     row.appendChild(tag);
-    var price = el("span", "calc_price", eur(t.price)); row.appendChild(price);
+    row.appendChild(el("span", "calc_price", eur(t.price)));
     item.appendChild(row);
     return item;
   }
@@ -394,6 +407,8 @@
     parent.classList.add("calc_item_parent");
     var parentSwitch = parent.querySelector(".calc_toggle");
     parentSwitch.setAttribute("aria-controls", "brand-subs");
+    var word = el("span", "calc_rec"); word.id = "brand-word";
+    parent.querySelector(".calc_price").before(word);
     root.appendChild(parent);
 
     var subs = el("div", "calc_subs"); subs.id = "brand-subs"; subs.hidden = true;
@@ -521,10 +536,11 @@
     reveal($("brand-subs"), state.brandOn);
     var parentSwitch = document.querySelector('.calc_toggle[data-id="brand"]');
     parentSwitch.setAttribute("aria-expanded", String(state.brandOn));
-    // Branding row: its total when on. Off it has no price yet: the parts open with the switch
-    var brandOff = mode !== "client" ? CONFIG.copy.recommended : share.r.b ? "" : CONFIG.copy.optional;
-    $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum()) : brandOff;
-    $("price-brand").classList.toggle("is-word", !state.brandOn);
+    // Branding row: its total when on. Off it has no price yet (the parts open with the switch), just a word by the (i)
+    var brandWord = mode !== "client" ? CONFIG.copy.recommended : share.r.b ? "" : CONFIG.copy.optional;
+    $("brand-word").textContent = brandWord;
+    $("brand-word").hidden = state.brandOn || !brandWord;
+    $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum()) : "";
 
     CONFIG.toggles.forEach(function (t) {
       if (!t.hourly) return;
@@ -632,7 +648,6 @@
       setBtn(cta, C.clientCta, C.clientCtaAlt);
       markRecommended(share.r);
       $("reset").textContent = C.reset;
-      setBtn($("copy-link"), C.clientCopy, C.clientCopyAlt); $("copy-link").hidden = false;
       $("reset").addEventListener("click", function () { applySnap(share.r); render(); });
     }
 
@@ -641,15 +656,6 @@
 
     // Copy a link; the pop-up says whether it worked. Maker: the link stays under the button with Copy
     // and Open it. Lead: the link only shows when copying failed, so they can copy it by hand.
-    // The lead's button: their email app opens with the link in the message. Webmail without a mail
-    // app set up can do nothing here, which is why "Or copy the link" stays right under it.
-    function openMail(link) {
-      var name = share.n || "My project", enc = function (t) { return encodeURIComponent(t.replace(/\n/g, "\r\n")); };
-      var a = el("a");
-      a.href = "mailto:" + CONFIG.replyTo + "?subject=" + enc(C.emailSubject.replace("{name}", name)) + "&body=" + enc(C.emailBody.replace("{link}", link));
-      a.click();
-    }
-
     function copyLink(link) {
       $("made-link").value = link; $("made-open").href = link; $("made-open").hidden = mode !== "make";
       function done(ok) { toast(ok ? (mode === "make" ? C.makeDone : C.clientDone) : C.copyFailed, !ok); $("made").hidden = mode !== "make" && ok; }
@@ -669,14 +675,8 @@
         toast(C.makeNeedName, true);
         return;
       }
-      if (preview) toast(mode === "make" ? C.previewLink : C.previewMail);
-      else if (mode === "make") copyLink(clientLink(shareData()));
-      else openMail(location.href);
-    });
-    $("copy-link").addEventListener("click", function () {
-      if (!picked()) { toast(C.needScope, true); return; }
       if (preview) toast(C.previewLink);
-      else copyLink(location.href);
+      else copyLink(mode === "make" ? clientLink(shareData()) : location.href);
     });
     $("made-copy").addEventListener("click", function () { copyLink($("made-link").value); });
     $("made-link").addEventListener("focus", function () { this.select(); });
@@ -783,7 +783,7 @@
 
   $("tip-close").addEventListener("click", function () { tip.pinned = tip.hover = null; showTip(); });
 
-  // In the price card: what every price includes, with its (i)
+  // At the bottom of the Website box: what every page includes, with its (i)
   function buildIncluded() {
     var I = CONFIG.included, p = $("included");
     p.appendChild(el("span", "calc_label", I.line));
