@@ -47,6 +47,7 @@
       recommended: "Recommended",
       optional: "Optional",
       reset: "Back to my recommendation",
+      resetDone: "Back to my recommendation.",
       clientCta: "Copy the link",
       clientCtaAlt: "Paste it in your reply",
       clientDone: "Link copied. Paste it in your reply to me.",
@@ -60,7 +61,7 @@
     // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
     priorityPct: 0.25,       // priority start: jump the queue
-    totalLabel: { below: "Your project", reached: "Your project" }, // the number starts at €0; the bar shows the minimum
+    totalLabel: { below: "Your estimate", reached: "Your estimate" }, // the number starts at €0; the bar shows the minimum
     included: {
       line: "Every page includes the design system, QA and launch.",
       title: "Included in every page",
@@ -590,8 +591,10 @@
   }
 
   // The site's button markup (.btn); buttons.js adds the magnet, the label swap and the boil
-  function setBtn(b, label, alt) {
+  var RESET_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.4 1.4v3.1h3.1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+  function setBtn(b, label, alt, icon) {
     var inner = el("span", "btn_in"), swap = el("span", "btn_swap"), line = el("span", "btn_line");
+    if (icon) { var ic = el("span", "btn_icon"); ic.innerHTML = icon; line.appendChild(ic); }
     line.appendChild(el("span", "btn_t", label));
     swap.appendChild(line); inner.appendChild(swap);
     b.textContent = ""; b.appendChild(inner);
@@ -616,7 +619,7 @@
   // Start over: clears everything at once, so the pop-up offers the way back
   function setupStartOver() {
     var C = CONFIG.copy;
-    $("start-over").textContent = C.startOver;
+    setBtn($("start-over"), C.startOver, null, RESET_ICON);
     $("start-over").addEventListener("click", function () {
       var before = snap();
       applySnap({ p: [], b: 0, t: [] });
@@ -647,8 +650,13 @@
       document.title = (share.n || "Your project") + " · Rimbo Designs";
       setBtn(cta, C.clientCta, C.clientCtaAlt);
       markRecommended(share.r);
-      $("reset").textContent = C.reset;
-      $("reset").addEventListener("click", function () { applySnap(share.r); render(); });
+      setBtn($("reset"), C.reset, null, RESET_ICON);
+      $("reset").addEventListener("click", function () {
+        var before = snap();
+        applySnap(share.r);
+        render();
+        toast(C.resetDone, false, C.undo, function () { applySnap(before); render(); });
+      });
     }
 
     $("made-copy").textContent = C.copy;

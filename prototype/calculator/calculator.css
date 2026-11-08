@@ -179,12 +179,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--accent); color: var(--on-accent); box-shadow: 0 0 1.2rem var(--glow); cursor: pointer; text-decoration: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   font: 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; transition: box-shadow .6s cubic-bezier(.16, 1, .3, 1); }
 .btn.is-hover { z-index: 1; box-shadow: 0 0 2.2rem var(--glow-on), 0 0 .6rem var(--glow-on); }
+/* The ghost one: same button, no fill. Back to my recommendation and Start over */
+.btn.is-secondary { margin-top: 12px; background: transparent; border-color: var(--field-line); color: var(--text); box-shadow: none; transition: border-color .35s; }
+.btn.is-secondary.is-hover { border-color: var(--text); box-shadow: none; }
+.btn_icon { display: inline-flex; flex: none; }
 .btn_in { display: inline-flex; max-width: 100%; }
 .btn_swap { position: relative; display: inline-block; overflow: hidden; }
 .btn_line { display: flex; align-items: center; justify-content: center; gap: .7em; padding: .15em 0; }
 .btn_line.is-alt { position: absolute; inset: 0; }
 .btn_arrow { display: inline-block; }
 .calc_cta { display: flex; width: 100%; }
+.calc_cta[hidden] { display: none; }
 .calc_cta .btn_in, .calc_cta .btn_swap { width: 100%; }
 .calc_fine { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
 /* What every page includes: one line with its (i), closing the Website box */
@@ -230,10 +235,6 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 @keyframes calc-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .calc_toast.is-in { animation: none; } }
 .calc_made .calc_link { font-size: 13px; }
-.calc_reset { display: block; margin: 14px 0 0; padding: 0; appearance: none; border: 0; background: none; cursor: pointer;
-  color: var(--text); font: 14px/1.4 var(--read); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--on); }
-.calc_reset:hover { color: var(--muted); }
-.calc_reset[hidden] { display: none; }
 /* Lead view: Rimbo's pick */
 /* The quiet word next to the (i); the price always stays far right */
 .calc_rec { flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
