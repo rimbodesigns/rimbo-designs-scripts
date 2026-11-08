@@ -151,16 +151,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_tip[hidden] { display: none; }
 .calc_tip.is-in { animation: calc-tip-in .28s ease-out; }
 @keyframes calc-tip-in { from { opacity: 0; } to { opacity: 1; } }
-.calc_tip_title { margin: 0 36px 12px 0; font: 900 clamp(1.2rem, 2.2vw, 1.5rem)/1.05 var(--head); text-transform: uppercase; }
-.calc_tip_text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
+.calc_tip_title { margin: 0 34px 16px 0; font: 900 clamp(1.15rem, 2vw, 1.4rem)/1.08 var(--head); text-transform: uppercase; text-wrap: balance; }
+.calc_nb { display: inline-block; white-space: nowrap; }
+.calc_tip_text { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
 .calc_tip_line { display: block; }
-.calc_tip_line + .calc_tip_line { margin-top: 8px; }
-.calc_tip_line.is-step { display: grid; grid-template-columns: 2em 1fr; margin-top: 12px; }
+.calc_tip_line + .calc_tip_line { margin-top: 10px; }
 .calc_tip_line:has(.calc_tip_name) { margin-top: 12px; }
 .calc_tip_line:first-child { margin-top: 0; }
+.calc_tip_line.is-step { display: grid; grid-template-columns: 2em 1fr; }
 .calc_tip_num { grid-row: 1 / span 2; font: 11px/1.95 var(--mono); color: var(--on-text); }
 .calc_tip_name { display: block; }
 .calc_tip_desc { display: block; font-size: 13px; line-height: 1.45; color: var(--muted); }
+/* A side note: quieter, under a thin line */
+.calc_tip_line.is-note { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.45; color: var(--muted); }
+.calc_tip_line.is-note + .calc_tip_line.is-note { margin-top: 8px; padding-top: 0; border-top: 0; }
+.calc_tip_line.is-phone { display: none; }
 .calc_tip_close { position: absolute; top: 14px; right: 14px; appearance: none; width: 26px; height: 26px; padding: 0; cursor: pointer;
   border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--muted); font: 16px/1 var(--mono); }
 .calc_tip_close:hover { border-color: var(--on); color: var(--text); }
@@ -302,4 +307,5 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 @media (max-width: 560px) {
   .calc_lede { max-width: 15.5em; }
   .calc_rec { display: none; }
+  .calc_tip_line.is-phone { display: block; }
 }

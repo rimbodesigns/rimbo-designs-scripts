@@ -74,14 +74,14 @@
     // Pages, by complexity: one counter each
     pages: [
       { id: "simple",  label: "Simple pages",  hint: "Contact, thank-you, plain text",         price: 400,  max: 20,
-        info: "A page with one job and a few sections. Same design standard as the rest, with light animation." },
+        info: "A page with one job and a few sections.\nSame design standard as the rest, with light animation." },
       { id: "medium",  label: "Medium pages",  hint: "Services, about, team",                 price: 800,  max: 20,
-        info: "A page with several sections, some interaction and animation. Most pages of a site are medium." },
+        info: "A page with several sections, some interaction and animation.\n~Most pages of a site are medium." },
       { id: "complex", label: "Complex pages", hint: "Home, scroll story, heavy animation",    price: 2000, max: 10,
-        info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." },
+        info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces.\n~Usually the home page and one or two showpieces." },
       // A whole type of content: structure, template and all its pages (Echo's 12 case studies). €1,500 on my advice, 2026-11-09
       { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 1500, max: 10,
-        info: "A whole type of content, like blog posts, news or case studies: the structure and one template, so you can add as many as you like in Webflow. The overview page that lists them counts as a normal page. The content itself is yours to write." }
+        info: "A whole type of content, like blog posts, news or case studies: the structure and one template, so you can add as many as you like in Webflow.\n~The overview page that lists them counts as a normal page. The content itself is yours to write." }
     ],
 
     // Branding: one switch that opens the parts. Turning it on the first time selects the preset.
@@ -122,25 +122,25 @@
     // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250, transitions
     // to €900, automations €500 (Rimbo, 2026-11-05)
     toggles: [
-      { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site. Search and AI search are the same work, so they come together." },
-      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  brings: "consent", info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons. It needs cookie consent, so that switches on with it. Or skip this and use Webflow Analyze, from about €10 a month." },
-      { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks. In the look of your site." },
+      { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site.\n~Search and AI search are the same work, so they come together." },
+      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  brings: "consent", info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons.\nIt needs cookie consent, so that switches on with it.\n~Or skip this and use Webflow Analyze, from about €10 a month." },
+      { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks.\nIn the look of your site." },
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
-        info: "So you can write and publish pages and posts that get found. What you get:\nA recorded tutorial you can watch again.\nA one-on-one call about your own site.\nA checklist template for every new page or post." },
+        info: "So you can write and publish pages and posts that get found.\nRecorded tutorial::Watch it again whenever you need it.\nOne-on-one call::About your own site.\nChecklist template::For every new page or post." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
       // Three amounts, not an hours field (Rimbo, 2026-11-05): €97 an hour behind the scenes
       { id: "migration",  group: "search", label: "Content migration",                         hourly: 97,
         question: "How much content do you have?",
         levels: [{ label: "Very little", hours: 2 }, { label: "Quite a bit", hours: 4 }, { label: "A lot", hours: 8 }], start: 0,
-        info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working. Pick roughly how much you have; the proposal confirms it." },
+        info: "Moving your existing pages, posts and images to the new site, with redirects so old links and search rankings keep working.\n~Pick roughly how much you have. The proposal confirms it." },
       { id: "loader",     group: "motion", label: "Custom page loader",                        price: 800,  info: "A branded intro animation while the site loads." },
       { id: "transition", group: "motion", label: "Custom page transitions",                   price: 900,  info: "Animated transitions between pages, so the site feels like one piece instead of separate pages." },
       { id: "theme",      group: "motion", label: "Light and dark mode",                       price: 600,  info: "A light and a dark version of the whole site, with a switch." },
-      { id: "legal",      group: "more",   label: "Legal pages, done for you",                 price: 500,  info: "Privacy, cookie and terms pages written for your business and checked against GDPR. You don't write a word." },
-      { id: "a11y",       group: "more",   label: "Accessibility check",                       price: 800,  info: "The site tested for keyboard use, screen readers, contrast and text size against WCAG 2.2 AA, with the fixes made. More and more businesses need this under the European Accessibility Act." },
+      { id: "legal",      group: "more",   label: "Legal pages, done for you",                 price: 500,  info: "Privacy, cookie and terms pages written for your business and checked against GDPR.\nYou don't write a word." },
+      { id: "a11y",       group: "more",   label: "Accessibility check",                       price: 800,  info: "The site tested for keyboard use, screen readers, contrast and text size against WCAG 2.2 AA, with the fixes made.\n~More and more businesses need this under the European Accessibility Act." },
       { id: "leads",      group: "more",   label: "Automations",                               price: 500,  info: "Your site connected to your other tools: form leads into your CRM or mailing list, with an automatic follow-up." },
       { id: "chatbot",    group: "more",   label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
-      { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system. This adds written documentation and a training session, so your team can build new pages with it." },
+      { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system.\nThis adds written documentation and a training session, so your team can build new pages with it." },
       { id: "members",    group: "more",   label: "Members area",                              price: 4000, info: "Log-in, member-only pages and gated content, with payments if needed." },
       { id: "shop",       group: "more",   label: "Webshop",                                   price: 4000, info: "Products, cart and checkout, built on Webflow e-commerce." },
       { id: "priority",   group: "more",   label: "Priority start (jump the queue)",           pct: true,   info: "Your project takes the next free slot instead of waiting in line." }
@@ -277,10 +277,15 @@
     });
     if (!key) { box.hidden = true; fitSide(); drawWire(); return; }
     if (box.hidden || box.dataset.key !== key) {
-      $("tip-title").textContent = info[key].label;
+      var wasHidden = box.hidden;
+      // Words stay whole in the title: "Analytics / set-up", never "set- / up"
+      var head = $("tip-title"); head.textContent = "";
+      info[key].label.split(" ").forEach(function (w, i) { if (i) head.appendChild(document.createTextNode(" ")); head.appendChild(el("span", "calc_nb", w)); });
       var tt = $("tip-text"); tt.textContent = "";
       info[key].text.split("\n").forEach(function (line) {
-        var step = line.split("::"), row = el("span", "calc_tip_line", step.length > 1 ? "" : line);
+        var kind = line.charAt(0) === "~" ? "is-note" : line.charAt(0) === "^" ? "is-note is-phone" : "";
+        if (kind) line = line.slice(1);
+        var step = line.split("::"), row = el("span", "calc_tip_line " + kind, step.length > 1 ? "" : line);
         if (step.length === 3) {
           row.classList.add("is-step");
           row.appendChild(el("span", "calc_tip_num", step[0]));
@@ -294,6 +299,12 @@
       });
       box.dataset.key = key;
       box.classList.remove("is-in"); void box.offsetWidth; box.classList.add("is-in");
+      // The lines arrive one after the other (not while hovering from one (i) to the next, that would flicker)
+      if (window.gsap && !reduceMotion && wasHidden) {
+        var lines = [head].concat(Array.from(tt.children));
+        gsap.killTweensOf(lines);
+        gsap.fromTo(lines, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: .5, ease: "expo.out", stagger: .035, clearProps: "all" });
+      }
     }
     box.hidden = false;
     fitSide();
@@ -360,7 +371,7 @@
       minus.addEventListener("click", function () { state.pages[p.id] = Math.max(0, state.pages[p.id] - 1); render(); });
       plus.addEventListener("click", function () { state.pages[p.id] = Math.min(p.max, state.pages[p.id] + 1); render(); });
       step.appendChild(minus); step.appendChild(out); step.appendChild(plus);
-      row.appendChild(labelLine(p.label, p.id, p.info + "\n" + p.hint + ".", row));
+      row.appendChild(labelLine(p.label, p.id, p.info + "\n^" + p.hint + ".", row)); // ^ shows on phones only: the examples sit next to the (i) elsewhere
       row.appendChild(el("span", "calc_rec calc_examples", p.hint));
       var price = el("span", "calc_price", eur(p.price)); price.id = "page-price-" + p.id;
       row.appendChild(price);
