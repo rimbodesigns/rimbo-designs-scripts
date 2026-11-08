@@ -46,18 +46,17 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_step legend { padding: 0 8px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .calc_num { margin-right: .5em; color: var(--on-text); }
 .calc_label { font-size: 15px; }
-.calc_hint { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; color: var(--muted); }
 
 /* One item = its row + its info box; the line sits under the item */
 .calc_item { border-bottom: 1px solid var(--line); }
 .calc_step > div > .calc_item:last-child, .calc_subs > .calc_item:last-child { border-bottom: 0; }
-.calc_row { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
-.calc_txt { flex: 1; min-width: 0; }
+.calc_row { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
 .calc_item_row { display: flex; align-items: center; gap: 12px; }
 .calc_stepper { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.calc_stepper { margin-right: 2px; }
 .calc_stepper button {
-  appearance: none; cursor: pointer; width: 34px; height: 34px; border-radius: .3em;
-  border: 1px solid var(--field-line); background: transparent; color: var(--field-text); font: 18px/1 var(--mono); transition: border-color .2s;
+  appearance: none; cursor: pointer; width: 28px; height: 28px; padding: 0; border-radius: .3em;
+  border: 1px solid var(--field-line); background: transparent; color: var(--field-text); font: 15px/1 var(--mono); transition: border-color .2s;
 }
 .calc_stepper button:hover { border-color: var(--text); }
 .calc_stepper output { min-width: 2.6ch; text-align: center; font: 13px/1 var(--mono); font-variant-numeric: tabular-nums; }
@@ -72,7 +71,7 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 1px; background: var(--knob); transition: transform .4s cubic-bezier(.16, 1, .3, 1), background .3s ease; }
 .calc_toggle[aria-checked="true"] .calc_switch { background: var(--on); }
 .calc_toggle[aria-checked="true"] .calc_switch::after { transform: translateX(16px); background: #131313; }
-.calc_toggle[aria-checked="true"] ~ .calc_price { color: var(--text); }
+.calc_toggle[aria-checked="true"] ~ .calc_price, .calc_price.is-on { color: var(--text); }
 
 /* The small round (i) right after a label. Hover or focus: orange outline. Pinned: filled orange. */
 .calc_labelline { display: inline-flex; align-items: center; gap: 8px; }
@@ -158,6 +157,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_tip_line { display: block; }
 .calc_tip_line + .calc_tip_line { margin-top: 8px; }
 .calc_tip_line.is-step { display: grid; grid-template-columns: 2em 1fr; margin-top: 12px; }
+.calc_tip_line:has(.calc_tip_name) { margin-top: 12px; }
+.calc_tip_line:first-child { margin-top: 0; }
 .calc_tip_num { grid-row: 1 / span 2; font: 11px/1.95 var(--mono); color: var(--on-text); }
 .calc_tip_name { display: block; }
 .calc_tip_desc { display: block; font-size: 13px; line-height: 1.45; color: var(--muted); }
@@ -182,7 +183,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* The ghost one: same button, no fill. Back to my recommendation and Start over */
 .btn.is-secondary { margin-top: 12px; background: transparent; border-color: var(--field-line); color: var(--text); box-shadow: none; transition: border-color .35s; }
 .btn.is-secondary.is-hover { border-color: var(--text); box-shadow: none; }
-.btn_icon { display: inline-flex; flex: none; }
 .btn_in { display: inline-flex; max-width: 100%; }
 .btn_swap { position: relative; display: inline-block; overflow: hidden; }
 .btn_line { display: flex; align-items: center; justify-content: center; gap: .7em; padding: .15em 0; }
@@ -193,9 +193,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_cta .btn_in, .calc_cta .btn_swap { width: 100%; }
 .calc_fine { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
 /* What every page includes: one line with its (i), closing the Website box */
-.calc_included { margin: 0; padding: 14px 0 2px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; color: var(--muted); }
+.calc_included { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 0 2px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; color: var(--muted); }
 .calc_included .calc_label { font-size: 13px; }
-.calc_included .calc_info { vertical-align: -3px; margin-left: 2px; }
 .calc_included.is-lit .calc_label { color: var(--text); }
 
 /* Hosted preview only: the three views */
@@ -239,7 +238,7 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 /* The quiet word next to the (i); the price always stays far right */
 .calc_rec { flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
 .calc_rec[hidden] { display: none; }
-.calc_rec_hint[hidden] { display: none; }
+.calc_examples { flex: 0 1 auto; min-width: 0; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Apply step */
 .calc_apply { margin-top: 48px; padding: 28px 24px 28px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); scroll-margin-top: 24px; }
@@ -302,8 +301,8 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
   .calc_submit { width: 100%; }
   .calc_subs { margin-left: 10px; padding-left: 12px; }
 }
-/* Phone: "Every project" goes, the tick says enough */
+/* Phone: no room for the quiet words next to the (i). The examples are in the (i) too, and "Back to my recommendation" stays */
 @media (max-width: 560px) {
   .calc_lede { max-width: 15.5em; }
-  .is-fixed .calc_rec_word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .calc_rec { display: none; }
 }

@@ -39,6 +39,7 @@
       startOver: "Start over",
       cleared: "All cleared.",
       undo: "Undo",
+      canUndo: "You can undo this",
       makeDone: "Link copied to your clipboard.",
       copy: "Copy",
       makeOpen: "Open it",
@@ -63,21 +64,22 @@
     priorityPct: 0.25,       // priority start: jump the queue
     totalLabel: { below: "Your estimate", reached: "Your estimate" }, // the number starts at €0; the bar shows the minimum
     included: {
-      line: "Every page includes the design system, QA and launch.",
+      line: "Every page includes the design system, QA, performance and onboarding.",
       title: "Included in every page",
-      text: "A design system: colours, type, spacing and components, so every page fits and new ones are quick to add.\n" +
-        "Navigation, footer and the motion that runs through the whole site.\n" +
-        "QA on every page: checked on phone, tablet and desktop, in Chrome, Safari, Firefox and Edge.\n" +
-        "Launch: domain, forms and a final speed check."
+      text: "Design system::Colours, type, spacing and components, so every page fits and new ones are quick to add.\n" +
+        "Navigation and footer::With the motion that runs through the whole site.\n" +
+        "QA (quality assurance)::Every page checked on phone, tablet and desktop, in Chrome, Safari, Firefox and Edge, before launch.\n" +
+        "Performance::Images, code and loading tuned so the site is fast.\n" +
+        "Onboarding::I show you how to manage the site yourself."
     },
 
     // Pages, by complexity: one counter each
     pages: [
-      { id: "simple",  label: "Simple pages",  hint: "Contact, thank-you, a plain text page", price: 400,  max: 20,
+      { id: "simple",  label: "Simple pages",  hint: "Contact, thank-you, plain text",         price: 400,  max: 20,
         info: "A page with one job and a few sections. Same design standard as the rest, with light animation." },
       { id: "medium",  label: "Medium pages",  hint: "Services, about, team",                 price: 800,  max: 20,
         info: "A page with several sections, some interaction and animation. Most pages of a site are medium." },
-      { id: "complex", label: "Complex pages", hint: "Home, a scroll story, heavy animation",  price: 2000, max: 10,
+      { id: "complex", label: "Complex pages", hint: "Home, scroll story, heavy animation",    price: 2000, max: 10,
         info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." },
       // One design for a type of content; a little under a medium page (Rimbo, 2026-11-06)
       { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 750,  max: 10,
@@ -280,12 +282,15 @@
       $("tip-title").textContent = info[key].label;
       var tt = $("tip-text"); tt.textContent = "";
       info[key].text.split("\n").forEach(function (line) {
-        var step = line.split("::"), row = el("span", "calc_tip_line", step.length === 3 ? "" : line);
+        var step = line.split("::"), row = el("span", "calc_tip_line", step.length > 1 ? "" : line);
         if (step.length === 3) {
           row.classList.add("is-step");
           row.appendChild(el("span", "calc_tip_num", step[0]));
-          row.appendChild(el("span", "calc_tip_name", step[1]));
-          row.appendChild(el("span", "calc_tip_desc", step[2]));
+          step.shift();
+        }
+        if (step.length === 2) {
+          row.appendChild(el("span", "calc_tip_name", step[0]));
+          row.appendChild(el("span", "calc_tip_desc", step[1]));
         }
         tt.appendChild(row);
       });
@@ -350,9 +355,6 @@
     CONFIG.pages.forEach(function (p) {
       var item = el("div", "calc_item");
       var row = el("div", "calc_row");
-      var txt = el("div", "calc_txt");
-      txt.appendChild(labelLine(p.label, p.id, p.info, row));
-      txt.appendChild(el("span", "calc_hint", p.hint + " · " + eur(p.price) + " each"));
       var step = el("div", "calc_stepper");
       var minus = el("button", "", "−"); minus.type = "button"; minus.setAttribute("aria-label", "Fewer " + p.label.toLowerCase());
       var out = el("output", "", "0"); out.id = "n-" + p.id;
@@ -360,7 +362,12 @@
       minus.addEventListener("click", function () { state.pages[p.id] = Math.max(0, state.pages[p.id] - 1); render(); });
       plus.addEventListener("click", function () { state.pages[p.id] = Math.min(p.max, state.pages[p.id] + 1); render(); });
       step.appendChild(minus); step.appendChild(out); step.appendChild(plus);
-      row.appendChild(txt); row.appendChild(step);
+      row.appendChild(step);
+      row.appendChild(labelLine(p.label, p.id, p.info + "\n" + p.hint + ".", row));
+      var ex = el("span", "calc_rec calc_examples", p.hint); ex.id = "ex-" + p.id;
+      row.appendChild(ex);
+      var price = el("span", "calc_price", "+" + eur(p.price)); price.id = "page-price-" + p.id;
+      row.appendChild(price);
       item.appendChild(row);
       root.appendChild(item);
     });
@@ -528,7 +535,10 @@
   }
 
   function render(instant) {
-    CONFIG.pages.forEach(function (p) { $("n-" + p.id).textContent = state.pages[p.id]; });
+    CONFIG.pages.forEach(function (p) {
+      $("n-" + p.id).textContent = state.pages[p.id];
+      $("page-price-" + p.id).classList.toggle("is-on", state.pages[p.id] > 0);
+    });
 
     document.querySelectorAll(".calc_toggle").forEach(function (s) {
       var id = s.dataset.id;
@@ -551,7 +561,7 @@
       $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
     });
 
-    recTags.forEach(function (t) { t.el.hidden = t.on(); });
+    recTags.forEach(function (t) { t.el.hidden = t.on(); if (t.also) t.also.hidden = !t.el.hidden; });
 
     var r = calc(), reached = r.scope >= CONFIG.minimum;
     $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
@@ -591,10 +601,8 @@
   }
 
   // The site's button markup (.btn); buttons.js adds the magnet, the label swap and the boil
-  var RESET_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.4 1.4v3.1h3.1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
-  function setBtn(b, label, alt, icon) {
+  function setBtn(b, label, alt) {
     var inner = el("span", "btn_in"), swap = el("span", "btn_swap"), line = el("span", "btn_line");
-    if (icon) { var ic = el("span", "btn_icon"); ic.innerHTML = icon; line.appendChild(ic); }
     line.appendChild(el("span", "btn_t", label));
     swap.appendChild(line); inner.appendChild(swap);
     b.textContent = ""; b.appendChild(inner);
@@ -619,7 +627,7 @@
   // Start over: clears everything at once, so the pop-up offers the way back
   function setupStartOver() {
     var C = CONFIG.copy;
-    setBtn($("start-over"), C.startOver, null, RESET_ICON);
+    setBtn($("start-over"), C.startOver, C.canUndo);
     $("start-over").addEventListener("click", function () {
       var before = snap();
       applySnap({ p: [], b: 0, t: [] });
@@ -650,7 +658,7 @@
       document.title = (share.n || "Your project") + " · Rimbo Designs";
       setBtn(cta, C.clientCta, C.clientCtaAlt);
       markRecommended(share.r);
-      setBtn($("reset"), C.reset, null, RESET_ICON);
+      setBtn($("reset"), C.reset, C.canUndo);
       $("reset").addEventListener("click", function () {
         var before = snap();
         applySnap(share.r);
@@ -698,9 +706,9 @@
     CONFIG.pages.forEach(function (p, i) {
       var n = Math.round(+r.p[i]) || 0;
       if (!n) return;
-      var tag = el("span", "calc_rec_hint", " · " + C.recommended.toLowerCase() + ": " + n);
-      $("n-" + p.id).closest(".calc_row").querySelector(".calc_hint").appendChild(tag);
-      recTags.push({ el: tag, on: function () { return state.pages[p.id] === n; } });
+      var tag = el("span", "calc_rec", C.recommended + ": " + n), ex = $("ex-" + p.id);
+      ex.after(tag);
+      recTags.push({ el: tag, also: ex, on: function () { return state.pages[p.id] === n; } }); // takes the place of the examples
     });
     var on = (r.t || []).filter(function (id) { return byId[id] && (r.b || !isBrandPart(id)); });
     if (r.b) on.push("brand");
@@ -795,7 +803,6 @@
   function buildIncluded() {
     var I = CONFIG.included, p = $("included");
     p.appendChild(el("span", "calc_label", I.line));
-    p.appendChild(document.createTextNode(" "));
     p.appendChild(addInfo("included", I.title, I.text, p));
   }
 
