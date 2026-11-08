@@ -6,6 +6,7 @@
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
     submitUrl: "",                 // PLACEHOLDER: MailerLite / email endpoint. Empty = log to the console only.
+    previewLead: { v: 1, n: "Sample project", m: "", r: { p: [1, 3, 1, 0], b: 1, t: ["colour", "logo", "seo", "type"] } }, // the client view in the hosted preview
     replyTo: "hello@rimbodesigns.com", // where a lead's version goes (the address in the site footer)
     underBudgetAutoMessage: true,  // true: "under €3k" sees the kind message instead of a reply promise. false: always the normal confirmation (reply by hand).
     showNewsletterOptIn: false,    // OPEN DECISION: rare-update checkbox, unticked by default. See apply-flow.md §5.3.
@@ -52,7 +53,10 @@
       clientDone: "Link copied. Paste it in your reply to me.",
       emailSubject: "{name}: my version",
       emailBody: "Hi Rimbo,\n\nHere's my version of the scope:\n{link}\n",
-      copyFailed: "Couldn't copy. Copy the link under the button."
+      copyFailed: "Couldn't copy. Copy the link under the button.",
+      previewLink: "Links work once this is on your own site.",
+      previewMail: "On your own site this opens their email with the link in it.",
+      views: [["public", "Public"], ["make", "Your view"], ["client", "Client view"]]
     },
 
     // No fixed build fee (2026-11-05): strategy, design system, QA and launch grow with the project,
@@ -141,7 +145,7 @@
 
   var q = new URLSearchParams(location.search);
   if (q.get("theme") === "light" || q.get("theme") === "dark") {
-    document.documentElement.setAttribute("data-theme", q.get("theme"));
+    document.documentElement.setAttribute("data-calc-theme", q.get("theme"));
   }
 
   function $(id) { return document.getElementById(id); }
@@ -168,8 +172,10 @@
   function shareHash(o) { return "#for=" + b64e(JSON.stringify(o)); }
   function clientLink(o) { return location.origin + location.pathname + shareHash(o); }
 
-  var share = readShare();
-  var mode = q.has("make") ? "make" : share ? "client" : "public";
+  // The hosted preview (build-preview.py): its viewer only passes a plain #name, so #make and #client pick the view
+  var preview = !!window.CALC_PREVIEW, view = location.hash.slice(1);
+  var share = preview ? (view === "client" ? CONFIG.previewLead : null) : readShare();
+  var mode = q.has("make") || (preview && view === "make") ? "make" : share ? "client" : "public";
   addEventListener("hashchange", function () { location.reload(); }); // a different link pasted into the same tab
 
   // The scope as a small object: page counts, branding on/off, the ids that are on (brand parts only with
@@ -515,7 +521,7 @@
   }
   function syncShare() {
     var o = shareData();
-    history.replaceState(null, "", location.pathname + (mode === "make" ? "?make" : "") + shareHash(o));
+    if (!preview) history.replaceState(null, "", location.pathname + (mode === "make" ? "?make" : "") + shareHash(o));
     if (mode === "client") reveal($("reset"), !!o.c);
     $("made").hidden = true; // the scope changed: the copied link is no longer this version
   }
@@ -616,12 +622,14 @@
         toast(C.makeNeedName, true);
         return;
       }
-      if (mode === "make") copyLink(clientLink(shareData()));
+      if (preview) toast(mode === "make" ? C.previewLink : C.previewMail);
+      else if (mode === "make") copyLink(clientLink(shareData()));
       else openMail(location.href);
     });
     $("copy-link").addEventListener("click", function () {
       if (!picked()) { toast(C.needScope, true); return; }
-      copyLink(location.href);
+      if (preview) toast(C.previewLink);
+      else copyLink(location.href);
     });
     $("made-copy").addEventListener("click", function () { copyLink($("made-link").value); });
     $("made-link").addEventListener("focus", function () { this.select(); });
@@ -738,6 +746,15 @@
   if (share) applySnap(share.c || share.r);
   if (mode === "public") setupApply(); else setupShare();
   setupStartOver();
+  if (preview) {
+    var nav = el("nav", "calc_views"); nav.setAttribute("aria-label", "Views");
+    CONFIG.copy.views.forEach(function (v) {
+      var a = el("a", "", v[1]); a.href = "#" + v[0];
+      if (mode === (v[0] === "client" ? "client" : v[0])) a.setAttribute("aria-current", "page");
+      nav.appendChild(a);
+    });
+    document.querySelector(".calc_head").prepend(nav);
+  }
   if (window.gsap && window.rdButtons) rdButtons();
   render();
   ready = true;

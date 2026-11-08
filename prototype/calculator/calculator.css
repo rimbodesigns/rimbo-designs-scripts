@@ -177,6 +177,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_included .calc_info { vertical-align: -3px; margin-left: 2px; }
 .calc_included.is-lit .calc_label { color: var(--text); }
 
+/* Hosted preview only: the three views */
+.calc_views { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 32px; font: 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.calc_views a { padding-bottom: 5px; color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
+.calc_views a:hover { color: var(--text); }
+.calc_views a[aria-current] { color: var(--text); border-bottom-color: var(--on); }
+
 /* Personal links. Maker view (?make): the title and the line are fields that look like what the lead sees */
 .calc_edit { display: block; width: 100%; margin: 0; padding: 0 0 6px; border: 0; border-bottom: 1px dashed var(--field-line); border-radius: 0;
   background: transparent; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; caret-color: var(--on); resize: none; }
@@ -260,7 +266,7 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 .calc_link:hover { color: var(--muted); }
 
 /* Light theme: opt-in with ?theme=light. Beige page, solid ink button, small orange text in Orange Text */
-:root[data-theme="light"] {
+:root[data-calc-theme="light"] {
   --bg: #f8f5ee; --panel: rgba(236, 229, 214, .82); --glass: rgba(248, 245, 238, .76); --solid: #f8f5ee;
   --line: rgba(19, 19, 19, .16); --text: #131313; --muted: color-mix(in srgb, #131313 68%, #f8f5ee);
   --field-bg: #f8f5ee; --field-text: #131313; --field-line: rgba(19, 19, 19, .34);
