@@ -53,7 +53,6 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_row { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
 .calc_item_row { display: flex; align-items: center; gap: 12px; }
 .calc_stepper { display: inline-flex; align-items: center; gap: 4px; flex: none; }
-.calc_stepper { margin-right: 2px; }
 .calc_stepper button {
   appearance: none; cursor: pointer; width: 28px; height: 28px; padding: 0; border-radius: .3em;
   border: 1px solid var(--field-line); background: transparent; color: var(--field-text); font: 15px/1 var(--mono); transition: border-color .2s;

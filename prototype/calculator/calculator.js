@@ -46,7 +46,6 @@
       clientEyebrow: "Scoped by Rimbo",
       clientLede: "This is what I'd build for you. Switch things on or off and the price follows.",
       recommended: "Recommended",
-      optional: "Optional",
       reset: "Back to my recommendation",
       resetDone: "Back to my recommendation.",
       clientCta: "Copy the link",
@@ -81,9 +80,9 @@
         info: "A page with several sections, some interaction and animation. Most pages of a site are medium." },
       { id: "complex", label: "Complex pages", hint: "Home, scroll story, heavy animation",    price: 2000, max: 10,
         info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces. Usually the home page and one or two showpieces." },
-      // One design for a type of content; a little under a medium page (Rimbo, 2026-11-06)
-      { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 750,  max: 10,
-        info: "One design for a type of content, like blog posts, news or case studies. You add as many as you like in Webflow. The overview page that lists them counts as a normal page. The content itself is yours to write." }
+      // A whole type of content: structure, template and all its pages (Echo's 12 case studies). €1,500 on my advice, 2026-11-09
+      { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 1500, max: 10,
+        info: "A whole type of content, like blog posts, news or case studies: the structure and one template, so you can add as many as you like in Webflow. The overview page that lists them counts as a normal page. The content itself is yours to write." }
     ],
 
     // Branding: one switch that opens the parts. Turning it on the first time selects the preset.
@@ -362,12 +361,11 @@
       minus.addEventListener("click", function () { state.pages[p.id] = Math.max(0, state.pages[p.id] - 1); render(); });
       plus.addEventListener("click", function () { state.pages[p.id] = Math.min(p.max, state.pages[p.id] + 1); render(); });
       step.appendChild(minus); step.appendChild(out); step.appendChild(plus);
-      row.appendChild(step);
       row.appendChild(labelLine(p.label, p.id, p.info + "\n" + p.hint + ".", row));
-      var ex = el("span", "calc_rec calc_examples", p.hint); ex.id = "ex-" + p.id;
-      row.appendChild(ex);
-      var price = el("span", "calc_price", "+" + eur(p.price)); price.id = "page-price-" + p.id;
+      row.appendChild(el("span", "calc_rec calc_examples", p.hint));
+      var price = el("span", "calc_price", eur(p.price)); price.id = "page-price-" + p.id;
       row.appendChild(price);
+      row.appendChild(step);
       item.appendChild(row);
       root.appendChild(item);
     });
@@ -548,7 +546,7 @@
     var parentSwitch = document.querySelector('.calc_toggle[data-id="brand"]');
     parentSwitch.setAttribute("aria-expanded", String(state.brandOn));
     // Branding row: its total when on. Off it has no price yet (the parts open with the switch), just a word by the (i)
-    var brandWord = mode !== "client" ? CONFIG.copy.recommended : share.r.b ? "" : CONFIG.copy.optional;
+    var brandWord = mode === "client" ? "" : CONFIG.copy.recommended; // in a lead's link, what's on already is the recommendation
     $("brand-word").textContent = brandWord;
     $("brand-word").hidden = state.brandOn || !brandWord;
     $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum()) : "";
@@ -560,8 +558,6 @@
       $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
       $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
     });
-
-    recTags.forEach(function (t) { t.el.hidden = t.on(); if (t.also) t.also.hidden = !t.el.hidden; });
 
     var r = calc(), reached = r.scope >= CONFIG.minimum;
     $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
@@ -657,7 +653,6 @@
       $("lede").textContent = share.m || C.clientLede;
       document.title = (share.n || "Your project") + " · Rimbo Designs";
       setBtn(cta, C.clientCta, C.clientCtaAlt);
-      markRecommended(share.r);
       setBtn($("reset"), C.reset, C.canUndo);
       $("reset").addEventListener("click", function () {
         var before = snap();
@@ -696,28 +691,6 @@
     });
     $("made-copy").addEventListener("click", function () { copyLink($("made-link").value); });
     $("made-link").addEventListener("focus", function () { this.select(); });
-  }
-
-  // The lead's view: what's switched on when the page opens is Rimbo's pick, so nothing needs a label.
-  // A dim "Recommended" only appears on something of his that they've switched off or changed.
-  var recTags = [];
-  function markRecommended(r) {
-    var C = CONFIG.copy;
-    CONFIG.pages.forEach(function (p, i) {
-      var n = Math.round(+r.p[i]) || 0;
-      if (!n) return;
-      var tag = el("span", "calc_rec", C.recommended + ": " + n), ex = $("ex-" + p.id);
-      ex.after(tag);
-      recTags.push({ el: tag, also: ex, on: function () { return state.pages[p.id] === n; } }); // takes the place of the examples
-    });
-    var on = (r.t || []).filter(function (id) { return byId[id] && (r.b || !isBrandPart(id)); });
-    if (r.b) on.push("brand");
-    on.forEach(function (id) {
-      var price = $("price-" + id); if (!price) return;
-      var tag = el("span", "calc_rec", C.recommended);
-      price.parentNode.insertBefore(tag, price);
-      recTags.push({ el: tag, on: function () { return id === "brand" ? state.brandOn : !!state.toggles[id]; } });
-    });
   }
 
   var current = { scope: "", range: "" };
