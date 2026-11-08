@@ -37,9 +37,9 @@
       makeNeedName: "Give it a project name first.",
       needScope: "Pick something first.",
       startOver: "Start over",
-      cleared: "All cleared.",
       undo: "Undo",
       canUndo: "You can undo this",
+      undoAlt: "Back to what you had",
       makeDone: "Link copied to your clipboard.",
       copy: "Copy",
       makeOpen: "Open it",
@@ -47,7 +47,6 @@
       clientLede: "This is what I'd build for you. Switch things on or off and the price follows.",
       recommended: "Recommended",
       reset: "Back to my recommendation",
-      resetDone: "Back to my recommendation.",
       clientCta: "Copy the link",
       clientCtaAlt: "Paste it in your reply",
       clientDone: "Link copied. Paste it in your reply to me.",
@@ -481,10 +480,14 @@
   var FOLD = ["height", "paddingTop", "paddingBottom", "marginTop", "marginBottom"], ready = false;
   function eased() { return ready && window.gsap && !reduceMotion; }
   function fold(box) { var cs = getComputedStyle(box), o = {}; FOLD.forEach(function (k) { o[k] = parseFloat(cs[k]) || 0; }); return o; }
-  function reveal(box, show) {
+  function reveal(box, show, instant) {
     if (box.dataset.show === String(show)) return;
     box.dataset.show = show;
-    if (!eased()) { box.hidden = !show; return; }
+    if (instant && window.gsap) { // one button takes over from another in the same spot
+      gsap.killTweensOf(box); gsap.killTweensOf(Array.from(box.children));
+      gsap.set(box, { clearProps: FOLD.join(",") + ",overflow" }); gsap.set(Array.from(box.children), { clearProps: "opacity,visibility,y" });
+    }
+    if (!eased() || instant) { box.hidden = !show; return; }
     var kids = Array.from(box.children), from = {}, to;
     if (box.hidden) FOLD.forEach(function (k) { from[k] = 0; }); else from = fold(box);
     gsap.killTweensOf(box); gsap.killTweensOf(kids);
@@ -577,7 +580,10 @@
     $("scope-summary").textContent = current.scope;
     $("f-selections").value = current.scope.split("\nEstimate:")[0];
     $("f-range").value = current.range;
-    reveal($("start-over"), mode !== "client" && picked()); // the lead has "Back to my recommendation"
+    if (undo && !sameSnap(snap(), undo.after)) undo = null; // something else changed: nothing left to undo
+    swapNow = !!undo !== undoShown; undoShown = !!undo;
+    reveal($("undo"), !!undo, swapNow);
+    reveal($("start-over"), mode !== "client" && picked() && !undo, swapNow); // the lead has "Back to my recommendation"
     if (mode !== "public") syncShare();
     queueWire();
   }
@@ -592,7 +598,7 @@
   function syncShare() {
     var o = shareData();
     if (!preview) history.replaceState(null, "", location.pathname + (mode === "make" ? "?make" : "") + shareHash(o));
-    if (mode === "client") reveal($("reset"), !!o.c);
+    if (mode === "client") reveal($("reset"), !!o.c && !undo, swapNow);
     $("made").hidden = true; // the scope changed: the copied link is no longer this version
   }
 
@@ -608,28 +614,28 @@
 
   // A short pop-up at the bottom of the screen (copied, or what's missing)
   var toastT = 0;
-  function toast(text, bad, action, onAction) {
+  function toast(text, bad) {
     var t = $("toast");
     t.textContent = text; t.classList.toggle("is-bad", !!bad);
-    if (action) {
-      var b = el("button", "calc_toast_btn", action); b.type = "button";
-      b.addEventListener("click", function () { t.hidden = true; onAction(); });
-      t.appendChild(b);
-    }
     t.hidden = false; t.classList.remove("is-in"); void t.offsetWidth; t.classList.add("is-in");
-    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, action ? 7000 : 2800);
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
   }
 
-  // Start over: clears everything at once, so the pop-up offers the way back
-  function setupStartOver() {
+  // Start over and Back to my recommendation change everything at once, so the button itself turns into Undo.
+  // It stays until something else changes: no pop-up that fades away before you've decided.
+  var undo = null, undoShown = false, swapNow = false;
+  function resetTo(target) {
+    undo = { before: snap() };
+    applySnap(target);
+    undo.after = snap();
+    render();
+  }
+  function setupUndo() {
     var C = CONFIG.copy;
     setBtn($("start-over"), C.startOver, C.canUndo);
-    $("start-over").addEventListener("click", function () {
-      var before = snap();
-      applySnap({ p: [], b: 0, t: [] });
-      render();
-      toast(C.cleared, false, C.undo, function () { applySnap(before); render(); });
-    });
+    $("start-over").addEventListener("click", function () { resetTo({ p: [], b: 0, t: [] }); });
+    setBtn($("undo"), C.undo, C.undoAlt);
+    $("undo").addEventListener("click", function () { var b = undo.before; undo = null; applySnap(b); render(); });
   }
 
   function setupShare() {
@@ -654,12 +660,7 @@
       document.title = (share.n || "Your project") + " · Rimbo Designs";
       setBtn(cta, C.clientCta, C.clientCtaAlt);
       setBtn($("reset"), C.reset, C.canUndo);
-      $("reset").addEventListener("click", function () {
-        var before = snap();
-        applySnap(share.r);
-        render();
-        toast(C.resetDone, false, C.undo, function () { applySnap(before); render(); });
-      });
+      $("reset").addEventListener("click", function () { resetTo(share.r); });
     }
 
     $("made-copy").textContent = C.copy;
@@ -786,7 +787,7 @@
   document.documentElement.setAttribute("data-mode", mode);
   if (share) applySnap(share.c || share.r);
   if (mode === "public") setupApply(); else setupShare();
-  setupStartOver();
+  setupUndo();
   if (preview) {
     var nav = el("nav", "calc_views"); nav.setAttribute("aria-label", "Views");
     CONFIG.copy.views.forEach(function (v) {
