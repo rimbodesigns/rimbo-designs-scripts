@@ -46,6 +46,7 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_step legend { padding: 0 8px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .calc_num { margin-right: .5em; color: var(--on-text); }
 .calc_label { font-size: 15px; }
+.calc_stack { display: block; min-width: 0; }
 .calc_hint { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; color: var(--muted); }
 
 /* One item = its row + its info box; the line sits under the item */
@@ -89,10 +90,9 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_item_row { cursor: pointer; }
 .is-lit .calc_label { color: var(--text); }
 
-/* Brand foundation: part of every project, so its switch is on, greyed out and can't be touched */
+/* Brand foundation: part of every project, so a tick in the switch's place: nothing to choose */
 .calc_fixed { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 12px 0; color: var(--text); }
-.calc_fixed .calc_switch { background: color-mix(in srgb, var(--text) 26%, var(--solid)); }
-.calc_fixed .calc_switch::after { transform: translateX(16px); background: var(--knob); }
+.calc_tick { flex: none; display: flex; align-items: center; width: 38px; height: 22px; color: var(--on-text); }
 .calc_item_row.is-fixed { cursor: default; }
 .calc_item_row.is-fixed .calc_rec::before { display: none; }
 
@@ -158,6 +158,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .calc_tip_text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
 .calc_tip_line { display: block; }
 .calc_tip_line + .calc_tip_line { margin-top: 8px; }
+.calc_tip_line.is-step { display: grid; grid-template-columns: 2em 1fr; margin-top: 12px; }
+.calc_tip_num { grid-row: 1 / span 2; font: 11px/1.95 var(--mono); color: var(--on-text); }
+.calc_tip_name { display: block; }
+.calc_tip_desc { display: block; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .calc_tip_close { position: absolute; top: 14px; right: 14px; appearance: none; width: 26px; height: 26px; padding: 0; cursor: pointer;
   border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--muted); font: 16px/1 var(--mono); }
 .calc_tip_close:hover { border-color: var(--on); color: var(--text); }

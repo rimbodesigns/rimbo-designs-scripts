@@ -6,7 +6,7 @@
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
     submitUrl: "",                 // PLACEHOLDER: MailerLite / email endpoint. Empty = log to the console only.
-    previewLead: { v: 1, n: "Sample project", m: "", r: { p: [1, 3, 1, 0], b: 1, t: ["colour", "logo", "seo", "type"] } }, // the client view in the hosted preview
+    previewLead: { v: 1, n: "Sample project", m: "", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     replyTo: "hello@rimbodesigns.com", // where a lead's version goes (the address in the site footer)
     underBudgetAutoMessage: true,  // true: "under €3k" sees the kind message instead of a reply promise. false: always the normal confirmation (reply by hand).
     showNewsletterOptIn: false,    // OPEN DECISION: rare-update checkbox, unticked by default. See apply-flow.md §5.3.
@@ -91,15 +91,25 @@
     brand: {
       label: "Branding",
       info: "Switch this on if you also need the brand itself made, then pick the parts.",
-      // Every project starts here, even with an existing brand: on, greyed out, can't be switched off
+      // Every project starts here, even with an existing brand: a tick, no switch
       foundation: { id: "foundation", label: "Brand foundation", price: 500, tag: "Every project",
-        info: "At least two calls, even if you already have a brand. Your mission and vision, where the website should go, and how much freedom I have to evolve the brand." },
-      preset: ["logo", "colour", "type"],
+        // A line "01::Name::Text" shows as a numbered step in the tip card
+        info: "Every project starts here, even if your brand already exists.\n" +
+          "01::Kickoff questionnaire::Your business, goals, competitors and a moodboard, before we talk.\n" +
+          "02::Discovery workshop::A 60 to 90 minute call on your mission, vision and audience.\n" +
+          "03::Competitor review::I look at who you're up against and where you can stand out.\n" +
+          "04::Direction call::Where the website should go, how much freedom I have to evolve the brand, and how we work together." },
+      preset: ["identity", "logo"],
       items: [
+        // Colour and type aren't sold apart: picking colours isn't the work, finding the visual language is (Rimbo, 2026-11-08)
+        { id: "identity", label: "Brand identity system", hint: "Stylescapes and rounds on colour, type and style", price: 1200,
+          info: "The whole visual language of your brand, not just some colours and fonts.\n" +
+            "01::Stylescapes::Three directions side by side: A, B and C.\n" +
+            "02::Rounds::We take the best one through a few rounds of colour, typography and style.\n" +
+            "03::The system::One visual language, ready for the design system of your site." },
         { id: "logo",   label: "Logo",                  price: 500, info: "A logo and its versions (full, icon, one colour), ready for web and print." },
-        { id: "colour", label: "Colour system",         price: 800, info: "A palette built for screens: main colours, tints and which goes where. It becomes part of the site's design system." },
-        { id: "type",   label: "Typography research",   price: 400, info: "Typefaces chosen and paired, with sizes and spacing that work from big headings to small print." },
         { id: "guide",  label: "Brand guide",           price: 500, info: "A short guide to using the logo, colours and type, so others can work with your brand." },
+        { id: "illustrations", label: "Illustrations",  price: 600, info: "A set of custom illustrations in the style of your brand." }, // DRAFT price
         { id: "social", label: "Social profiles",       price: 200, info: "Profile images and banners for your social channels." },
         { id: "print",  label: "Business card + flyer", price: 200, info: "A print-ready business card and flyer." }
       ]
@@ -272,7 +282,16 @@
     if (box.hidden || box.dataset.key !== key) {
       $("tip-title").textContent = info[key].label;
       var tt = $("tip-text"); tt.textContent = "";
-      info[key].text.split("\n").forEach(function (line) { tt.appendChild(el("span", "calc_tip_line", line)); });
+      info[key].text.split("\n").forEach(function (line) {
+        var step = line.split("::"), row = el("span", "calc_tip_line", step.length === 3 ? "" : line);
+        if (step.length === 3) {
+          row.classList.add("is-step");
+          row.appendChild(el("span", "calc_tip_num", step[0]));
+          row.appendChild(el("span", "calc_tip_name", step[1]));
+          row.appendChild(el("span", "calc_tip_desc", step[2]));
+        }
+        tt.appendChild(row);
+      });
       box.dataset.key = key;
       box.classList.remove("is-in"); void box.offsetWidth; box.classList.add("is-in");
     }
@@ -335,7 +354,10 @@
     var sw = el("button", "calc_toggle");
     sw.type = "button"; sw.setAttribute("role", "switch"); sw.dataset.id = t.id;
     sw.appendChild(el("span", "calc_switch"));
-    sw.appendChild(el("span", "calc_label", t.label));
+    var text = el("span", "calc_stack");
+    text.appendChild(el("span", "calc_label", t.label));
+    if (t.hint) text.appendChild(el("span", "calc_hint", t.hint));
+    sw.appendChild(text);
     sw.addEventListener("click", onToggle);
     var price = el("span", "calc_price", priceText); price.id = "price-" + t.id;
     sw.setAttribute("aria-describedby", price.id);
@@ -347,10 +369,12 @@
     return item;
   }
 
-  // The locked row: looks like a switch that's on, but it's no control, so it can't be focused or clicked
+  // The row that's part of every project: a tick instead of a switch, because there's nothing to choose
   function makeFixed(t) {
     var item = el("div", "calc_item"), row = el("div", "calc_item_row is-fixed"), label = el("span", "calc_fixed");
-    label.appendChild(el("span", "calc_switch")); label.appendChild(el("span", "calc_label", t.label));
+    var tick = el("span", "calc_tick");
+    tick.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>';
+    label.appendChild(tick); label.appendChild(el("span", "calc_label", t.label));
     row.appendChild(label);
     row.appendChild(addInfo(t.id, t.label, t.info, row));
     var tag = el("span", "calc_rec"); tag.appendChild(el("span", "calc_rec_word", t.tag));
