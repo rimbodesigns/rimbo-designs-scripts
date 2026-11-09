@@ -140,6 +140,7 @@
 /* Your estimate, with the day the link was made quietly on the right (the same faded capitals as EXCL. VAT) */
 .calc_est_row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
 .calc_est_row .calc_eyebrow { margin: 0; }
+.calc_est_row .calc_eyebrow, .calc_date { white-space: nowrap; } /* each stays on one line */
 .calc_date[hidden] { display: none; }
 /* The price, with EXCL. VAT quietly on the same line */
 .calc_price_row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }

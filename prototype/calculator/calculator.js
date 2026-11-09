@@ -36,7 +36,7 @@
       copy: "Copy",
       makeOpen: "Open it",
       clientEyebrow: "Proposal",
-      dated: "Last updated {date}", // quiet, next to Your estimate: the day the link was made (Rimbo's words, 2026-11-09)
+      dated: "Updated {date}", // quiet, next to Your estimate: the day the link was made. "Last updated 10 Nov 2026" didn't fit the card
       clientLede: "Switch things on or off and the price follows.",
       recommended: "Recommended",
       reset: "Back to my recommendation",
