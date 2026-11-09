@@ -159,10 +159,9 @@
   };
 
   // The markup inside [data-calc]. Ids start with calc- so nothing on the page can share them
-  function template(logo) {
+  function template() {
     return '<canvas class="calc_ball" id="calc-ball" aria-hidden="true"></canvas>' +
     '<main class="calc">' +
-      (logo ? '<a class="calc_logo" href="https://www.rimbodesigns.com" target="_blank" rel="noopener" aria-label="Rimbo Designs"></a>' : '') +
       '<header class="calc_head">' +
         '<p class="calc_eyebrow" id="calc-eyebrow">' + BASE.copy.clientEyebrow + '</p>' +
         '<h1 class="calc_title" id="calc-title"></h1>' +
@@ -338,7 +337,10 @@
 
     if (q.get("theme") === "light" || q.get("theme") === "dark") root.setAttribute("data-calc-theme", q.get("theme"));
 
-    root.innerHTML = template(root.hasAttribute("data-calc-logo"));
+    // What the Designer put in the section with data-calc-end (the logo back to the site) stays, under the calculator
+    var end = root.querySelector("[data-calc-end]");
+    root.innerHTML = template();
+    if (end) root.querySelector(".calc").appendChild(end);
     function $(id) { return document.getElementById("calc-" + id); }
 
     // A different link pasted into the same tab: start again with it. Only a new #for= counts, never an anchor

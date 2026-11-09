@@ -22,8 +22,7 @@ html, body { margin: 0; background: #0c0c0c; color: #f8f5ee; }
 .btn_line { display: inline-flex; align-items: center; gap: .7em; white-space: nowrap; grid-area: 1 / 1 / 2 / 2; }
 .btn_t, .btn_arrow { display: inline-block; }
 
-/* The logo, quiet in the top right corner, on the price card's right edge. On the site the nav has it */
-.calc_logo { position: absolute; top: 44px; right: 24px; display: block; width: 72px; height: 26px; color: #f8f5ee; background: currentColor; opacity: .4; transition: opacity .3s ease;
+/* The logo back to the site, quiet, centred under the boxes (as the Designer's calc_end on /proposal; no nav there) */
+.calc_end { margin-top: 2rem; width: 72px; height: 26px; color: #f8f5ee; background: currentColor; opacity: .4; transition: opacity .3s ease;
   -webkit-mask: url(logo.svg) center / contain no-repeat; mask: url(logo.svg) center / contain no-repeat; }
-.calc_logo:hover { opacity: .85; }
-@media (max-width: 560px) { .calc_logo { position: static; margin: 0 0 24px; } } /* the ball has the top right corner on phones */
+.calc_end:hover { opacity: .85; }
