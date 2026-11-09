@@ -329,8 +329,9 @@
 
   // Starts the new page before the cube is built, all in one go so nothing paints in between. For that moment the old
   // page is out of the document: the page functions search the whole document, and they measure the new page in its
-  // real place in the flow. Then it comes straight back, with its own CSS still on, for its last two seconds on screen
-  function startCube(data) {
+  // real place in the flow. Then it comes straight back, with its own CSS still on, for its last two seconds on screen.
+  // alone(next), if given, runs while the new page is the only one in the document (the ticket tear measures it there)
+  function startCube(data, alone) {
     var current = data.current.container, next = data.next.container;
     var parent = current.parentNode, sibling = current.nextSibling;
     var root = document.documentElement;
@@ -346,6 +347,7 @@
     initBeforeEnterFunctions(next, doc);
     if (window.lenis) window.lenis.resize();
     if (hasScrollTrigger) ScrollTrigger.refresh();
+    if (alone) alone(next);
     // while both pages are on screen each keeps its classes on its own face: on <html> the post CSS would reach the other page too
     var nextClasses = PAGE_HTML_CLASSES.filter(function (name) { return root.classList.contains(name); });
     root.classList.remove.apply(root.classList, PAGE_HTML_CLASSES);
@@ -383,6 +385,364 @@
     videos.forEach(function (video) {
       var playing = video.play();
       if (playing && playing.catch) playing.catch(function () {});
+    });
+  }
+
+  // -----------------------------------------
+  // TICKET TEAR
+  // The Journey pass's button (any link inside .pass) rips the ticket along its perforation: the main part goes up, the
+  // stub goes down, and the next page (/apply) was behind it all along. On that page X ([data-tear-close]) and the Back
+  // button play it backwards, to the same spot on the page you came from. Opened any other way, X is a plain link home.
+  // The two halves are copies of the ticket, so its look stays in Webflow. Rimbo picked "1 Ticket" with the sound from the
+  // lab in prototype/ticket-tear. A tear keeps the arriving page in the flow, at the scroll it needs, and lifts the
+  // leaving page into a fixed layer: forward /apply starts at its top, backwards the old page lands where you were
+  // -----------------------------------------
+  var TEAR_PRESS = 0.14, TEAR_RIP = 0.56, TEAR_FLY = 1.0, TEAR_PAPER = '#F8F5EE';
+  var tearReturn = null; // { from, to, y, ground } while you are on the page the ticket tore open
+  var tearStyle = null;
+
+  function tearRule(data) {
+    var t = data.trigger;
+    return !reducedMotion && !!(t && t.nodeType === 1 && t.closest('.pass'));
+  }
+  function tearBackRule(data) {
+    return !reducedMotion && !!tearReturn && (data.trigger === 'back' || data.trigger === 'forward' || data.trigger === 'popstate') &&
+      samePage(data.current.url.href, tearReturn.to) && samePage(data.next.url.href, tearReturn.from);
+  }
+  function samePage(a, b) {
+    var x = new URL(a, location.href), y = new URL(b, location.href);
+    return x.pathname.replace(/\/$/, '') === y.pathname.replace(/\/$/, '') && x.search === y.search;
+  }
+
+  function tearCss() {
+    if (tearStyle) return;
+    tearStyle = document.createElement('style');
+    tearStyle.textContent =
+      '.tear_layer{position:fixed;inset:0;overflow:hidden}' +
+      '.tear_stage{position:fixed;inset:0;z-index:999;overflow:hidden;perspective:1600px}' +
+      '.tear_part{position:absolute;will-change:transform}' +
+      '.tear_shadow{position:absolute;opacity:0;box-shadow:0 2.5rem 6rem rgba(0,0,0,.55),0 .5rem 1.5rem rgba(0,0,0,.35)}' +
+      '.tear_clone{position:absolute!important;left:0;top:0;margin:0!important;pointer-events:none}' +
+      '.tear_clone .pass_stub{transition:none!important}' +
+      '.tear_clone.is-main .pass_stub,.tear_clone.is-stub .pass_main{visibility:hidden}' +
+      '.tear_shade{position:absolute;inset:0;z-index:50;opacity:0;pointer-events:none;background:linear-gradient(180deg,rgba(19,19,19,.55),rgba(19,19,19,.15))}' +
+      '.tear_fibre{position:absolute;z-index:60;overflow:visible;pointer-events:none}' +
+      '.tear_fleck{position:absolute;left:0;top:0;z-index:70;background:' + TEAR_PAPER + ';opacity:0;pointer-events:none}';
+    document.head.appendChild(tearStyle);
+  }
+
+  function tearRand(a, b) { return a + Math.random() * (b - a); }
+  function tearEl(cls, parent) {
+    var el = document.createElement('div');
+    el.className = cls;
+    if (parent) parent.appendChild(el);
+    return el;
+  }
+
+  // Where the ticket really is: flat, without the mouse tilt and the stub's hover lift (both are carried over)
+  function tearMeasure(pass) {
+    var main = qs('.pass_main', pass), stub = qs('.pass_stub', pass);
+    if (!main || !stub) return null;
+    var tilt = pass.style.transform, lift = getComputedStyle(stub).transform, stubStyle = stub.style.cssText;
+    pass.style.transform = 'none';
+    stub.style.transition = 'none';
+    stub.style.transform = 'none';
+    var P = pass.getBoundingClientRect(), M = main.getBoundingClientRect(), S = stub.getBoundingClientRect();
+    var cs = getComputedStyle(pass);
+    var angle = /rotateX\(([-\d.]+)deg\) rotateY\(([-\d.]+)deg\)/.exec(tilt);
+    stub.style.cssText = stubStyle;
+    pass.style.transform = tilt;
+    return {
+      P: P, M: M, S: S, width: cs.width, height: cs.height, zoom: parseFloat(cs.zoom) || 1,
+      lift: lift === 'none' ? '' : lift, tiltX: angle ? +angle[1] : 0, tiltY: angle ? +angle[2] : 0,
+      stacked: S.top >= M.bottom - 3 // on phones the stub sits under the main part and the tear runs across
+    };
+  }
+
+  // One copy of the ticket per half, each showing only its own half, in the spot of the real one
+  function tearPart(pass, m, kind, parent) {
+    var part = tearEl('tear_part is-' + kind, parent);
+    part.style.cssText = 'left:' + m.P.left + 'px;top:' + m.P.top + 'px;width:' + m.P.width + 'px;height:' + m.P.height + 'px';
+    var half = kind === 'main' ? m.M : m.S;
+    var shadow = tearEl('tear_shadow', part);
+    shadow.style.cssText = 'left:' + (half.left - m.P.left) + 'px;top:' + (half.top - m.P.top) + 'px;width:' + half.width + 'px;height:' + half.height + 'px';
+    var clone = pass.cloneNode(true);
+    clone.classList.add('tear_clone', 'is-' + kind);
+    clone.removeAttribute('id');
+    clone.style.width = m.width;
+    clone.style.height = m.height;
+    clone.style.transform = 'none';
+    clone.style.visibility = ''; // the real ticket hides while its copies are out
+    var inner = qs(kind === 'main' ? '.pass_main' : '.pass_stub', clone);
+    if (kind === 'stub' && m.lift) inner.style.transform = m.lift;
+    var shade = tearEl('tear_shade', inner);
+    part.appendChild(clone);
+    return { part: part, clone: clone, shade: shade, shadow: shadow };
+  }
+
+  // The white core of the paper: little fibres on every tab between two holes, revealed as the tip runs past
+  function tearFibre(part, m, dir) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var length = m.stacked ? m.P.width : m.P.height, pitch = 14 * m.zoom, at = 14 * m.zoom + pitch * 0.5, d = '';
+    while (at < length - 14 * m.zoom) {
+      var a = at - pitch * 0.32, b = at + pitch * 0.32, s = a, line = [[0, a]];
+      while (s < b) {
+        s = Math.min(b, s + tearRand(0.8, 2));
+        line.push([dir * tearRand(0.5, Math.random() < 0.12 ? 4.5 : 2.4), s]);
+      }
+      line.push([0, b]);
+      d += 'M' + line.map(function (p) { return m.stacked ? p[1] + ' ' + p[0] : p[0] + ' ' + p[1]; }).join('L') + 'Z';
+      at += pitch;
+    }
+    var svg = document.createElementNS(NS, 'svg'), path = document.createElementNS(NS, 'path');
+    svg.setAttribute('class', 'tear_fibre');
+    svg.setAttribute('aria-hidden', 'true');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', TEAR_PAPER);
+    svg.appendChild(path);
+    if (m.stacked) {
+      svg.style.cssText = 'left:0;top:' + (m.S.top - m.P.top) + 'px;width:' + length + 'px;height:1px';
+      svg.setAttribute('viewBox', '0 0 ' + length + ' 1');
+    } else {
+      svg.style.cssText = 'left:' + (m.S.left - m.P.left) + 'px;top:0;width:1px;height:' + length + 'px';
+      svg.setAttribute('viewBox', '0 0 1 ' + length);
+    }
+    part.appendChild(svg);
+    return svg;
+  }
+  function tearFibreShow(svg, tip, stacked) {
+    svg.style.clipPath = stacked // the clip reaches past the 1 px box the fibres stick out of
+      ? 'inset(-8px ' + ((1 - tip) * 100) + '% -8px 0)'
+      : 'inset(0 -8px ' + ((1 - tip) * 100) + '% -8px)';
+  }
+
+  // Square bits of paper that come off at the tip
+  function tearFlecks(tl, parent, m, startAt) {
+    var length = m.stacked ? m.P.width : m.P.height, count = Math.round(length / 22);
+    for (var i = 0; i < count; i++) {
+      var p = (i + tearRand(0.1, 0.9)) / count, size = tearRand(1.5, Math.random() < 0.15 ? 7 : 4);
+      var fleck = tearEl('tear_fleck', parent);
+      fleck.style.width = size + 'px';
+      fleck.style.height = tearRand(1.5, size) + 'px';
+      if (Math.random() < 0.3) fleck.style.background = '#ECE5D6';
+      var x = m.stacked ? m.P.left + p * length : m.S.left, y = m.stacked ? m.S.top : m.P.top + p * length;
+      var at = startAt + TEAR_RIP * Math.sqrt(p); // when the tip passes: it speeds up (power1.in)
+      var side = Math.random() < 0.5 ? -1 : 1, life = tearRand(0.35, 0.85);
+      tl.fromTo(fleck, { x: x, y: y, rotation: tearRand(0, 90), opacity: 0 }, { opacity: 1, duration: 0.03, ease: 'none' }, at);
+      tl.to(fleck, {
+        x: x + (m.stacked ? tearRand(-50, 50) : side * tearRand(12, 170)),
+        y: y + (m.stacked ? side * tearRand(12, 110) : tearRand(-50, 40)),
+        rotation: tearRand(-420, 420), duration: life, ease: 'power2.out'
+      }, at);
+      tl.to(fleck, { y: '+=' + tearRand(50, 200), duration: life, ease: 'power2.in' }, at);
+      tl.to(fleck, { opacity: 0, duration: life * 0.4, ease: 'power1.in' }, at + life * 0.6);
+    }
+  }
+
+  // The rip you hear: made here, no file to host. Rough noise that speeds up with the tip, a click on every tab, the last
+  // tab letting go and a soft whoosh; backwards it plays reversed
+  var tearAudio = null, tearBuffers = null, tearPlaying = null;
+  function tearSound(back, speed, offset) {
+    try {
+      if (!tearAudio) {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        tearAudio = new Ctx();
+        tearBuffers = tearRipBuffers(tearAudio);
+      }
+      if (tearAudio.state === 'suspended') tearAudio.resume();
+      if (tearPlaying) { try { tearPlaying.stop(); } catch (err) {} }
+      var src = tearAudio.createBufferSource(), gain = tearAudio.createGain();
+      src.buffer = back ? tearBuffers.back : tearBuffers.rip;
+      src.playbackRate.value = speed;
+      gain.gain.value = 0.32;
+      src.connect(gain);
+      gain.connect(tearAudio.destination);
+      src.start(0, offset || 0);
+      tearPlaying = src;
+    } catch (err) { /* no sound is fine */ }
+  }
+  function tearRipBuffers(ctx) {
+    var rate = ctx.sampleRate, n = Math.floor((TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) * rate);
+    var data = new Float32Array(n), ripEnd = TEAR_PRESS + TEAR_RIP, prev = 0, low = 0, i, j;
+    for (i = 0; i < n; i++) {
+      var t = i / rate, white = Math.random() * 2 - 1, high = white - prev;
+      prev = white;
+      var rip = t > TEAR_PRESS && t < ripEnd ? Math.pow((t - TEAR_PRESS) / TEAR_RIP, 0.7) : 0;
+      var fall = t >= ripEnd ? Math.exp(-(t - ripEnd) * 26) : 0;
+      low += (white - low) * 0.05;
+      var flutter = 0.55 + 0.45 * Math.sin(t * 2 * Math.PI * 58 + Math.sin(t * 90) * 2);
+      var whoosh = t > ripEnd ? Math.sin(Math.min(1, (t - ripEnd) / (TEAR_FLY * 0.8)) * Math.PI) : 0;
+      data[i] = high * (rip * flutter + fall) * 0.24 + low * whoosh * 0.5;
+    }
+    for (var k = 0; k < 42; k++) {
+      var start = Math.floor((TEAR_PRESS + TEAR_RIP * Math.sqrt((k + tearRand(0.1, 0.9)) / 42)) * rate);
+      var amp = tearRand(0.25, 0.75) * (0.5 + k / 42 * 0.6), len = Math.floor(rate * tearRand(0.003, 0.008));
+      for (j = 0; j < len && start + j < n; j++) data[start + j] += (Math.random() * 2 - 1) * amp * Math.pow(1 - j / len, 2);
+    }
+    var snap = Math.floor(ripEnd * rate);
+    for (j = 0; j < rate * 0.05 && snap + j < n; j++) {
+      data[snap + j] += (Math.sin(j / rate * 2 * Math.PI * 170) * 0.5 + (Math.random() * 2 - 1) * 0.45) * Math.exp(-j / (rate * 0.012));
+    }
+    var rip = ctx.createBuffer(1, n, rate), back = ctx.createBuffer(1, n, rate);
+    rip.copyToChannel(data, 0);
+    back.copyToChannel(data.slice().reverse(), 0);
+    return { rip: rip, back: back };
+  }
+
+  // The form page's ground, the colour the ticket rips open onto. Read near both side edges, where a page shows its
+  // background and not a field or a card. A page without one of its own shows the body's
+  function tearGround(page) {
+    var hidden = page.style.visibility, body = getComputedStyle(document.body).backgroundColor, W = window.innerWidth, H = window.innerHeight;
+    page.style.visibility = 'visible';
+    var colours = [[6, H * 0.5], [W - 6, H * 0.5], [6, H * 0.8], [W - 6, H * 0.8]].map(function (point) {
+      var stack = document.elementsFromPoint(point[0], point[1]);
+      for (var i = 0; i < stack.length; i++) {
+        if (!page.contains(stack[i])) continue;
+        var bg = getComputedStyle(stack[i]).backgroundColor;
+        if (bg && bg !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(bg)) return bg;
+      }
+      return body;
+    });
+    page.style.visibility = hidden;
+    return colours.sort(function (a, b) {
+      return colours.filter(function (c) { return c === b; }).length - colours.filter(function (c) { return c === a; }).length;
+    })[0];
+  }
+
+  // The tear itself, forwards. Backwards it is the same timeline in reverse. form = the page behind the ticket
+  function tearTimeline(pass, m, ground, form, stage) {
+    var H = window.innerHeight, tl = gsap.timeline({ paused: true });
+    var seamX = m.S.left - m.P.left, seamY = m.S.top - m.P.top;
+    var flecks = tearEl('', stage);
+    var main = tearPart(pass, m, 'main', stage), stub = tearPart(pass, m, 'stub', stage);
+    stage.appendChild(flecks);
+    var fibres = [tearFibre(main.part, m, 1), tearFibre(stub.part, m, -1)];
+    fibres.forEach(function (svg) { tearFibreShow(svg, 0, m.stacked); });
+    gsap.set([main.part, stub.part], { transformOrigin: m.stacked ? (m.P.width + 'px ' + seamY + 'px') : (seamX + 'px ' + m.P.height + 'px') }); // the tear runs towards this point
+    gsap.set([main.clone, stub.clone], { transformPerspective: 1600, rotationX: m.tiltX, rotationY: m.tiltY });
+
+    var ripAt = TEAR_PRESS, flyAt = ripAt + TEAR_RIP - 0.02, tip = { p: 0 };
+    tl.to([main.clone, stub.clone], { rotationX: 0, rotationY: 0, duration: 0.3, ease: 'power2.out' }, 0);
+    tl.to(ground, { opacity: 1, duration: 0.5, ease: 'power1.inOut' }, 0.02);
+    // pulled tight
+    tl.to(main.part, { y: -2.5, duration: TEAR_PRESS, ease: 'power2.out' }, 0);
+    tl.to(stub.part, { y: 2.5, duration: TEAR_PRESS, ease: 'power2.out' }, 0);
+    // the tip runs along the perforation, speeding up
+    tl.to(tip, {
+      p: 1, duration: TEAR_RIP, ease: 'power1.in',
+      onUpdate: function () { fibres.forEach(function (svg) { tearFibreShow(svg, tip.p, m.stacked); }); }
+    }, ripAt);
+    tl.to(main.part, m.stacked ? { rotation: 1.1, y: -7, duration: TEAR_RIP, ease: 'power1.in' } : { rotation: -0.9, y: -8, x: -2, duration: TEAR_RIP, ease: 'power1.in' }, ripAt);
+    tl.to(stub.part, m.stacked ? { rotation: -1.6, y: 7, duration: TEAR_RIP, ease: 'power1.in' } : { rotation: 2.1, y: 8, x: 4, duration: TEAR_RIP, ease: 'power1.in' }, ripAt);
+    tl.to([main.shadow, stub.shadow], { opacity: 1, duration: TEAR_RIP, ease: 'power1.in' }, ripAt);
+    tearFlecks(tl, flecks, m, ripAt);
+    // the last tab lets go: the main part up, the stub down
+    var up = (m.stacked ? m.M.bottom : m.P.bottom) + 90 + (m.stacked ? 0 : m.P.width * 0.1);
+    var down = H - (m.stacked ? m.S.top : m.P.top) + 90 + (m.stacked ? 0 : m.S.width * 0.2);
+    tl.to(main.part, { y: -up, x: m.stacked ? 0 : -14, rotation: m.stacked ? 3 : -5, rotationX: 22, duration: TEAR_FLY, ease: 'osmo' }, flyAt);
+    tl.to(stub.part, { y: down, x: m.stacked ? 0 : 26, rotation: m.stacked ? -4 : 11, rotationX: -22, duration: TEAR_FLY * 0.96, ease: 'osmo' }, flyAt);
+    tl.to([main.shade, stub.shade], { opacity: 1, duration: TEAR_FLY * 0.6, ease: 'power1.in' }, flyAt);
+    // the form page was there all along
+    tl.fromTo(form, { autoAlpha: 0, y: 26, scale: 0.975 }, { autoAlpha: 1, y: 0, scale: 1, duration: TEAR_FLY * 0.85, ease: 'osmo' }, flyAt + 0.08);
+    return tl;
+  }
+
+  function runTear(data, back) {
+    var current = data.current.container, next = data.next.container;
+    var memory = tearReturn;
+    return new Promise(function (resolve) {
+      // Webflow.destroy() ran in beforeEnter; its engine needs a frame to notice before it can start again (see restartWebflow)
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () {
+          if (rdNavFull.close) rdNavFull.close(true);
+          if (window.lenis) window.lenis.stop();
+          tearCss();
+          var pass = back ? null : data.trigger.closest('.pass');
+          var m = pass ? tearMeasure(pass) : null;
+          var y = back ? memory.y : window.scrollY;
+          var ground = back ? memory.ground : '';
+          if (back) ground = ground || tearGround(current);
+          var parent = current.parentElement || document.body;
+
+          var started = startCube(data, function () {
+            if (!back) { ground = tearGround(next); return; }
+            gsap.set(next, { autoAlpha: 1 });
+            window.scrollTo(0, y); // the page you came from, back at your spot
+            if (hasScrollTrigger) ScrollTrigger.update();
+            pass = qs('.pass', next);
+            m = pass ? tearMeasure(pass) : null;
+          });
+          var leftAt = started.scrollY;
+
+          // The layers, bottom to top: the ticket's page, the ground, the form page, the ticket's halves
+          var under = tearEl('tear_layer', null), groundEl = tearEl('', null), over = null;
+          under.style.zIndex = 997;
+          groundEl.style.cssText = 'position:absolute;inset:0;opacity:0;background:' + ground;
+          var face = getComputedStyle(document.body).backgroundColor;
+          parent.insertBefore(under, current);
+          var form;
+          if (back) {
+            // the form page leaves: lifted out of the flow, above the ground. The page you came from waits in the flow below
+            over = tearEl('tear_layer', null);
+            over.style.zIndex = 998;
+            parent.insertBefore(over, current);
+            over.appendChild(current);
+            under.appendChild(groundEl);
+            gsap.set(current, { position: 'absolute', top: -leftAt, left: 0, width: '100%', transformOrigin: '50% ' + (leftAt + window.innerHeight / 2) + 'px' });
+            form = current;
+          } else {
+            // the ticket's page leaves into the bottom layer; the form page waits in the flow above it, at its top
+            under.style.background = face;
+            under.appendChild(current);
+            under.appendChild(groundEl);
+            gsap.set(current, { position: 'absolute', top: -leftAt, left: 0, width: '100%' });
+            gsap.set(next, { position: 'relative', zIndex: 998, backgroundColor: ground, transformOrigin: '50% ' + window.innerHeight / 2 + 'px' });
+            form = next;
+          }
+          window.scrollTo(0, back ? y : 0);
+
+          var stage = tearEl('tear_stage', parent);
+
+          function done() {
+            stage.remove();
+            under.remove();
+            if (over) over.remove();
+            if (pass) pass.style.visibility = '';
+            gsap.set(next, { clearProps: 'all' });
+            if (back) {
+              if (window.lenis) window.lenis.scrollTo(y, { immediate: true, force: true }); else window.scrollTo(0, y);
+              tearReturn = null;
+            } else if (tearReturn) {
+              tearReturn.ground = ground;
+            }
+            playVideos(started.nextVideos);
+            finishCube(started);
+            resolve();
+          }
+
+          if (!pass || !m) { // no ticket to tear (it is gone from that page): the form page simply fades
+            if (back) {
+              gsap.timeline({ onComplete: done })
+                .set(groundEl, { opacity: 1 })
+                .to(form, { autoAlpha: 0, duration: 0.5, ease: 'osmo' })
+                .to(groundEl, { opacity: 0, duration: 0.4, ease: 'power1.inOut' }, '-=0.2');
+            } else {
+              gsap.timeline({ onComplete: done }).fromTo(form, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: 'osmo' });
+            }
+            return;
+          }
+          pass.style.visibility = 'hidden';
+          var tl = tearTimeline(pass, m, groundEl, form, stage);
+          if (back) {
+            tl.progress(1).timeScale(1.12).eventCallback('onReverseComplete', done).reverse();
+            tearSound(true, 1.12, Math.max(0, (TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) - tl.duration()));
+          } else {
+            tl.eventCallback('onComplete', done).play(0);
+            tearSound(false, 1);
+          }
+        });
+      });
     });
   }
 
@@ -474,6 +834,33 @@
       if (window.lenis) window.lenis.start();
     });
 
+    // The ticket tear's way back. X on the page the ticket tore open is Back, so the history stays as it was and the Back
+    // button does the same. Anywhere else (opened directly, the thank-you page) X stays a plain link
+    document.addEventListener('click', function (e) {
+      var x = e.target.closest && e.target.closest('[data-tear-close]');
+      if (!x || !tearReturn || !samePage(location.href, tearReturn.to)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!barba.transitions.isRunning) history.back();
+    }, true);
+    barba.hooks.before(function (data) { // noted for every click on the ticket, so X is "back" with reduced motion too (then it fades)
+      var t = data.trigger;
+      if (t && t.nodeType === 1 && t.closest('.pass')) tearReturn = { from: data.current.url.href, to: data.next.url.href, y: window.scrollY, ground: '' };
+    });
+    barba.hooks.after(function () {
+      if (tearReturn && !samePage(location.href, tearReturn.to)) tearReturn = null; // left that page some other way
+    });
+
+    // A Webflow form that sends you on after it's done (the apply form to /thank-you) goes through Barba, so the cube plays
+    if (window.Webflow && typeof Webflow.location === 'function') {
+      var webflowLocation = Webflow.location;
+      Webflow.location = function (url) {
+        var to = new URL(url, location.href);
+        if (to.origin === location.origin && !barbaSkips({ el: document.body, href: to.href })) barba.go(to.href);
+        else webflowLocation.call(Webflow, url);
+      };
+    }
+
     // One navigation at a time. preventRunning only starts once the page has been fetched, which leaves a gap for a second click
     var navigating = false, go = barba.go;
     barba.go = function (href, trigger, e) {
@@ -503,9 +890,21 @@
       }, {
         name: 'cube',
         sync: true,
-        custom: function (data) { return data.trigger !== 'back' && data.trigger !== 'forward' && data.trigger !== 'popstate' && !linkHash && !reducedMotion; },
+        custom: function (data) { return data.trigger !== 'back' && data.trigger !== 'forward' && data.trigger !== 'popstate' && !linkHash && !reducedMotion && !tearRule(data); },
         leave: function (data) { return runPageLeaveAnimation(data.current.container, data.next.container, data); },
         enter: function () { return runPageEnterAnimation(); }
+      }, {
+        name: 'tear',
+        sync: true,
+        custom: tearRule,
+        leave: function (data) { return runTear(data, false); },
+        enter: function () { return Promise.resolve(); }
+      }, {
+        name: 'tear-back',
+        sync: true,
+        custom: tearBackRule,
+        leave: function (data) { return runTear(data, true); },
+        enter: function () { return Promise.resolve(); }
       }]
     });
   }
