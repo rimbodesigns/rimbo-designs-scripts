@@ -7080,14 +7080,14 @@
   }
 
   // =========================================================
-  // STAGING LINKS — on webflow.io only: the menu, the logo, the buttons and every other internal link to the OLD
-  // home, service and work pages open the new ones (Home Extreme, Service V2, Work V2), so Rimbo can click through the new
+  // STAGING LINKS — on webflow.io only: the menu, the buttons and every other internal link to the OLD
+  // service and work pages open the new ones (Service V2, Work V2), so Rimbo can click through the new
   // experience without falling back to the old pages. The Webflow links stay as they are (the live site keeps working
   // untouched); this only rewrites the href here, until the URL structure is cleared up. Dutch (/nl) links are left alone.
   // =========================================================
   function rdStagingLinks() {
     if (!/\.webflow\.io$/.test(location.hostname)) return;
-    var MAP = { '/': '/home-extreme', '/service': '/service-v2', '/work': '/work-v2' };
+    var MAP = { '/service': '/service-v2', '/work': '/work-v2' };
     function fix(a) {
       if (!a || !a.getAttribute) return;
       var h = a.getAttribute('href');
