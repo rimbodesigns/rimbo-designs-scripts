@@ -6297,6 +6297,8 @@
       next.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;overflow:hidden;pointer-events:none';
       slider.appendChild(next);
       initSpatialCardsSlider();
+      var seen = new IntersectionObserver(function (entries) { if (entries[0].isIntersecting) { seen.disconnect(); reveal(); } }, { threshold: 0.1 });
+      seen.observe(sec);
       var watch = function () { clips = watchClips(); }; // after the page has loaded, so the clips don't compete with the hero photo
       if (document.readyState === 'complete') watch(); else rdOn(window, 'load', watch, { once: true });
       var rt = null; // Osmo re-clones the cards after a width change: watch the new clips too
@@ -6305,6 +6307,25 @@
         rt = setTimeout(function () { if (clips) clips.disconnect(); clips = watchClips(); }, 450);
       });
       setClock();
+    }
+    // The entrance (Rimbo, 2026-11-09: "the recent work can load in like it loads in on the homepage, and then the text drops
+    // in with recent work"): the hero card comes in by CSS, then the label drops in and each card grows from one pixel at its
+    // centre, the middle one first, as on home-v4. The template head hides both until .is-in (and shows them by itself after
+    // 4 s should this never run). It plays once the section is really on screen, and never before the hero card has landed.
+    var shown = false, bornAt = performance.now();
+    function reveal() {
+      if (shown) return; shown = true;
+      var label = qs('.loc_show-t', sec);
+      if (reduced || !window.gsap) { sec.classList.add('is-in'); return; }
+      var cx = window.innerWidth / 2;
+      var panels = qsa('.band_panel', sec).map(function (p) { var r = p.getBoundingClientRect(); return { el: p, d: Math.abs(r.left + r.width / 2 - cx) }; })
+        .sort(function (a, b) { return a.d - b.d; }).map(function (x) { return x.el; }); // nearest the middle first
+      gsap.set(panels, { scale: 0.002, transformOrigin: '50% 50%' });
+      if (label) gsap.set(label, { opacity: 0, y: -28 });
+      sec.classList.add('is-in');
+      var delay = Math.max(0.35, 0.9 - (performance.now() - bornAt) / 1000);
+      if (label) gsap.to(label, { opacity: 1, y: 0, duration: 0.9, ease: 'expo.out', delay: delay, clearProps: 'opacity,transform' });
+      gsap.to(panels, { scale: 1, duration: 1.1, ease: 'expo.out', stagger: 0.1, delay: delay + 0.1, clearProps: 'transform' });
     }
     new IntersectionObserver(function (entries) { if (entries[0].isIntersecting) start(); }, { rootMargin: '60% 0px' }).observe(sec);
     new IntersectionObserver(function (entries) { onScreen = entries[0].isIntersecting; setClock(); }, { threshold: 0.6 }).observe(sec);
