@@ -663,6 +663,8 @@
             window.scrollTo(0, y); // the page you came from, back at your spot
             if (hasScrollTrigger) ScrollTrigger.update();
             pass = qs('.pass', next);
+            // its route line was drawn when you left; the card code would only draw it again after landing, and the copies would come back without it
+            if (pass) qsa('.pass_fill, .pass_dot', pass).forEach(function (el) { el.classList.add('is-in'); });
             m = pass ? tearMeasure(pass) : null;
             if (!ground) ground = pass ? tearTable(pass) : TEAR_DARK;
           });
@@ -725,6 +727,9 @@
             }
             return;
           }
+          // Backwards the form page has to end up gone. Played backwards, GSAP puts a page back the way it was before the
+          // animation first ran, and /apply was on screen: it stayed visible behind the closing ticket, then vanished at once
+          if (back) gsap.set(form, { autoAlpha: 0, y: 26, scale: 0.975 });
           var tl = tearTimeline(pass, m, groundEl, form, stage);
           if (back) { tl.progress(1); pass.style.visibility = 'hidden'; } // the halves wait off screen, the ticket under the dark
           tearReady(stage, function () {
