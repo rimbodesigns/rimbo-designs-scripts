@@ -123,7 +123,7 @@
     // to €900, automations €500 (Rimbo, 2026-11-05)
     toggles: [
       { id: "seo",        group: "search", label: "SEO and AI-search optimisation",            price: 1000, info: "Technical SEO, titles and descriptions, structured data, and the set-up that lets search engines and AI assistants read and recommend your site.\n~Search and AI search are the same work, so they come together." },
-      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  brings: "consent", info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons.\nIt needs cookie consent, so that switches on with it.\n~Or skip this and use Webflow Analyze, from about €10 a month." },
+      { id: "analytics",  group: "search", label: "Analytics set-up",                          price: 250,  info: "Tracking that shows where visitors come from and what they do, with goals on your forms and buttons.\nIt needs cookie consent, so add that too.\n~Or skip this and use Webflow Analyze, from about €10 a month." },
       { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks.\nIn the look of your site." },
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
         info: "So you can write and publish pages and posts that get found.\nRecorded tutorial::Watch it again whenever you need it.\nOne-on-one call::About your own site.\nChecklist template::For every new page or post." },
@@ -443,11 +443,7 @@
       box.appendChild(list);
       CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
         var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
-        list.appendChild(makeItem(t, priceText, function () {
-          state.toggles[t.id] = !state.toggles[t.id];
-          if (state.toggles[t.id] && t.brings) state.toggles[t.brings] = true; // analytics needs cookie consent: separate rows, on together
-          render();
-        }));
+        list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
         if (t.hourly) list.appendChild(makeHours(t));
       });
       root.appendChild(box);
