@@ -215,25 +215,37 @@
   // d = the day the link was made, x = the prices of that day, r = Rimbo's pick, c = the lead's own version (only
   // when it differs). Links made before x existed show today's prices.
 
-  // Every price as "id:price,id:price": pages, the foundation, every part and switch (an hourly item: its rate),
-  // plus _min (the minimum) and _pri (priority, in %)
-  function priceList(C) {
-    var out = [];
-    function add(id, v) { out.push(id + ":" + v); }
-    C.pages.forEach(function (p) { add(p.id, p.price); });
-    add(C.brand.foundation.id, C.brand.foundation.price);
-    C.brand.items.forEach(function (t) { add(t.id, t.price); });
+  // The prices in a link are only numbers, in this order, so the link stays short: "400.800.2000…".
+  // APPEND NEW IDS AT THE END. Never reorder or remove one: links already sent read their prices by position.
+  var PRICE_ORDER = ["simple", "medium", "complex", "cms", "foundation", "identity", "logo", "guide", "illustrations", "social",
+    "print", "seo", "analytics", "consent", "training", "i18n", "migration", "loader", "transition", "theme", "legal", "a11y",
+    "leads", "chatbot", "system", "login", "dashboard", "gated", "payments", "courses", "shop", "_min", "_pri"];
+
+  // Every price by id: pages, the foundation, every part and switch (an hourly item: its rate), plus _min (the
+  // minimum) and _pri (priority, in %)
+  function prices(C) {
+    var map = {};
+    C.pages.forEach(function (p) { map[p.id] = p.price; });
+    map[C.brand.foundation.id] = C.brand.foundation.price;
+    C.brand.items.forEach(function (t) { map[t.id] = t.price; });
     C.toggles.forEach(function (t) {
-      if (t.parts) t.parts.forEach(function (p) { add(p.id, p.price); });
-      else if (!t.pct) add(t.id, t.hourly || t.price);
+      if (t.parts) t.parts.forEach(function (p) { map[p.id] = p.price; });
+      else if (!t.pct) map[t.id] = t.hourly || t.price;
     });
-    add("_min", C.minimum); add("_pri", Math.round(C.priorityPct * 100));
-    return out.join(",");
+    map._min = C.minimum; map._pri = Math.round(C.priorityPct * 100);
+    return map;
   }
-  // A link's prices over today's: what the link doesn't name (something added since) keeps today's price
+  function priceList(C) {
+    var map = prices(C);
+    Object.keys(map).forEach(function (id) { if (PRICE_ORDER.indexOf(id) < 0) console.warn("[calculator] add " + id + " to PRICE_ORDER, or links won't keep its price"); });
+    return PRICE_ORDER.map(function (id) { return id in map ? map[id] : ""; }).join(".");
+  }
+  // A link's prices over today's: what the link doesn't name (something added since) keeps today's price.
+  // Reads the short form, and the first links' "id:price,…" form too
   function setPrices(C, x) {
     var map = {};
-    String(x).split(",").forEach(function (pair) { var kv = pair.split(":"); if (kv.length === 2 && isFinite(+kv[1])) map[kv[0]] = +kv[1]; });
+    if (String(x).indexOf(":") >= 0) String(x).split(",").forEach(function (pair) { var kv = pair.split(":"); if (kv.length === 2 && isFinite(+kv[1])) map[kv[0]] = +kv[1]; });
+    else String(x).split(".").forEach(function (v, i) { if (v !== "" && isFinite(+v) && PRICE_ORDER[i]) map[PRICE_ORDER[i]] = +v; });
     function set(t) { if (t.id in map) { if (t.hourly) t.hourly = map[t.id]; else t.price = map[t.id]; } }
     C.pages.forEach(set); set(C.brand.foundation); C.brand.items.forEach(set);
     C.toggles.forEach(function (t) { if (t.parts) t.parts.forEach(set); else if (!t.pct) set(t); });
@@ -921,7 +933,8 @@
       var C = CONFIG.copy.none;
       $("title").textContent = C.title;
       $("lede").textContent = C.lede;
-      var apply = el("a", "calc_none_cta"); apply.href = CONFIG.applyUrl;
+      // Where the button goes: the section's data-calc-apply in the Designer, or /apply
+      var apply = el("a", "calc_none_cta"); apply.href = root.getAttribute("data-calc-apply") || CONFIG.applyUrl;
       setBtn(apply, C.cta, C.ctaAlt);
       $("lede").after(apply);
       grid.hidden = true;

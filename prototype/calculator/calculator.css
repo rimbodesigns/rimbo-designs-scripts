@@ -39,6 +39,9 @@
 .calc_ball.is-top { position: absolute; inset: 0 0 auto 0; height: 420px; }
 
 .calc { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
+/* On the site (data-calc-align="left" on the section): the section's own side padding in the Designer sets the edges, the
+   same 5% as the nav, so the calculator starts in line with the logo. Same width as before, the ball keeps the space on the right */
+[data-calc-align="left"] .calc { max-width: 1032px; margin-left: 0; padding-left: 0; padding-right: 0; }
 .calc_eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .calc_eyebrow::before { content: ""; flex: none; width: 6px; height: 6px; background: var(--on); }
 .calc_title { margin: 0 0 12px; font: 900 clamp(2rem, 5vw, 3.4rem)/.95 var(--head); text-transform: uppercase; }
