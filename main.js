@@ -725,18 +725,35 @@
             }
             return;
           }
-          pass.style.visibility = 'hidden';
           var tl = tearTimeline(pass, m, groundEl, form, stage);
-          if (back) {
-            tl.progress(1).timeScale(1.12).eventCallback('onReverseComplete', done).reverse();
-            tearSound(true, 1.12, Math.max(0, (TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) - tl.duration()));
-          } else {
-            tl.eventCallback('onComplete', done).play(0);
-            tearSound(false, 1);
-          }
+          if (back) { tl.progress(1); pass.style.visibility = 'hidden'; } // the halves wait off screen, the ticket under the dark
+          tearReady(stage, function () {
+            pass.style.visibility = 'hidden';
+            if (back) {
+              tl.timeScale(1.12).eventCallback('onReverseComplete', done).reverse();
+              tearSound(true, 1.12, Math.max(0, (TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) - tl.duration()));
+            } else {
+              tl.eventCallback('onComplete', done).play(0);
+              tearSound(false, 1);
+            }
+          });
         });
       });
     });
+  }
+
+  // The tear starts only once its copies of the ticket are drawn (photo, barcode, logo) and the new page's start is
+  // painted. Before, the ticket blinked empty for a frame and the fade to dark jumped ahead by that heavy frame (Rimbo:
+  // "it flickers to black"). Until then the copies lie exactly on the real ticket
+  function tearReady(stage, go) {
+    var started = false;
+    function start() {
+      if (started) return;
+      started = true;
+      window.requestAnimationFrame(function () { window.requestAnimationFrame(go); });
+    }
+    Promise.all(qsa('img', stage).map(function (img) { return img.decode ? img.decode().catch(function () {}) : null; })).then(start);
+    browserTimeout(start, 400); // never longer than this
   }
 
   // The plain fade: for the back and forward buttons, anchors and reduced motion, where the page has to land somewhere else than its top
