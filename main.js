@@ -735,6 +735,16 @@
           tearReady(stage, function () {
             pass.style.visibility = 'hidden';
             if (back) {
+              // the real ticket leans towards the mouse the whole time (card code): over the last 0.3 s the copies lean in
+              // with it, so they hand over without a jump (Rimbo: "once it finishes it flickers to the mouse position")
+              var copies = qsa('.tear_clone', stage), lean = /rotateX\(([-\d.]+)deg\) rotateY\(([-\d.]+)deg\)/;
+              tl.eventCallback('onUpdate', function () {
+                var t = tl.time(), a = lean.exec(pass.style.transform);
+                if (t >= 0.3 || !a) return;
+                var k = 1 - t / 0.3;
+                k = k * k * (3 - 2 * k);
+                gsap.set(copies, { rotationX: +a[1] * k, rotationY: +a[2] * k });
+              });
               tl.timeScale(1.12).eventCallback('onReverseComplete', done).reverse();
               tearSound(true, 1.12, Math.max(0, (TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) - tl.duration()));
             } else {
