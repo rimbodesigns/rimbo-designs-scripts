@@ -36,6 +36,10 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_ball.is-top { position: absolute; inset: 0 0 auto 0; height: 420px; }
 
 .calc { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
+/* The logo, quiet in the top right corner, on the price card's right edge. On his own site the nav takes over */
+.calc_logo { position: absolute; top: 44px; right: 24px; display: block; width: 72px; height: 26px; color: var(--text); background: currentColor; opacity: .4; transition: opacity .3s ease;
+  -webkit-mask: url(logo.svg) center / contain no-repeat; mask: url(logo.svg) center / contain no-repeat; }
+.calc_logo:hover { opacity: .85; }
 .calc_eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .calc_eyebrow::before { content: ""; flex: none; width: 6px; height: 6px; background: var(--on); }
 .calc_title { margin: 0 0 12px; font: 900 clamp(2rem, 5vw, 3.4rem)/.95 var(--head); text-transform: uppercase; }
@@ -308,4 +312,5 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
   .calc_lede { max-width: 15.5em; }
   .calc_rec { display: none; }
   .calc_tip_line.is-phone { display: block; }
+  .calc_logo { position: static; margin: 0 0 24px; } /* the ball has the top right corner on phones */
 }

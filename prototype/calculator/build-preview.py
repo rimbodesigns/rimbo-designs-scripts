@@ -4,7 +4,7 @@
     python3 prototype/calculator/build-preview.py <output.html>
 
 The viewer only allows scripts from a few CDNs and fonts as data: URIs, and it adds its own <head>. So the
-CSS and JS go inline, the three site fonts are embedded, and GSAP is pinned to an exact version.
+CSS and JS go inline, the three site fonts and the logo are embedded, and GSAP is pinned to an exact version.
 window.CALC_PREVIEW tells calculator.js it runs here: plain #make and #client pick the view, and the
 buttons that need a real address say so.
 """
@@ -27,12 +27,15 @@ def font_uri(match):
 def main(out):
     html = (HERE / "index.html").read_text()
     css = re.sub(r"url\((https://[^)]+\.woff2)\)", font_uri, (HERE / "calculator.css").read_text())
+    logo = base64.b64encode((HERE / "logo.svg").read_bytes()).decode()
+    css = css.replace("url(logo.svg)", "url(data:image/svg+xml;base64," + logo + ")")
     body = re.search(r"<body>(.*?)<script", html, re.S).group(1).rstrip()
     scripts = "".join(
         "<script>\n" + (HERE / name).read_text() + "\n</script>\n"
         for name in ["odometer.js", "ball.js", "buttons.js", "calculator.js"]
     )
     page = (
+        '<meta charset="utf-8">\n'
         "<title>Rimbo Project Calculator</title>\n"
         "<style>\n" + css + "\n</style>\n"
         + body + "\n"
