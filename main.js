@@ -3430,8 +3430,12 @@
       const curveRadians = curve * Math.PI / 180;
 
       const firstRect = originalItems[0].getBoundingClientRect();
-      const itemWidth = firstRect.width;
-      const itemHeight = firstRect.height;
+      // Arriving by the page transition, the page is still small and turned in the cube when the drum builds:
+      // the screen sizes are then a fraction of the real ones and the drum came out squashed over the hero
+      let pageScale = originalItems[0].offsetWidth ? firstRect.width / originalItems[0].offsetWidth : 1;
+      if (!(pageScale > 0) || Math.abs(pageScale - 1) < 0.02) pageScale = 1;
+      const itemWidth = pageScale === 1 ? firstRect.width : originalItems[0].offsetWidth;
+      const itemHeight = pageScale === 1 ? firstRect.height : originalItems[0].offsetHeight;
 
       const perspectiveValue = parseFloat(getComputedStyle(track).perspective);
       const perspective = Number.isFinite(perspectiveValue) ? perspectiveValue : 1200;
@@ -3475,8 +3479,8 @@
       const containerRect = container.getBoundingClientRect();
       const trackRect = track.getBoundingClientRect();
       const originX = trackRect.left + trackRect.width / 2;
-      const leftLimit = containerRect.left - originX;
-      const rightLimit = containerRect.right - originX;
+      const leftLimit = (containerRect.left - originX) / pageScale;
+      const rightLimit = (containerRect.right - originX) / pageScale;
 
       const isOffsetInside = offset => {
         if (Math.abs(offset * curve) >= edgeAngle) return false;
