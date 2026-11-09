@@ -60,7 +60,7 @@
     // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
     priorityPct: 0.25,       // priority start: jump the queue
-    totalLabel: { below: "Your estimate", reached: "Your estimate" }, // the number starts at €0; the bar shows the minimum
+    totalLabel: { below: "Your estimate", reached: "Your estimate" }, // the number starts at the Brand foundation; the bar shows the minimum
     included: {
       line: "Every page includes the design system, QA, performance and onboarding.",
       title: "Included in every page",
@@ -220,7 +220,7 @@
   }
   function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify(normSnap(b)); }
 
-  // Nothing picked yet: no lines, an empty bar
+  // Anything picked on top of the Brand foundation?
   function picked() {
     return CONFIG.pages.some(function (p) { return state.pages[p.id]; }) ||
       (state.brandOn && CONFIG.brand.items.some(function (t) { return state.toggles[t.id]; })) ||
@@ -229,14 +229,13 @@
 
   // The selected items as [label, price] lines, plus:
   //   scope  the items added up (before priority)
-  //   shown  the big number: starts at €0 and follows the scope, priority included
+  //   shown  the big number: starts at the Brand foundation and follows the scope, priority included
   //   total  the estimate for the application: never below the minimum, priority on top
   function calc() {
-    if (!picked()) return { lines: [], scope: 0, shown: 0, total: CONFIG.minimum };
     // One line per section, so the card stays short however much is on (the switches already show what's picked)
     var out = [];
     function line(label, sum) { if (sum) out.push([label, sum]); }
-    // Branding includes the foundation; this only runs once something is picked, so the page still starts at €0
+    // Branding includes the foundation: it's in every project, so the page starts at its price
     line(CONFIG.brand.label, CONFIG.brand.foundation.price + (state.brandOn ? brandSum() : 0));
     line("Website", CONFIG.pages.reduce(function (a, p) { return a + state.pages[p.id] * p.price; }, 0));
     CONFIG.groups.forEach(function (g) {
