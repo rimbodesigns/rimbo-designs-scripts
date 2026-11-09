@@ -421,7 +421,8 @@
       '.tear_layer{position:fixed;inset:0;overflow:hidden}' +
       '.tear_stage{position:fixed;inset:0;z-index:999;overflow:hidden;perspective:1600px}' +
       '.tear_part{position:absolute;will-change:transform}' +
-      '.tear_shadow{position:absolute;opacity:0;box-shadow:0 2.5rem 6rem rgba(0,0,0,.55),0 .5rem 1.5rem rgba(0,0,0,.35)}' +
+      '.tear_sheet{position:absolute;opacity:0;pointer-events:none}' +
+      '.tear_shadow{position:absolute;opacity:0;box-shadow:0 1.5rem 3rem rgba(19,19,19,.3),0 .25rem .75rem rgba(19,19,19,.2)}' +
       '.tear_clone{position:absolute!important;left:0;top:0;margin:0!important;pointer-events:none}' +
       '.tear_clone .pass_stub{transition:none!important}' +
       '.tear_clone.is-main .pass_stub,.tear_clone.is-stub .pass_main{visibility:hidden}' +
@@ -590,32 +591,49 @@
     return { rip: rip, back: back };
   }
 
-  // The form page's ground, the colour the ticket rips open onto. Read near both side edges, where a page shows its
-  // background and not a field or a card. A page without one of its own shows the body's
-  function tearGround(page) {
-    var hidden = page.style.visibility, body = getComputedStyle(document.body).backgroundColor, W = window.innerWidth, H = window.innerHeight;
-    page.style.visibility = 'visible';
-    var colours = [[6, H * 0.5], [W - 6, H * 0.5], [6, H * 0.8], [W - 6, H * 0.8]].map(function (point) {
-      var stack = document.elementsFromPoint(point[0], point[1]);
-      for (var i = 0; i < stack.length; i++) {
-        if (!page.contains(stack[i])) continue;
-        var bg = getComputedStyle(stack[i]).backgroundColor;
-        if (bg && bg !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(bg)) return bg;
-      }
-      return body;
-    });
-    page.style.visibility = hidden;
-    return colours.sort(function (a, b) {
-      return colours.filter(function (c) { return c === b; }).length - colours.filter(function (c) { return c === a; }).length;
-    })[0];
+  // The ground the ticket rips on is always dark, as in the lab Rimbo picked: the dark the ticket lies on (the home's own
+  // black), or the site's black when it lies on something light. On a light ground the paper and its shadow went muddy
+  var TEAR_DARK = 'var(--color--black, #131313)';
+  function tearTable(pass) {
+    for (var el = pass.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      var c = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(getComputedStyle(el).backgroundColor);
+      if (!c || (c[4] !== undefined && +c[4] < 0.9)) continue;
+      return (0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3]) / 255 < 0.25 ? 'rgb(' + c[1] + ',' + c[2] + ',' + c[3] + ')' : TEAR_DARK;
+    }
+    return TEAR_DARK;
+  }
+
+  // The dark around the ticket tears along the same line and goes with its half, so the form page behind it shows only
+  // where the dark has left: never a fade of a light page over the dark (that passes through grey). Outside the ticket the
+  // edge is rough, under it the ticket's own perforation is the edge
+  function tearSheet(part, m, kind, colour) {
+    var W = window.innerWidth, H = window.innerHeight, M = 260;
+    var seamX = m.S.left - m.P.left, seamY = m.S.top - m.P.top;
+    var left = -m.P.left - M, top = -m.P.top - M, right = W - m.P.left + M, bottom = H - m.P.top + M; // the screen and more, in the part's own coordinates
+    var length = m.stacked ? right - left : bottom - top, from = m.stacked ? left : top, edge = [], at = 0;
+    while (at <= length) {
+      var v = from + at, inTicket = m.stacked ? v > 0 && v < m.P.width : v > 0 && v < m.P.height;
+      edge.push([v, inTicket ? 0 : tearRand(-2.4, 2.4)]);
+      at += inTicket ? 40 : tearRand(2.5, 7);
+    }
+    edge.push([from + length, 0]);
+    var pts = edge.map(function (p) { return m.stacked ? [p[0], seamY + p[1]] : [seamX + p[1], p[0]]; });
+    var first = kind === 'main';
+    var corners = m.stacked ? (first ? [[right, top], [left, top]] : [[right, bottom], [left, bottom]]) : (first ? [[left, bottom], [left, top]] : [[right, bottom], [right, top]]);
+    var sheet = tearEl('tear_sheet', null);
+    part.insertBefore(sheet, part.firstChild);
+    sheet.style.cssText = 'left:' + left + 'px;top:' + top + 'px;width:' + (right - left) + 'px;height:' + (bottom - top) + 'px;background:' + colour +
+      ';clip-path:polygon(' + pts.concat(corners).map(function (p) { return (p[0] - left).toFixed(1) + 'px ' + (p[1] - top).toFixed(1) + 'px'; }).join(',') + ')';
+    return sheet;
   }
 
   // The tear itself, forwards. Backwards it is the same timeline in reverse. form = the page behind the ticket
-  function tearTimeline(pass, m, ground, form, stage) {
+  function tearTimeline(pass, m, ground, colour, form, stage) {
     var H = window.innerHeight, tl = gsap.timeline({ paused: true });
     var seamX = m.S.left - m.P.left, seamY = m.S.top - m.P.top;
     var flecks = tearEl('', stage);
     var main = tearPart(pass, m, 'main', stage), stub = tearPart(pass, m, 'stub', stage);
+    var sheets = [tearSheet(main.part, m, 'main', colour), tearSheet(stub.part, m, 'stub', colour)];
     stage.appendChild(flecks);
     var fibres = [tearFibre(main.part, m, 1), tearFibre(stub.part, m, -1)];
     fibres.forEach(function (svg) { tearFibreShow(svg, 0, m.stacked); });
@@ -624,7 +642,7 @@
 
     var ripAt = TEAR_PRESS, flyAt = ripAt + TEAR_RIP - 0.02, tip = { p: 0 };
     tl.to([main.clone, stub.clone], { rotationX: 0, rotationY: 0, duration: 0.3, ease: 'power2.out' }, 0);
-    tl.to(ground, { opacity: 1, duration: 0.5, ease: 'power1.inOut' }, 0.02);
+    tl.to([ground].concat(sheets), { opacity: 1, duration: 0.5, ease: 'power1.inOut' }, 0.02);
     // pulled tight
     tl.to(main.part, { y: -2.5, duration: TEAR_PRESS, ease: 'power2.out' }, 0);
     tl.to(stub.part, { y: 2.5, duration: TEAR_PRESS, ease: 'power2.out' }, 0);
@@ -637,14 +655,13 @@
     tl.to(stub.part, m.stacked ? { rotation: -1.6, y: 7, duration: TEAR_RIP, ease: 'power1.in' } : { rotation: 2.1, y: 8, x: 4, duration: TEAR_RIP, ease: 'power1.in' }, ripAt);
     tl.to([main.shadow, stub.shadow], { opacity: 1, duration: TEAR_RIP, ease: 'power1.in' }, ripAt);
     tearFlecks(tl, flecks, m, ripAt);
-    // the last tab lets go: the main part up, the stub down
-    var up = (m.stacked ? m.M.bottom : m.P.bottom) + 90 + (m.stacked ? 0 : m.P.width * 0.1);
-    var down = H - (m.stacked ? m.S.top : m.P.top) + 90 + (m.stacked ? 0 : m.S.width * 0.2);
-    tl.to(main.part, { y: -up, x: m.stacked ? 0 : -14, rotation: m.stacked ? 3 : -5, rotationX: 22, duration: TEAR_FLY, ease: 'osmo' }, flyAt);
-    tl.to(stub.part, { y: down, x: m.stacked ? 0 : 26, rotation: m.stacked ? -4 : 11, rotationX: -22, duration: TEAR_FLY * 0.96, ease: 'osmo' }, flyAt);
-    tl.to([main.shade, stub.shade], { opacity: 1, duration: TEAR_FLY * 0.6, ease: 'power1.in' }, flyAt);
-    // the form page was there all along
-    tl.fromTo(form, { autoAlpha: 0, y: 26, scale: 0.975 }, { autoAlpha: 1, y: 0, scale: 1, duration: TEAR_FLY * 0.85, ease: 'osmo' }, flyAt + 0.08);
+    // the last tab lets go: the main part up, the stub down, each with its half of the dark, off the screen
+    var up = (m.stacked ? m.S.top : H) + 260 + 140, down = H - (m.stacked ? m.S.top : 0) + 260 + 140;
+    tl.to(main.part, { y: -up, x: m.stacked ? 0 : -14, rotation: m.stacked ? 3 : -5, rotationX: 8, duration: TEAR_FLY, ease: 'osmo' }, flyAt);
+    tl.to(stub.part, { y: down, x: m.stacked ? 0 : 26, rotation: m.stacked ? -4 : 11, rotationX: -8, duration: TEAR_FLY * 0.96, ease: 'osmo' }, flyAt);
+    tl.to([main.shade, stub.shade], { opacity: 0.7, duration: TEAR_FLY * 0.6, ease: 'power1.in' }, flyAt);
+    // the form page was there all along, under the dark
+    tl.fromTo(form, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0, immediateRender: false }, flyAt);
     return tl;
   }
 
@@ -661,17 +678,17 @@
           var pass = back ? null : data.trigger.closest('.pass');
           var m = pass ? tearMeasure(pass) : null;
           var y = back ? memory.y : window.scrollY;
-          var ground = back ? memory.ground : '';
-          if (back) ground = ground || tearGround(current);
+          var ground = back ? memory.ground : (pass ? tearTable(pass) : TEAR_DARK);
           var parent = current.parentElement || document.body;
 
           var started = startCube(data, function () {
-            if (!back) { ground = tearGround(next); return; }
+            if (!back) return;
             gsap.set(next, { autoAlpha: 1 });
             window.scrollTo(0, y); // the page you came from, back at your spot
             if (hasScrollTrigger) ScrollTrigger.update();
             pass = qs('.pass', next);
             m = pass ? tearMeasure(pass) : null;
+            if (!ground) ground = pass ? tearTable(pass) : TEAR_DARK;
           });
           var leftAt = started.scrollY;
 
@@ -689,7 +706,7 @@
             parent.insertBefore(over, current);
             over.appendChild(current);
             under.appendChild(groundEl);
-            gsap.set(current, { position: 'absolute', top: -leftAt, left: 0, width: '100%', transformOrigin: '50% ' + (leftAt + window.innerHeight / 2) + 'px' });
+            gsap.set(current, { position: 'absolute', top: -leftAt, left: 0, width: '100%', backgroundColor: face });
             form = current;
           } else {
             // the ticket's page leaves into the bottom layer; the form page waits in the flow above it, at its top
@@ -697,7 +714,7 @@
             under.appendChild(current);
             under.appendChild(groundEl);
             gsap.set(current, { position: 'absolute', top: -leftAt, left: 0, width: '100%' });
-            gsap.set(next, { position: 'relative', zIndex: 998, backgroundColor: ground, transformOrigin: '50% ' + window.innerHeight / 2 + 'px' });
+            gsap.set(next, { position: 'relative', zIndex: 998, backgroundColor: face });
             form = next;
           }
           window.scrollTo(0, back ? y : 0);
@@ -733,7 +750,7 @@
             return;
           }
           pass.style.visibility = 'hidden';
-          var tl = tearTimeline(pass, m, groundEl, form, stage);
+          var tl = tearTimeline(pass, m, groundEl, ground, form, stage);
           if (back) {
             tl.progress(1).timeScale(1.12).eventCallback('onReverseComplete', done).reverse();
             tearSound(true, 1.12, Math.max(0, (TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) - tl.duration()));
@@ -843,6 +860,13 @@
       e.stopPropagation();
       if (!barba.transitions.isRunning) history.back();
     }, true);
+    // The ticket's page is fetched as soon as a pointer is on the ticket, so the tear starts on the click (the stub isn't a link)
+    ['pointerover', 'touchstart'].forEach(function (type) {
+      document.addEventListener(type, function (e) {
+        var pass = e.target.closest && e.target.closest('.pass'), link = pass && qs('a[href]', pass);
+        if (link && !reducedMotion) barba.prefetch(link.href);
+      }, { passive: true });
+    });
     barba.hooks.before(function (data) { // noted for every click on the ticket, so X is "back" with reduced motion too (then it fades)
       var t = data.trigger;
       if (t && t.nodeType === 1 && t.closest('.pass')) tearReturn = { from: data.current.url.href, to: data.next.url.href, y: window.scrollY, ground: '' };
