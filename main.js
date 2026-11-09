@@ -4490,9 +4490,12 @@
     requestAnimationFrame(tick);
   }
 
-  function rdButtons() {
-    var buttons = qsa('.btn');
+  // rdButtons(root): the buttons inside root (the whole page without one) that aren't wired yet. Each button once:
+  // the calculator on /proposal builds its buttons after this page's run and calls it again through window.rdButtons
+  function rdButtons(root) {
+    var buttons = qsa('.btn', root).filter(function (b) { return !b.hasAttribute('data-btn-on'); });
     if (!buttons.length) return;
+    buttons.forEach(function (b) { b.setAttribute('data-btn-on', ''); });
 
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var finePointer = window.matchMedia('(pointer: fine)').matches;
@@ -4686,6 +4689,7 @@
       magnets.forEach(function (m) { io.observe(m.el); });
     }
   }
+  window.rdButtons = rdButtons; // for page code that builds buttons later (the calculator on /proposal: prototype/calculator)
 
   // =========================================================
   // SCROLL RULER — blog posts (/post/…): Osmo Supply "Scroll Ruler" (docs/osmo/scroll-ruler.md)
