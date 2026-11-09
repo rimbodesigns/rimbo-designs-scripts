@@ -6,6 +6,7 @@
   var CONFIG = {
     // Apply step (docs/apply-flow.md §4-5). Nothing is sent anywhere until submitUrl is filled in.
     submitUrl: "",                 // PLACEHOLDER: MailerLite / email endpoint. Empty = log to the console only.
+    callUrl: "https://cal.com/rimbo-designs/45-minute-discovery-call", // the lead's one button: they don't need to send anything back, you talk it through
     previewLead: { v: 1, n: "Sample project", m: "", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     underBudgetAutoMessage: true,  // true: "under €3k" sees the kind message instead of a reply promise. false: always the normal confirmation (reply by hand).
     showNewsletterOptIn: false,    // OPEN DECISION: rare-update checkbox, unticked by default. See apply-flow.md §5.3.
@@ -47,9 +48,8 @@
       clientLede: "Switch things on or off and the price follows.",
       recommended: "Recommended",
       reset: "Back to my recommendation",
-      clientCta: "Copy the link",
-      clientCtaAlt: "Paste it in your reply",
-      clientDone: ["Link copied", "Paste it in your reply to me."],
+      clientCta: "Book a call",
+      clientCtaAlt: "We go through it together",
       copyFailed: ["Couldn't copy", "Copy the link under the button."],
       previewLink: ["Link copied", "Not really: this preview can't copy. On your own site it will."],
       views: [["public", "Public"], ["make", "Your view"], ["client", "Client view"]]
@@ -683,6 +683,9 @@
       $("title").textContent = share.n || "Your project";
       $("lede").textContent = share.m || C.clientLede;
       document.title = (share.n || "Your project") + " · Rimbo Designs";
+      // A real link to the booking page
+      var call = el("a", cta.className); call.id = "cta"; call.href = CONFIG.callUrl; call.target = "_blank"; call.rel = "noopener";
+      cta.replaceWith(call); cta = call;
       setBtn(cta, C.clientCta, C.clientCtaAlt);
       setBtn($("reset"), C.reset, C.canUndo);
       $("reset").addEventListener("click", function () { resetTo(share.r); });
@@ -694,8 +697,8 @@
     // Copy a link; the pop-up says whether it worked. Maker: the link stays under the button with Copy
     // and Open it. Lead: the link only shows when copying failed, so they can copy it by hand.
     function copyLink(link) {
-      $("made-link").value = link; $("made-open").href = link; $("made-open").hidden = mode !== "make";
-      function done(ok) { toast(ok ? (mode === "make" ? C.makeDone : C.clientDone) : C.copyFailed, !ok); $("made").hidden = mode !== "make" && ok; }
+      $("made-link").value = link; $("made-open").href = link; $("made-open").hidden = false;
+      function done(ok) { toast(ok ? C.makeDone : C.copyFailed, !ok); $("made").hidden = false; }
       function oldCopy() { // browsers that block the clipboard API: select the field and copy
         $("made").hidden = false; var f = $("made-link"); f.focus(); f.select();
         var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
@@ -705,15 +708,15 @@
       else oldCopy();
     }
 
-    cta.addEventListener("click", function () {
+    if (mode === "make") cta.addEventListener("click", function () {
       if (!picked()) { toast(C.needScope, true); return; }
-      if (mode === "make" && !$("make-name").value.trim()) {
+      if (!$("make-name").value.trim()) {
         $("make-name").setAttribute("aria-invalid", "true"); $("make-name").focus();
         toast(C.makeNeedName, true);
         return;
       }
       if (preview) toast(C.previewLink);
-      else copyLink(mode === "make" ? clientLink(shareData()) : location.href);
+      else copyLink(clientLink(shareData()));
     });
     $("made-copy").addEventListener("click", function () { copyLink($("made-link").value); });
     $("made-link").addEventListener("focus", function () { this.select(); });
