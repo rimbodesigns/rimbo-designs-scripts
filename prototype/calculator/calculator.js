@@ -34,13 +34,13 @@
       applyCtaAlt: "A few short questions",
       submit: "Send my application",
       submitAlt: "I read every one",
-      makeNeedName: "Give it a project name first.",
-      needScope: "Pick something first.",
+      makeNeedName: ["Not yet", "Give it a project name first."],
+      needScope: ["Not yet", "Pick something first."],
       startOver: "Start over",
       undo: "Undo",
       canUndo: "You can undo this",
       undoAlt: "Back to what you had",
-      makeDone: "Link copied to your clipboard.",
+      makeDone: ["Link copied", "Send it to them. It opens with this scope."],
       copy: "Copy",
       makeOpen: "Open it",
       clientEyebrow: "Proposal",
@@ -49,9 +49,9 @@
       reset: "Back to my recommendation",
       clientCta: "Copy the link",
       clientCtaAlt: "Paste it in your reply",
-      clientDone: "Link copied. Paste it in your reply to me.",
-      copyFailed: "Couldn't copy. Copy the link under the button.",
-      previewLink: "Links work once this is on your own site.",
+      clientDone: ["Link copied", "Paste it in your reply to me."],
+      copyFailed: ["Couldn't copy", "Copy the link under the button."],
+      previewLink: ["Link copied", "Not really: this preview can't copy. On your own site it will."],
       views: [["public", "Public"], ["make", "Your view"], ["client", "Client view"]]
     },
 
@@ -624,11 +624,30 @@
 
   // A short pop-up at the bottom of the screen (copied, or what's missing)
   var toastT = 0;
-  function toast(text, bad) {
-    var t = $("toast");
-    t.textContent = text; t.classList.toggle("is-bad", !!bad);
-    t.hidden = false; t.classList.remove("is-in"); void t.offsetWidth; t.classList.add("is-in");
-    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
+  function toast(msg, bad) {
+    var t = $("toast"), title = $("toast-title"), bar = $("toast-time"), side = document.querySelector(".calc_side");
+    clearTimeout(toastT);
+    if (toast.stop) toast.stop();
+    title.textContent = "";
+    var chars = Array.from(msg[0]).map(function (ch) { var c = el("span", "calc_toast_ch", ch === " " ? "\u00a0" : ch); title.appendChild(c); return c; });
+    $("toast-text").textContent = msg[1];
+    t.classList.toggle("is-bad", !!bad);
+    // Under the price card, where the eye already is. On phones the CSS takes it full width
+    var wide = innerWidth > 860, r = side.getBoundingClientRect();
+    t.style.left = wide ? r.left + "px" : ""; t.style.width = wide ? r.width + "px" : "";
+    t.hidden = false;
+    toast.stop = window.calcBall ? calcBall.pop($("toast-ball"), !!bad) : null;
+    function close() {
+      if (toast.stop) { toast.stop(); toast.stop = null; }
+      t.hidden = true;
+    }
+    if (!window.gsap || reduceMotion) { gsap && gsap.set(bar, { scaleX: 0 }); toastT = setTimeout(close, 3600); t.onclick = close; return; }
+    gsap.killTweensOf([t, bar].concat(chars));
+    gsap.fromTo(t, { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .7, ease: "expo.out" });
+    gsap.fromTo(chars, { yPercent: 110 }, { yPercent: 0, duration: .65, ease: "expo.out", stagger: .014, delay: .05 });
+    function out() { gsap.killTweensOf(bar); gsap.to(t, { y: 12, autoAlpha: 0, duration: .35, ease: "power2.in", overwrite: true, onComplete: close }); }
+    gsap.fromTo(bar, { scaleX: 1 }, { scaleX: 0, duration: 3.6, ease: "none", onComplete: out }); // the line shows how long it stays
+    t.onclick = out;
   }
 
   // Start over and Back to my recommendation change everything at once, so the button itself turns into Undo.

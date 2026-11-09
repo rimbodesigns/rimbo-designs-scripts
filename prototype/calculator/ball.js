@@ -77,21 +77,27 @@
     "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
     "}";
 
-  function shader(type, src) { var o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; }
-  var prog = gl.createProgram();
-  gl.attachShader(prog, shader(gl.VERTEX_SHADER, "#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }"));
-  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FRAG));
-  gl.bindAttribLocation(prog, 0, "a"); gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cv.hidden = true; return; }
-  gl.useProgram(prog);
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  var U = {};
-  ["res", "center", "R", "seed", "bias", "heat", "grainScale", "grainT", "t", "ptr", "ptrR", "ptrAmt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
-  gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ["E4441C", "E4566A", "4B7888", "DACCAE"].map(oklab))));
-  gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
-  gl.uniform1f(U.seed, 14);
+  // The shader on a canvas. Returns its context and uniforms, or null if it can't run
+  function setup(gl) {
+    function shader(type, src) { var o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; }
+    var prog = gl.createProgram();
+    gl.attachShader(prog, shader(gl.VERTEX_SHADER, "#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }"));
+    gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FRAG));
+    gl.bindAttribLocation(prog, 0, "a"); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    var U = {};
+    ["res", "center", "R", "seed", "bias", "heat", "grainScale", "grainT", "t", "ptr", "ptrR", "ptrAmt", "stops", "edges"].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+    gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ["E4441C", "E4566A", "4B7888", "DACCAE"].map(oklab))));
+    gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
+    gl.uniform1f(U.seed, 14);
+    return U;
+  }
+  var U = setup(gl);
+  if (!U) { cv.hidden = true; return; }
 
   var MAX = 30000; // the price at which the ball is full size
   var FLOW = +new URLSearchParams(location.search).get("flow") || 1; // ?flow=2: the colours move twice as fast
@@ -170,8 +176,44 @@
   layout();
   if (!reduce) requestAnimationFrame(function (t) { last = t; frame(t); });
 
+  // The pop-up's own little ball: it runs off the card's edge, floods orange as it arrives and settles (brand blocks).
+  // Only runs while the pop-up is open. calm = no flood, for "not yet" messages.
+  var mini = null;
+  function popBall(c, calm) {
+    if (!mini) {
+      var g = c.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+      var u = g && setup(g);
+      if (!u) return function () {};
+      mini = { gl: g, U: u, run: 0, t: 40 };
+    }
+    var m = mini, g2 = m.gl, u2 = m.U, box = c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+    c.width = Math.round(box.width * d); c.height = Math.round(box.height * d);
+    g2.viewport(0, 0, c.width, c.height);
+    var heat = calm || reduce ? 0 : 1, id = ++m.run, prev = performance.now(), clock = 0;
+    function paint() {
+      g2.uniform2f(u2.res, c.width, c.height); g2.uniform2f(u2.center, c.width * .94, c.height * .5);
+      g2.uniform1f(u2.R, c.height * .86); g2.uniform1f(u2.bias, calm ? .3 : .02); g2.uniform1f(u2.heat, heat);
+      g2.uniform1f(u2.grainScale, d * .75); g2.uniform1f(u2.t, m.t);
+      g2.uniform1f(u2.grainT, reduce ? 0 : Math.floor(clock * 11) % 64 * 1.7); g2.uniform1f(u2.ptrAmt, 0); g2.uniform1f(u2.ptrR, 1);
+      g2.clearColor(0, 0, 0, 0); g2.clear(g2.COLOR_BUFFER_BIT);
+      g2.drawArrays(g2.TRIANGLES, 0, 3);
+    }
+    paint();
+    if (reduce) return function () {};
+    (function loop(now) {
+      if (id !== m.run) return;
+      var dt = Math.min((now - prev) / 1000, .25); prev = now; clock += dt; // real time: it only lives for a few seconds
+      m.t += dt * 1.6;
+      heat *= Math.pow(.965, dt * 60);
+      paint();
+      requestAnimationFrame(loop);
+    })(prev);
+    return function () { if (id === m.run) m.run++; };
+  }
+
   // Called on every change of the scope. value = the big number, minimum = the project minimum.
   window.calcBall = {
+    pop: popBall,
     set: function (value, minimum) {
       var d = value - B.value, first = !B.seen, crossed = B.value < minimum && value >= minimum;
       B.value = value; B.minimum = minimum; B.seen = true;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Calculator</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="calculator.css?v=32">
+<link rel="stylesheet" href="calculator.css?v=33">
 </head>
 <body>
 <canvas class="calc_ball" id="ball" aria-hidden="true"></canvas>
@@ -152,13 +152,17 @@
     </div>
   </section>
 </main>
-<div class="calc_toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="calc_toast" id="toast" role="status" aria-live="polite" hidden>
+  <canvas class="calc_toast_ball" id="toast-ball" aria-hidden="true"></canvas>
+  <p class="calc_toast_copy"><strong class="calc_toast_title" id="toast-title"></strong><span id="toast-text"></span></p>
+  <span class="calc_toast_time" id="toast-time"></span>
+</div>
 <svg class="calc_wire" id="wire" aria-hidden="true"><path id="wire-path" d=""/><rect id="wire-a" width="5" height="5"/><rect id="wire-b" width="5" height="5"/></svg>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/ScrollTrigger.min.js"></script>
 <script src="odometer.js?v=3"></script>
-<script src="ball.js?v=7"></script>
+<script src="ball.js?v=9"></script>
 <script src="buttons.js?v=1"></script>
-<script src="calculator.js?v=39"></script>
+<script src="calculator.js?v=40"></script>
 </body>
 </html>
