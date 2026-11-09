@@ -1,0 +1,29 @@
+/* The hosted preview and the local page only. Here is what rimbodesigns.com already has around the calculator:
+   its three fonts, the dark page, its global button (.btn, as the Designer has it on 2026-11-09) and a logo in place of the nav.
+   The site page /proposal doesn't load this file. */
+@font-face { font-family: IntegralNEW; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68b025db738fc57555d5e08f_Integral-Heavy.woff2) format("woff2"); font-weight: 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "RM MONO"; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: Akkuratllsub; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6603db04efccc89ef43b319b_AkkuratLLSub-Regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+
+:root { --color--rimbobage: #f8f5ee; --color--black: #131313; --font--rm-mono: "RM MONO", ui-monospace, Menlo, monospace; }
+html, body { margin: 0; background: #0c0c0c; color: #f8f5ee; }
+[data-calc] { min-height: 100vh; }
+
+/* The site's .btn: solid beige on dark, RM Mono capitals, radius .3em; .is-secondary is the ghost one.
+   The magnet, the label swap and the boil come from buttons.js */
+.btn { position: relative; display: inline-flex; align-items: center; padding: .95em 1.4em; border: 1px solid var(--color--rimbobage); border-radius: .3em;
+  background: var(--color--rimbobage); color: var(--color--black); box-shadow: 0 0 1.2rem rgba(248, 245, 238, .18); cursor: pointer; text-decoration: none;
+  font: .72rem/1 var(--font--rm-mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; transition: box-shadow .6s cubic-bezier(.625, .05, 0, 1); }
+.btn.is-hover { z-index: 1; box-shadow: 0 0 2.2rem rgba(248, 245, 238, .4), 0 0 .6rem rgba(248, 245, 238, .3); }
+.btn.is-secondary { background: transparent; border-color: rgba(248, 245, 238, .18); color: var(--color--rimbobage); box-shadow: none; transition: border-color .35s; }
+.btn.is-secondary.is-hover { border-color: rgba(248, 245, 238, .6); box-shadow: none; }
+.btn_in { display: inline-flex; align-items: center; }
+.btn_swap { display: inline-grid; justify-items: center; overflow: hidden; margin: -.15em -.5em -.15em 0; padding: .15em .5em .15em 0; }
+.btn_line { display: inline-flex; align-items: center; gap: .7em; white-space: nowrap; grid-area: 1 / 1 / 2 / 2; }
+.btn_t, .btn_arrow { display: inline-block; }
+
+/* The logo, quiet in the top right corner, on the price card's right edge. On the site the nav has it */
+.calc_logo { position: absolute; top: 44px; right: 24px; display: block; width: 72px; height: 26px; color: #f8f5ee; background: currentColor; opacity: .4; transition: opacity .3s ease;
+  -webkit-mask: url(logo.svg) center / contain no-repeat; mask: url(logo.svg) center / contain no-repeat; }
+.calc_logo:hover { opacity: .85; }
+@media (max-width: 560px) { .calc_logo { position: static; margin: 0 0 24px; } } /* the ball has the top right corner on phones */

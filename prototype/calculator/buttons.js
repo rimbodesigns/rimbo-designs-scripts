@@ -1,12 +1,15 @@
-/* The site's global button (.btn): magnetic + label swap + boil. rdButtons is copied as it is from main.js,
-   so the calculator's buttons feel like the rest of the site. Needs GSAP. */
+/* The site's global button (.btn): magnetic + label swap + boil. For the hosted preview only: on rimbodesigns.com the
+   calculator uses the site's own window.rdButtons from main.js. This is a copy of it, so keep the two the same.
+   rdButtons(root) wires the buttons inside root that aren't wired yet. Needs GSAP. */
 (function () {
   function qs(s, r) { return (r || document).querySelector(s); }
   function qsa(s, r) { return Array.from((r || document).querySelectorAll(s)); }
 
-  function rdButtons() {
-    var buttons = qsa('.btn');
+  function rdButtons(root) {
+    // Each button once: the calculator builds its buttons after the page's own run, so it may call this again
+    var buttons = qsa('.btn', root).filter(function (b) { return !b.hasAttribute('data-btn-on'); });
     if (!buttons.length) return;
+    buttons.forEach(function (b) { b.setAttribute('data-btn-on', ''); });
 
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var finePointer = window.matchMedia('(pointer: fine)').matches;

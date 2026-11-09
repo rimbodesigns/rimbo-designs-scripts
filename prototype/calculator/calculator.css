@@ -1,12 +1,12 @@
-/* The site's own fonts, from its Webflow CDN */
-@font-face { font-family: IntegralNEW; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68b025db738fc57555d5e08f_Integral-Heavy.woff2) format("woff2"); font-weight: 900; font-style: normal; font-display: swap; }
-@font-face { font-family: "RM MONO"; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: Akkuratllsub; src: url(https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6603db04efccc89ef43b319b_AkkuratLLSub-Regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+/* The calculator, everything inside [data-calc]. On rimbodesigns.com that's the section on the hidden page /proposal:
+   the page, the section's background and spacing, the nav and the fonts are the site's own (Webflow). Nothing in here
+   reaches outside the section. preview.css adds what the site already has, for the hosted preview and the local page.
 
-/* The brand rules (docs/brand.md): Night and Ink carry the page, Beige the text, Deep Orange marks what matters
-   and stays small: switches, the bar, dots, step numbers, the dashed line. Buttons never go orange.
+   The brand rules (docs/brand.md): Night and Ink carry the page, Beige the text, Deep Orange marks what matters
+   and stays small: switches, the bar, dots, step numbers, the dashed line. Buttons never go orange: they are the
+   site's own .btn (Webflow), so a change to the button in the Designer shows here too.
    Integral for headings, Akkurat for reading, RM Mono for labels, buttons and numbers. */
-:root {
+[data-calc] {
   --mono: "RM MONO", ui-monospace, Menlo, monospace;
   --read: Akkuratllsub, "Helvetica Neue", Arial, sans-serif;
   --head: IntegralNEW, Impact, Arial, sans-serif;
@@ -14,32 +14,31 @@
   --line: rgba(248, 245, 238, .13); --text: #f8f5ee; --muted: color-mix(in srgb, #f8f5ee 64%, #131313);
   --field-bg: #0c0c0c; --field-text: #f8f5ee; --field-line: rgba(248, 245, 238, .26);
   --accent: #f8f5ee; --on-accent: #131313; --focus: #f8f5ee; --track: #2f2d2a; --knob: #0c0c0c; --on: #e4441c; --on-text: #e4441c;
-  --glow: rgba(248, 245, 238, .18); --glow-on: rgba(248, 245, 238, .4);
   --r: 2px; --error: #e8564f;
   color-scheme: dark;
+  position: relative; isolation: isolate; /* the ball, the grain and the pop-up stay inside the section, under the site's nav */
+  color: var(--text); font: 15px/1.55 var(--read); -webkit-font-smoothing: antialiased;
 }
-
-* { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--text); }
-body { font: 15px/1.55 var(--read); -webkit-font-smoothing: antialiased; }
+[data-calc], [data-calc] * { box-sizing: border-box; }
+/* The site styles plain h1, h2, p, ul, li and label (sizes, colours, margins). Inside the calculator they start from
+   nothing, and the calc_ classes set what they need. :where() keeps these weaker than any class */
+:where([data-calc]) h1, :where([data-calc]) h2, :where([data-calc]) p, :where([data-calc]) ul, :where([data-calc]) li, :where([data-calc]) label, :where([data-calc]) legend {
+  margin: 0; padding: 0; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-wrap: inherit;
+}
 /* Grain over everything: the stipple tile comes from ball.js */
-body::after { content: ""; position: fixed; inset: -128px; pointer-events: none; z-index: 10; background-image: var(--grain); background-size: var(--grain-size, 256px); will-change: transform; animation: calc-grain .72s steps(1) infinite; }
+[data-calc]::after { content: ""; position: fixed; inset: -128px; pointer-events: none; z-index: 10; background-image: var(--grain); background-size: var(--grain-size, 256px); will-change: transform; animation: calc-grain .72s steps(1) infinite; }
 /* The grain is alive: the whole layer jumps to a new spot 11 times a second, like film. Only moves a layer, so it costs nothing */
 @keyframes calc-grain {
   0% { transform: translate(0, 0); } 12.5% { transform: translate(-41px, 27px); } 25% { transform: translate(63px, -18px); } 37.5% { transform: translate(-22px, -71px); }
   50% { transform: translate(84px, 46px); } 62.5% { transform: translate(-96px, 12px); } 75% { transform: translate(35px, 88px); } 87.5% { transform: translate(-58px, -39px); }
 }
-@media (prefers-reduced-motion: reduce) { body::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { [data-calc]::after { animation: none; } }
 /* The ball: see ball.js. Behind everything, in the empty corner under the price card */
 .calc_ball { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 .calc_ball[hidden] { display: none; }
 .calc_ball.is-top { position: absolute; inset: 0 0 auto 0; height: 420px; }
 
 .calc { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
-/* The logo, quiet in the top right corner, on the price card's right edge. On his own site the nav takes over */
-.calc_logo { position: absolute; top: 44px; right: 24px; display: block; width: 72px; height: 26px; color: var(--text); background: currentColor; opacity: .4; transition: opacity .3s ease;
-  -webkit-mask: url(logo.svg) center / contain no-repeat; mask: url(logo.svg) center / contain no-repeat; }
-.calc_logo:hover { opacity: .85; }
 .calc_eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .calc_eyebrow::before { content: ""; flex: none; width: 6px; height: 6px; background: var(--on); }
 .calc_title { margin: 0 0 12px; font: 900 clamp(2rem, 5vw, 3.4rem)/.95 var(--head); text-transform: uppercase; }
@@ -121,9 +120,9 @@ body::after { content: ""; position: fixed; inset: -128px; pointer-events: none;
 .calc_seg_opt input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .calc_seg_opt input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+:where([data-calc]) button:focus-visible, :where([data-calc]) a:focus-visible, :where([data-calc]) input:focus-visible, :where([data-calc]) textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-.calc_side { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 20px; }
+.calc_side { position: sticky; top: var(--calc-top, 24px); display: flex; flex-direction: column; gap: 20px; }
 /* Frosted, so the ball shows through when it grows behind the card */
 .calc_result { padding: 28px 24px 24px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
 .calc_result .calc_eyebrow::before { display: none; }
@@ -182,24 +181,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @keyframes calc-march { to { stroke-dashoffset: -8; } }
 @media (prefers-reduced-motion: reduce) { .calc_wire path, .calc_tip.is-in { animation: none; } }
 
-/* The site's global button (.btn, rdButtons in buttons.js): solid beige on dark, RM Mono capitals, radius .3em.
-   Magnetic, the label rolls to its second line, the new line boils. */
-.btn { position: relative; display: inline-flex; align-items: center; justify-content: center; appearance: none; padding: 1.15em 1.4em; border: 1px solid var(--accent); border-radius: .3em;
-  background: var(--accent); color: var(--on-accent); box-shadow: 0 0 1.2rem var(--glow); cursor: pointer; text-decoration: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
-  font: 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; transition: box-shadow .6s cubic-bezier(.16, 1, .3, 1); }
-.btn.is-hover { z-index: 1; box-shadow: 0 0 2.2rem var(--glow-on), 0 0 .6rem var(--glow-on); }
-/* The ghost one: same button, no fill. Back to my recommendation and Start over */
-.btn.is-secondary { margin-top: 12px; background: transparent; border-color: var(--field-line); color: var(--text); box-shadow: none; transition: border-color .35s; }
-.btn.is-secondary.is-hover { border-color: var(--text); box-shadow: none; }
-.btn_in { display: inline-flex; max-width: 100%; }
-.btn_swap { position: relative; display: inline-block; overflow: hidden; }
-.btn_line { display: flex; align-items: center; justify-content: center; gap: .7em; padding: .15em 0; }
-.btn_line.is-alt { position: absolute; inset: 0; }
-.btn_arrow { display: inline-block; }
-.calc_cta { display: flex; width: 100%; }
+/* The buttons: the site's .btn and .btn.is-secondary (the ghost one). Here only how they sit in the card: full width,
+   and 45px tall as the calculator was approved (the site's button is a little lower) */
+.calc_cta { display: flex; width: 100%; padding: 1.37em 1.4em; }
 .calc_cta[hidden] { display: none; }
 .calc_cta .btn_in, .calc_cta .btn_swap { width: 100%; }
-.calc_fine { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.calc_cta.is-secondary { margin-top: 12px; }
+/* The page without a link: one button under the line */
+.calc_none_cta { margin-top: 4px; padding: 1.37em 1.4em; }
+.calc_grid[hidden] { display: none; }
 /* What every page includes: one line with its (i), closing the Website box */
 .calc_included { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 0 2px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; color: var(--muted); }
 .calc_included .calc_label { font-size: 13px; }
@@ -248,54 +238,16 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 .calc_rec[hidden] { display: none; }
 .calc_examples { flex: 0 1 auto; min-width: 0; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Apply step */
-.calc_apply { margin-top: 48px; padding: 28px 24px 28px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); scroll-margin-top: 24px; }
-.calc_apply[hidden], .calc_apply [hidden] { display: none; }
-.calc_apply_title { margin: 0 0 12px; font: 900 clamp(1.5rem, 3.4vw, 2.2rem)/1 var(--head); text-transform: uppercase; }
-.calc_apply_intro { margin: 0 0 16px; max-width: 56ch; color: var(--muted); }
-.calc_scope { margin: 0 0 28px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--field-bg); color: var(--field-text); font: 12px/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.calc_formfields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 20px; }
-.calc_field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.calc_field_wide, .calc_error, .calc_submitrow, .calc_check { grid-column: 1 / -1; }
-.calc_field label { font: 11px/1.3 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.calc_opt { opacity: .7; letter-spacing: .08em; text-transform: none; }
-.calc_field input, .calc_field select, .calc_field textarea {
-  appearance: none; width: 100%; padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--field-line);
-  background-color: var(--field-bg); color: var(--field-text); caret-color: var(--accent); font: inherit; font-size: 15px;
-}
-.calc_field textarea { resize: vertical; min-height: 104px; }
-.calc_field select {
-  padding-right: 38px; cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat;
-}
-.calc_field select:invalid { color: var(--muted); }
-.calc_field select option { background: var(--field-bg); color: var(--field-text); }
-.calc_field input::placeholder, .calc_field textarea::placeholder { color: var(--muted); opacity: .7; }
-.calc_field input:hover, .calc_field select:hover, .calc_field textarea:hover { border-color: var(--muted); }
-.calc_field input:focus-visible, .calc_field select:focus-visible, .calc_field textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
-.calc_field [aria-invalid="true"] { border-color: var(--error); }
-.calc_check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--text); cursor: pointer; }
-.calc_check input { appearance: auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
-.calc_error { margin: 0; color: var(--error); font-size: 14px; }
-.calc_submitrow { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-.calc_submit { width: auto; padding: 1.3em 2em; }
-.calc_submit[disabled] { opacity: .6; cursor: progress; }
-.calc_submitrow .calc_fine { margin: 0; }
-.calc_done:focus { outline: none; }
-.calc_done_title { margin: 0 0 12px; font: 900 clamp(1.3rem, 3vw, 1.8rem)/1.05 var(--head); text-transform: uppercase; }
-.calc_done p { max-width: 56ch; margin: 0 0 12px; }
 .calc_link { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--on); }
 .calc_link:hover { color: var(--muted); }
 
-/* Light theme: opt-in with ?theme=light. Beige page, solid ink button, small orange text in Orange Text */
-:root[data-calc-theme="light"] {
+/* Light theme: opt-in with ?theme=light, for trying out. Beige page, small orange text in Orange Text (the buttons stay the site's) */
+[data-calc][data-calc-theme="light"] {
   --bg: #f8f5ee; --panel: rgba(236, 229, 214, .82); --glass: rgba(248, 245, 238, .76); --solid: #f8f5ee;
   --line: rgba(19, 19, 19, .16); --text: #131313; --muted: color-mix(in srgb, #131313 68%, #f8f5ee);
   --field-bg: #f8f5ee; --field-text: #131313; --field-line: rgba(19, 19, 19, .34);
   --accent: #131313; --on-accent: #f8f5ee; --focus: #131313; --track: #d6cfbf; --knob: #f8f5ee; --on-text: #cc3c18;
-  --glow: rgba(19, 19, 19, .12); --glow-on: rgba(19, 19, 19, .26);
-  color-scheme: light;
+  color-scheme: light; background: var(--bg);
 }
 
 @media (max-width: 860px) {
@@ -305,9 +257,6 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
   .calc_tip { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; max-height: 50vh; overflow-y: auto; }
   .calc_wire { display: none; }
   .calc_toast { left: 16px; right: 16px; bottom: 16px; }
-  .calc_formfields { grid-template-columns: 1fr; }
-  .calc_apply { padding: 24px 16px; }
-  .calc_submit { width: 100%; }
   .calc_subs { margin-left: 10px; padding-left: 12px; }
 }
 /* Phone: no room for the quiet words next to the (i). The examples are in the (i) too, and "Back to my recommendation" stays */
@@ -315,5 +264,4 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
   .calc_lede { max-width: 15.5em; }
   .calc_rec { display: none; }
   .calc_tip_line.is-phone { display: block; }
-  .calc_logo { position: static; margin: 0 0 24px; } /* the ball has the top right corner on phones */
 }

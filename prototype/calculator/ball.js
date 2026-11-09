@@ -5,27 +5,27 @@
    - it lives on its own: the colours flow and turn around inside it, and the ball floats and breathes.
      Orange is one colour among the others at any size, it never takes over
    - a pick stirs the colours and warms them a little, the pointer warms the spot under it
-   Also makes the page's grain. Without WebGL2 there's no ball and nothing else changes. */
+   Also makes the page's grain. Without WebGL2 there's no ball and nothing else changes.
+   calculator.js starts it with calcBallMount(root) and stops it with destroy() when the page leaves. */
 (function () {
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // The page grain: a fine stipple, light and dark specks, drawn once into a tile
-  (function grain() {
-    var size = 256, c = document.createElement("canvas"); c.width = c.height = size;
-    var x = c.getContext("2d"), img = x.createImageData(size, size), d = img.data;
-    for (var i = 0; i < d.length; i += 4) {
-      var n = Math.random(), light = n > .5, a = light ? (n - .5) * .2 : (n < .22 ? (.22 - n) * .75 : 0);
-      d[i] = light ? 248 : 12; d[i + 1] = light ? 245 : 12; d[i + 2] = light ? 238 : 12; d[i + 3] = a * 255;
+  // The page grain: a fine stipple, light and dark specks, drawn once into a tile (once per visit: every start reuses it)
+  var grainTile = null;
+  function grain(root) {
+    if (!grainTile) {
+      var size = 256, c = document.createElement("canvas"); c.width = c.height = size;
+      var x = c.getContext("2d"), img = x.createImageData(size, size), d = img.data;
+      for (var i = 0; i < d.length; i += 4) {
+        var n = Math.random(), light = n > .5, a = light ? (n - .5) * .2 : (n < .22 ? (.22 - n) * .75 : 0);
+        d[i] = light ? 248 : 12; d[i + 1] = light ? 245 : 12; d[i + 2] = light ? 238 : 12; d[i + 3] = a * 255;
+      }
+      x.putImageData(img, 0, 0);
+      grainTile = { url: "url(" + c.toDataURL("image/png") + ")", size: Math.round(size / Math.min(devicePixelRatio || 1, 2)) + "px" }; // one tile pixel per screen pixel: a clean stipple
     }
-    x.putImageData(img, 0, 0);
-    var root = document.documentElement.style;
-    root.setProperty("--grain", "url(" + c.toDataURL("image/png") + ")");
-    root.setProperty("--grain-size", Math.round(size / Math.min(devicePixelRatio || 1, 2)) + "px"); // one tile pixel per screen pixel: a clean stipple
-  })();
-
-  var cv = document.getElementById("ball");
-  var gl = cv && cv.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
-  if (!gl) { if (cv) cv.hidden = true; return; }
+    root.style.setProperty("--grain", grainTile.url);
+    root.style.setProperty("--grain-size", grainTile.size);
+  }
 
   function oklab(hex) {
     var c = [0, 2, 4].map(function (i) {
@@ -96,134 +96,158 @@
     gl.uniform1f(U.seed, 14);
     return U;
   }
-  var U = setup(gl);
-  if (!U) { cv.hidden = true; return; }
 
   var MAX = 30000; // the price at which the ball is full size
   var FLOW = +new URLSearchParams(location.search).get("flow") || 1; // ?flow=2: the colours move twice as fast
-  var B = { R: 0, tR: 0, bias: .12, tBias: .12, heat: 0, kick: 0, stir: 0, cx: 0, cy: 0, min: 0, max: 0, value: 0, minimum: 1, seen: false };
-  var P = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
-  var dpr = 1, time = 0, float = 0, last = 0, lastDraw = 0, onScreen = true;
 
-  function targets() {
-    B.tR = B.min + (B.max - B.min) * Math.sqrt(Math.min(B.value, MAX) / MAX); // area follows the price
-    B.tBias = .12 - .06 * Math.min(1, B.value / B.minimum); // a touch cooler while it's small
-  }
+  // Starts the grain and the ball inside root (the calculator). Returns { set, pop, destroy }, or null without WebGL2:
+  // then there is no ball and nothing else changes. destroy() stops all of it, for a page that leaves without a reload.
+  window.calcBallMount = function (root) {
+    grain(root);
+    var cv = root.querySelector(".calc_ball");
+    var gl = cv && cv.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+    var U = gl && setup(gl);
+    if (!U) { if (cv) cv.hidden = true; return null; }
+    var alive = true, offs = [];
+    function on(target, type, fn, options) { target.addEventListener(type, fn, options); offs.push(function () { target.removeEventListener(type, fn, options); }); }
+    var B = { R: 0, tR: 0, bias: .12, tBias: .12, heat: 0, kick: 0, stir: 0, cx: 0, cy: 0, min: 0, max: 0, value: 0, minimum: 1, seen: false };
+    var P = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
+    var dpr = 1, time = 0, float = 0, last = 0, lastDraw = 0, onScreen = true;
 
-  // Wide: fixed, in the empty corner under the price card. Phone: at the top of the page, behind the title.
-  function layout() {
-    var wide = innerWidth > 860, side = document.querySelector(".calc_side");
-    cv.classList.toggle("is-top", !wide);
-    var w = wide ? innerWidth : document.documentElement.clientWidth, h = wide ? innerHeight : 420;
-    dpr = Math.min(devicePixelRatio || 1, 1.5);
-    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-    gl.viewport(0, 0, cv.width, cv.height);
-    if (wide) {
-      var r = side.getBoundingClientRect();
-      B.cx = Math.min(r.right + 40, w - 10); B.cy = h * .92; B.min = Math.max(96, h * .17); B.max = h * .54;
-    } else {
-      B.cx = w * .98; B.cy = 30; B.min = 62; B.max = 165;
+    function targets() {
+      B.tR = B.min + (B.max - B.min) * Math.sqrt(Math.min(B.value, MAX) / MAX); // area follows the price
+      B.tBias = .12 - .06 * Math.min(1, B.value / B.minimum); // a touch cooler while it's small
     }
-    targets();
-    if (reduce) { B.R = B.tR; B.bias = B.tBias; }
-  }
 
-  function draw() {
-    // It floats and breathes on its own (still with reduced motion)
-    var fx = reduce ? 0 : Math.sin(float * .31) * 16 + Math.sin(float * .13) * 10, fy = reduce ? 0 : Math.cos(float * .23) * 14;
-    var breath = reduce ? 1 : 1 + Math.sin(float * .37) * .022;
-    gl.uniform2f(U.res, cv.width, cv.height); gl.uniform2f(U.center, (B.cx + fx) * dpr, (B.cy + fy) * dpr);
-    gl.uniform1f(U.R, Math.max(B.R * breath, 1) * dpr); gl.uniform1f(U.bias, B.bias); gl.uniform1f(U.heat, B.heat);
-    gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, time);
-    gl.uniform1f(U.grainT, reduce ? 0 : Math.floor(float * 11) % 64 * 1.7); // the grain flickers like film, 11 frames a second
-    gl.uniform2f(U.ptr, P.x * dpr, P.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(B.R * .4, 80), 200) * dpr); gl.uniform1f(U.ptrAmt, P.amt);
-    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-
-  function ease(a, b, k, dt) { return a + (b - a) * (1 - Math.pow(1 - k, dt * 60)); }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    if (document.hidden || !onScreen) { last = now; return; }
-    var dt = Math.min((now - last) / 1000, .05); last = now;
-    time += dt * FLOW * (1 + B.stir * 7); // a pick stirs the colours, then they settle back to their own pace
-    float += dt;
-    B.stir *= Math.pow(.955, dt * 60);
-    B.R = ease(B.R, B.tR, .07, dt);
-    B.bias = ease(B.bias, B.tBias, .05, dt);
-    B.heat = ease(B.heat, B.kick, .16, dt);
-    B.kick *= Math.pow(.962, dt * 60);
-    P.x = ease(P.x, P.tx, .12, dt); P.y = ease(P.y, P.ty, .12, dt); P.amt = ease(P.amt, P.target, .06, dt);
-    var moving = Math.abs(B.tR - B.R) > .4 || B.heat > .004 || B.kick > .004 || B.stir > .01 || Math.abs(P.target - P.amt) > .004 || P.target;
-    if (!moving && now - lastDraw < 33) return; // on its own: 30 frames a second is plenty for slow colours
-    lastDraw = now;
-    draw();
-  }
-
-  if (matchMedia("(pointer: fine)").matches && !reduce) {
-    addEventListener("pointermove", function (e) {
-      if (cv.classList.contains("is-top")) return;
-      var d = Math.hypot(e.clientX - B.cx, e.clientY - B.cy);
-      if (d < B.R * 1.05) { if (!P.target) { P.x = e.clientX; P.y = e.clientY; } P.tx = e.clientX; P.ty = e.clientY; P.target = 1; }
-      else P.target = 0;
-    }, { passive: true });
-  }
-  if ("IntersectionObserver" in window) new IntersectionObserver(function (es) { onScreen = es[0].isIntersecting; }).observe(cv);
-  var rt = 0;
-  addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { layout(); draw(); }, 120); });
-
-  layout();
-  if (!reduce) requestAnimationFrame(function (t) { last = t; frame(t); });
-
-  // The pop-up's own little ball: it runs off the card's edge, floods orange as it arrives and settles (brand blocks).
-  // Only runs while the pop-up is open. calm = no flood, for "not yet" messages.
-  var mini = null;
-  function popBall(c, calm) {
-    if (!mini) {
-      var g = c.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
-      var u = g && setup(g);
-      if (!u) return function () {};
-      mini = { gl: g, U: u, run: 0, t: 40 };
-    }
-    var m = mini, g2 = m.gl, u2 = m.U, box = c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
-    c.width = Math.round(box.width * d); c.height = Math.round(box.height * d);
-    g2.viewport(0, 0, c.width, c.height);
-    var heat = calm || reduce ? 0 : 1, id = ++m.run, prev = performance.now(), clock = 0;
-    function paint() {
-      g2.uniform2f(u2.res, c.width, c.height); g2.uniform2f(u2.center, c.width * .94, c.height * .5);
-      g2.uniform1f(u2.R, c.height * .86); g2.uniform1f(u2.bias, calm ? .3 : .02); g2.uniform1f(u2.heat, heat);
-      g2.uniform1f(u2.grainScale, d * .75); g2.uniform1f(u2.t, m.t);
-      g2.uniform1f(u2.grainT, reduce ? 0 : Math.floor(clock * 11) % 64 * 1.7); g2.uniform1f(u2.ptrAmt, 0); g2.uniform1f(u2.ptrR, 1);
-      g2.clearColor(0, 0, 0, 0); g2.clear(g2.COLOR_BUFFER_BIT);
-      g2.drawArrays(g2.TRIANGLES, 0, 3);
-    }
-    paint();
-    if (reduce) return function () {};
-    (function loop(now) {
-      if (id !== m.run) return;
-      var dt = Math.min((now - prev) / 1000, .25); prev = now; clock += dt; // real time: it only lives for a few seconds
-      m.t += dt * 1.6;
-      heat *= Math.pow(.965, dt * 60);
-      paint();
-      requestAnimationFrame(loop);
-    })(prev);
-    return function () { if (id === m.run) m.run++; };
-  }
-
-  // Called on every change of the scope. value = the big number, minimum = the project minimum.
-  window.calcBall = {
-    pop: popBall,
-    set: function (value, minimum) {
-      var d = value - B.value, first = !B.seen, crossed = B.value < minimum && value >= minimum;
-      B.value = value; B.minimum = minimum; B.seen = true;
+    // Wide: fixed, in the empty corner under the price card. Phone: at the top of the page, behind the title.
+    function layout() {
+      var wide = innerWidth > 860, side = root.querySelector(".calc_side");
+      cv.classList.toggle("is-top", !wide);
+      var w = wide ? innerWidth : document.documentElement.clientWidth, h = wide ? innerHeight : 420;
+      dpr = Math.min(devicePixelRatio || 1, 1.5);
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      gl.viewport(0, 0, cv.width, cv.height);
+      if (wide) {
+        var r = side.getBoundingClientRect();
+        B.cx = r.width ? Math.min(r.right + 40, w - 10) : w * .82; // no price card (a page without a link): the right-hand corner
+        B.cy = h * .92; B.min = Math.max(96, h * .17); B.max = h * .54;
+      } else {
+        // by the title: on the site the section's top spacing keeps the title (and the ball) clear of the nav
+        B.cx = w * .98; B.cy = 30 + (parseFloat(getComputedStyle(root).paddingTop) || 0); B.min = 62; B.max = 165;
+      }
       targets();
-      if (reduce) { B.R = B.tR; B.bias = B.tBias; draw(); return; }
-      if (first) return;
-      var size = Math.min(1, Math.abs(d) / 2000);
-      if (d) B.stir = Math.min(1, B.stir + .35 + .4 * size);
-      if (crossed) B.kick = .4;
-      else if (d > 0) B.kick = Math.max(B.kick, .12 + .14 * size);
+      if (reduce) { B.R = B.tR; B.bias = B.tBias; }
     }
+
+    function draw() {
+      // It floats and breathes on its own (still with reduced motion)
+      var fx = reduce ? 0 : Math.sin(float * .31) * 16 + Math.sin(float * .13) * 10, fy = reduce ? 0 : Math.cos(float * .23) * 14;
+      var breath = reduce ? 1 : 1 + Math.sin(float * .37) * .022;
+      gl.uniform2f(U.res, cv.width, cv.height); gl.uniform2f(U.center, (B.cx + fx) * dpr, (B.cy + fy) * dpr);
+      gl.uniform1f(U.R, Math.max(B.R * breath, 1) * dpr); gl.uniform1f(U.bias, B.bias); gl.uniform1f(U.heat, B.heat);
+      gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, time);
+      gl.uniform1f(U.grainT, reduce ? 0 : Math.floor(float * 11) % 64 * 1.7); // the grain flickers like film, 11 frames a second
+      gl.uniform2f(U.ptr, P.x * dpr, P.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(B.R * .4, 80), 200) * dpr); gl.uniform1f(U.ptrAmt, P.amt);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    function ease(a, b, k, dt) { return a + (b - a) * (1 - Math.pow(1 - k, dt * 60)); }
+
+    function frame(now) {
+      if (!alive) return;
+      requestAnimationFrame(frame);
+      if (document.hidden || !onScreen) { last = now; return; }
+      var dt = Math.min((now - last) / 1000, .05); last = now;
+      time += dt * FLOW * (1 + B.stir * 7); // a pick stirs the colours, then they settle back to their own pace
+      float += dt;
+      B.stir *= Math.pow(.955, dt * 60);
+      B.R = ease(B.R, B.tR, .07, dt);
+      B.bias = ease(B.bias, B.tBias, .05, dt);
+      B.heat = ease(B.heat, B.kick, .16, dt);
+      B.kick *= Math.pow(.962, dt * 60);
+      P.x = ease(P.x, P.tx, .12, dt); P.y = ease(P.y, P.ty, .12, dt); P.amt = ease(P.amt, P.target, .06, dt);
+      var moving = Math.abs(B.tR - B.R) > .4 || B.heat > .004 || B.kick > .004 || B.stir > .01 || Math.abs(P.target - P.amt) > .004 || P.target;
+      if (!moving && now - lastDraw < 33) return; // on its own: 30 frames a second is plenty for slow colours
+      lastDraw = now;
+      draw();
+    }
+
+    if (matchMedia("(pointer: fine)").matches && !reduce) {
+      on(window, "pointermove", function (e) {
+        if (cv.classList.contains("is-top")) return;
+        var d = Math.hypot(e.clientX - B.cx, e.clientY - B.cy);
+        if (d < B.R * 1.05) { if (!P.target) { P.x = e.clientX; P.y = e.clientY; } P.tx = e.clientX; P.ty = e.clientY; P.target = 1; }
+        else P.target = 0;
+      }, { passive: true });
+    }
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (es) { onScreen = es[0].isIntersecting; });
+      io.observe(cv);
+      offs.push(function () { io.disconnect(); });
+    }
+    var rt = 0;
+    on(window, "resize", function () { clearTimeout(rt); rt = setTimeout(function () { layout(); draw(); }, 120); });
+
+    layout();
+    if (!reduce) requestAnimationFrame(function (t) { last = t; frame(t); });
+
+    // The pop-up's own little ball: it runs off the card's edge, floods orange as it arrives and settles (brand blocks).
+    // Only runs while the pop-up is open. calm = no flood, for "not yet" messages.
+    var mini = null;
+    function popBall(c, calm) {
+      if (!mini) {
+        var g = c.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+        var u = g && setup(g);
+        if (!u) return function () {};
+        mini = { gl: g, U: u, run: 0, t: 40 };
+      }
+      var m = mini, g2 = m.gl, u2 = m.U, box = c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+      c.width = Math.round(box.width * d); c.height = Math.round(box.height * d);
+      g2.viewport(0, 0, c.width, c.height);
+      var heat = calm || reduce ? 0 : 1, id = ++m.run, prev = performance.now(), clock = 0;
+      function paint() {
+        g2.uniform2f(u2.res, c.width, c.height); g2.uniform2f(u2.center, c.width * .94, c.height * .5);
+        g2.uniform1f(u2.R, c.height * .86); g2.uniform1f(u2.bias, calm ? .3 : .02); g2.uniform1f(u2.heat, heat);
+        g2.uniform1f(u2.grainScale, d * .75); g2.uniform1f(u2.t, m.t);
+        g2.uniform1f(u2.grainT, reduce ? 0 : Math.floor(clock * 11) % 64 * 1.7); g2.uniform1f(u2.ptrAmt, 0); g2.uniform1f(u2.ptrR, 1);
+        g2.clearColor(0, 0, 0, 0); g2.clear(g2.COLOR_BUFFER_BIT);
+        g2.drawArrays(g2.TRIANGLES, 0, 3);
+      }
+      paint();
+      if (reduce) return function () {};
+      (function loop(now) {
+        if (id !== m.run || !alive) return;
+        var dt = Math.min((now - prev) / 1000, .25); prev = now; clock += dt; // real time: it only lives for a few seconds
+        m.t += dt * 1.6;
+        heat *= Math.pow(.965, dt * 60);
+        paint();
+        requestAnimationFrame(loop);
+      })(prev);
+      return function () { if (id === m.run) m.run++; };
+    }
+
+    // set() is called on every change of the scope. value = the big number, minimum = the project minimum.
+    return {
+      pop: popBall,
+      set: function (value, minimum) {
+        var d = value - B.value, first = !B.seen, crossed = B.value < minimum && value >= minimum;
+        B.value = value; B.minimum = minimum; B.seen = true;
+        targets();
+        if (reduce) { B.R = B.tR; B.bias = B.tBias; draw(); return; }
+        if (first) return;
+        var size = Math.min(1, Math.abs(d) / 2000);
+        if (d) B.stir = Math.min(1, B.stir + .35 + .4 * size);
+        if (crossed) B.kick = .4;
+        else if (d > 0) B.kick = Math.max(B.kick, .12 + .14 * size);
+      },
+      // The page leaves: stop the clock and the listeners, and hand the WebGL contexts back to the browser
+      destroy: function () {
+        if (!alive) return;
+        alive = false; clearTimeout(rt);
+        offs.forEach(function (off) { off(); });
+        [gl, mini && mini.gl].forEach(function (g) { var x = g && g.getExtension("WEBGL_lose_context"); if (x) x.loseContext(); });
+      }
+    };
   };
 })();
