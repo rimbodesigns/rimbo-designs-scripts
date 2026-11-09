@@ -12,10 +12,12 @@
    everything inside the section is built here. The page's footer code loads these files from the repo and calls
    rdCalc.mount(). It stops by itself when the page leaves through a page transition. */
 (function () {
-  var CONFIG = {
+  // Today's prices and texts. A personal link keeps the prices of the day it was made (x in the link), so changing a
+  // price here never changes a proposal that was already sent. start() works on a copy of this, called CONFIG.
+  var BASE = {
     callUrl: "https://cal.com/rimbo-designs/45-minute-discovery-call", // the lead's one button: they don't need to send anything back, you talk it through
     applyUrl: "/apply",            // the page without a link: strangers apply like everyone else
-    previewLead: { v: 1, n: "Sample project", m: "", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
+    previewLead: { v: 1, n: "Sample project", m: "", d: "2026-11-09", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     copy: {
       underMinimum: "You haven't met the {min} minimum yet.",
 
@@ -34,6 +36,7 @@
       copy: "Copy",
       makeOpen: "Open it",
       clientEyebrow: "Proposal",
+      dated: "Last updated {date}", // quiet, next to Your estimate: the day the link was made (Rimbo's words, 2026-11-09)
       clientLede: "Switch things on or off and the price follows.",
       recommended: "Recommended",
       reset: "Back to my recommendation",
@@ -73,7 +76,7 @@
         info: "A page with one job and a few sections.\nSame design standard as the rest, with light animation." },
       { id: "medium",  label: "Medium pages",  hint: "Services, about, team",                 price: 800,  max: 20,
         info: "A page with several sections, some interaction and animation.\n~Most pages of a site are medium." },
-      { id: "complex", label: "Complex pages", hint: "Home, scroll story, heavy animation",    price: 2000, max: 10,
+      { id: "complex", label: "Complex pages", hint: "Home, scroll story, rich interaction",   price: 2000, max: 10,
         info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces.\n~Usually the home page and one or two showpieces." },
       // A whole type of content: structure, template and all its pages (Echo's 12 case studies). €1,500 on my advice, 2026-11-09
       { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 1500, max: 10,
@@ -123,7 +126,8 @@
       { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks.\nIn the look of your site." },
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
         info: "So you can write and publish pages and posts that get found.\nRecorded tutorial::Watch it again whenever you need it.\nOne-on-one call::About your own site.\nChecklist template::For every new page or post." },
-      { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,  info: "A second language with a language switch, set up so each language can be found in search." },
+      { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,
+        info: "A second language with a language switch: every page, SEO text and form translated and checked, set up so each language can be found in search.\n~Webflow charges for localisation on top of the site plan." },
       // Three amounts, not an hours field (Rimbo, 2026-11-05): €97 an hour behind the scenes
       { id: "migration",  group: "search", label: "Content migration",                         hourly: 97,
         question: "How much content do you have?",
@@ -137,7 +141,18 @@
       { id: "leads",      group: "more",   label: "Automations",                               price: 500,  info: "Your site connected to your other tools: form leads into your CRM or mailing list, with an automatic follow-up." },
       { id: "chatbot",    group: "more",   label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
       { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system.\nThis adds written documentation and a training session, so your team can build new pages with it." },
-      { id: "members",    group: "more",   label: "Members area",                              price: 4000, info: "Log-in, member-only pages and gated content, with payments if needed." },
+      // A switch that opens parts, like Branding. Turning it on the first time picks the preset, so the usual
+      // total stays €4,000 (Rimbo, 2026-11-09). All five part prices are DRAFT
+      { id: "members",    group: "more",   label: "Members area",
+        info: "Switch this on if your site needs members, then pick the parts.",
+        preset: ["login", "dashboard", "gated"],
+        parts: [
+          { id: "login",     label: "Log-in and member pages", price: 2500, info: "Sign-up, log-in and the pages only members can see." },
+          { id: "dashboard", label: "Dashboard",               price: 1000, info: "A personal page for each member, with their own info or progress." },
+          { id: "gated",     label: "Gated content",           price: 500,  info: "Downloads, videos or posts that only members can open." },
+          { id: "payments",  label: "Payments",                price: 1000, info: "Paid plans or subscriptions, so members pay to join." },
+          { id: "courses",   label: "Courses",                 price: 2500, info: "Lessons and modules, with each member's progress saved." }
+        ] },
       { id: "shop",       group: "more",   label: "Webshop",                                   price: 4000, info: "Products, cart and checkout, built on Webflow e-commerce." },
       { id: "priority",   group: "more",   label: "Priority start (jump the queue)",           pct: true,   info: "Your project takes the next free slot instead of waiting in line." }
     ]
@@ -149,7 +164,7 @@
     '<main class="calc">' +
       (logo ? '<a class="calc_logo" href="https://www.rimbodesigns.com" target="_blank" rel="noopener" aria-label="Rimbo Designs"></a>' : '') +
       '<header class="calc_head">' +
-        '<p class="calc_eyebrow" id="calc-eyebrow">' + CONFIG.copy.clientEyebrow + '</p>' +
+        '<p class="calc_eyebrow" id="calc-eyebrow">' + BASE.copy.clientEyebrow + '</p>' +
         '<h1 class="calc_title" id="calc-title"></h1>' +
         '<p class="calc_lede" id="calc-lede"></p>' +
       '</header>' +
@@ -161,7 +176,7 @@
         '</div>' +
         '<div class="calc_side">' +
           '<aside class="calc_result" aria-live="polite">' +
-            '<p class="calc_eyebrow" id="calc-total-label">Your estimate</p>' +
+            '<div class="calc_est_row"><p class="calc_eyebrow" id="calc-total-label">Your estimate</p><span class="calc_vat calc_date" id="calc-date" hidden></span></div>' +
             '<div class="calc_price_row"><p class="calc_range"><span id="calc-total" data-odometer-element>&nbsp;</span></p><span class="calc_vat">Excl. VAT</span></div>' +
             '<div class="calc_meter" id="calc-meter" hidden><div class="calc_meter_bar"><span id="calc-meter-fill"></span></div><p class="calc_meter_text" id="calc-meter-text"></p></div>' +
             '<ul class="calc_lines" id="calc-lines"></ul>' +
@@ -197,11 +212,35 @@
   function pad(n) { return (n < 10 ? "0" : "") + n; }
 
   // Personal links. Everything sits after the # (browsers never send that part to a server): n = name, m = line,
-  // d = the day the link was made, r = Rimbo's pick, c = the lead's own version (only when it differs).
-  // A link shows today's prices; d is there so a link could keep its own prices or a "valid until" later.
-  var byId = {};
-  CONFIG.brand.items.concat(CONFIG.toggles).forEach(function (t) { byId[t.id] = t; });
-  function isBrandPart(id) { return CONFIG.brand.items.indexOf(byId[id]) >= 0; }
+  // d = the day the link was made, x = the prices of that day, r = Rimbo's pick, c = the lead's own version (only
+  // when it differs). Links made before x existed show today's prices.
+
+  // Every price as "id:price,id:price": pages, the foundation, every part and switch (an hourly item: its rate),
+  // plus _min (the minimum) and _pri (priority, in %)
+  function priceList(C) {
+    var out = [];
+    function add(id, v) { out.push(id + ":" + v); }
+    C.pages.forEach(function (p) { add(p.id, p.price); });
+    add(C.brand.foundation.id, C.brand.foundation.price);
+    C.brand.items.forEach(function (t) { add(t.id, t.price); });
+    C.toggles.forEach(function (t) {
+      if (t.parts) t.parts.forEach(function (p) { add(p.id, p.price); });
+      else if (!t.pct) add(t.id, t.hourly || t.price);
+    });
+    add("_min", C.minimum); add("_pri", Math.round(C.priorityPct * 100));
+    return out.join(",");
+  }
+  // A link's prices over today's: what the link doesn't name (something added since) keeps today's price
+  function setPrices(C, x) {
+    var map = {};
+    String(x).split(",").forEach(function (pair) { var kv = pair.split(":"); if (kv.length === 2 && isFinite(+kv[1])) map[kv[0]] = +kv[1]; });
+    function set(t) { if (t.id in map) { if (t.hourly) t.hourly = map[t.id]; else t.price = map[t.id]; } }
+    C.pages.forEach(set); set(C.brand.foundation); C.brand.items.forEach(set);
+    C.toggles.forEach(function (t) { if (t.parts) t.parts.forEach(set); else if (!t.pct) set(t); });
+    if ("_min" in map) C.minimum = map._min;
+    if ("_pri" in map) C.priorityPct = map._pri / 100;
+  }
+  function niceDate(d) { var p = String(d).split("-"); return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
 
   function b64e(str) { var s = ""; new TextEncoder().encode(str).forEach(function (c) { s += String.fromCharCode(c); }); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
   function b64d(s) { var bin = atob(s.replace(/-/g, "+").replace(/_/g, "/")), b = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return new TextDecoder().decode(b); }
@@ -239,7 +278,7 @@
     root.setAttribute("data-calc-on", "");
     withCSS(root, function () { stopGone(); current = start(root); });
   }
-  window.rdCalc = { mount: mount, config: CONFIG };
+  window.rdCalc = { mount: mount, config: BASE };
   // Page transitions (Barba, on staging): once the page has gone, everything it started stops
   if (window.barba && barba.hooks) barba.hooks.after(stopGone);
 
@@ -254,36 +293,53 @@
       try { return fn(); } finally { if (own) window.addEventListener = before; else delete window.addEventListener; }
     }
 
-    var state = { pages: { simple: 0, medium: 0, complex: 0, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {} };
-    CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.levels[t.start].hours; });
-    // An item's price: fixed, or the chosen amount's hours × rate
-    function priceOf(t) { return t.hourly ? t.hourly * state.hours[t.id] : t.price; }
-
-    var q = new URLSearchParams(location.search);
-    if (q.get("theme") === "light" || q.get("theme") === "dark") root.setAttribute("data-calc-theme", q.get("theme"));
-
-    root.innerHTML = template(root.hasAttribute("data-calc-logo"));
-    function $(id) { return document.getElementById("calc-" + id); }
-
     // Three views of the same page:
     //   make    ?make: Rimbo types the project name and a line in the header, sets the scope, "Create link" copies a link
     //   client  #for=…: the lead sees their project name and Rimbo's pick switched on, and can change it
     //   none    no link, or a broken one: a short line and Apply
     // The hosted preview (build-preview.py): its viewer only passes a plain #name, so #make, #client and #none pick the view
+    var q = new URLSearchParams(location.search);
     var preview = !!window.CALC_PREVIEW, view = location.hash.slice(1);
-    var share = preview ? (view === "client" ? CONFIG.previewLead : null) : readShare();
+    var share = preview ? (view === "client" ? BASE.previewLead : null) : readShare();
     var mode = q.has("make") || (preview && (view === "make" || !view)) ? "make" : share ? "client" : "none";
+
+    // This visit's prices: today's, or for a lead the ones their link was made with. Rimbo's view always uses today's
+    var CONFIG = JSON.parse(JSON.stringify(BASE));
+    if (mode === "client" && share.x) setPrices(CONFIG, share.x);
+    // Every switch by its id. A part belongs to a switch that opens it: Branding's parts to "brand", Members to "members"
+    var byId = {}, partOf = {};
+    CONFIG.brand.items.forEach(function (t) { byId[t.id] = t; partOf[t.id] = "brand"; });
+    CONFIG.toggles.forEach(function (t) {
+      byId[t.id] = t;
+      (t.parts || []).forEach(function (p) { byId[p.id] = p; partOf[p.id] = t.id; });
+    });
+
+    var state = { pages: { simple: 0, medium: 0, complex: 0, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {}, touched: {} };
+    CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.levels[t.start].hours; });
+    // A part counts only while the switch that opens it is on
+    function parentOn(id) { var p = partOf[id]; return !p || (p === "brand" ? state.brandOn : !!state.toggles[p]); }
+    // An item's price: fixed, the chosen amount's hours × rate, or (a switch with parts) the parts that are on
+    function priceOf(t) {
+      if (t.parts) return t.parts.reduce(function (a, p) { return a + (state.toggles[p.id] ? p.price : 0); }, 0);
+      return t.hourly ? t.hourly * state.hours[t.id] : t.price;
+    }
+
+    if (q.get("theme") === "light" || q.get("theme") === "dark") root.setAttribute("data-calc-theme", q.get("theme"));
+
+    root.innerHTML = template(root.hasAttribute("data-calc-logo"));
+    function $(id) { return document.getElementById("calc-" + id); }
+
     // A different link pasted into the same tab: start again with it. Only a new #for= counts, never an anchor
     var lastHash = location.hash;
     on(window, "hashchange", function () { if (preview || (/[#&]for=/.test(location.hash) && location.hash !== lastHash)) location.reload(); });
 
-    // The scope as a small object: page counts, branding on/off, the ids that are on (brand parts only with
-    // branding on), and the hours behind the chosen amount of items that are on
+    // The scope as a small object: page counts, branding on/off, the ids that are on (parts only while the switch
+    // that opens them is on), and the hours behind the chosen amount of items that are on
     function snap() {
       var s = {
         p: CONFIG.pages.map(function (p) { return state.pages[p.id]; }),
         b: state.brandOn ? 1 : 0,
-        t: Object.keys(byId).filter(function (id) { return state.toggles[id] && (state.brandOn || !isBrandPart(id)); }).sort()
+        t: Object.keys(byId).filter(function (id) { return state.toggles[id] && parentOn(id); }).sort()
       };
       s.t.forEach(function (id) { if (byId[id].hourly) { s.h = s.h || {}; s.h[id] = state.hours[id]; } });
       return s;
@@ -293,17 +349,30 @@
       n = +n; if (!n) return t.levels[t.start].hours;
       return t.levels.reduce(function (best, l) { return Math.abs(l.hours - n) < Math.abs(best - n) ? l.hours : best; }, t.levels[0].hours);
     }
+    // A link's ids as this version knows them (retired items go)
+    function knownIds(ids) { return (ids || []).filter(function (id) { return byId[id]; }); }
+    // Links from before Members had parts (v 1): the switch alone stood for its preset, the parts its old price covered
+    function upgrade(s) {
+      if (!s || !s.t) return s;
+      var t = s.t.slice();
+      CONFIG.toggles.forEach(function (sw) {
+        if (sw.parts && t.indexOf(sw.id) >= 0 && !sw.parts.some(function (p) { return t.indexOf(p.id) >= 0; })) t = t.concat(sw.preset);
+      });
+      return Object.assign({}, s, { t: t });
+    }
+    if (share && !(share.v >= 2)) share = Object.assign({}, share, { r: upgrade(share.r), c: share.c && upgrade(share.c) });
     function applySnap(s) {
       CONFIG.pages.forEach(function (p, i) { state.pages[p.id] = Math.max(0, Math.min(p.max, Math.round(+s.p[i]) || 0)); });
       state.brandOn = !!s.b; state.brandTouched = !!s.b;
-      state.toggles = {};
-      (s.t || []).forEach(function (id) { if (byId[id]) state.toggles[id] = true; });
+      state.toggles = {}; state.touched = {};
+      knownIds(s.t).forEach(function (id) { state.toggles[id] = true; if (byId[id].parts) state.touched[id] = true; });
       CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = clampHours(t, s.h && s.h[t.id]); });
     }
     // A link's pick in the same shape as snap(), so the two compare
     function normSnap(b) {
-      var s = { p: CONFIG.pages.map(function (p, i) { return Math.max(0, Math.min(p.max, Math.round(+b.p[i]) || 0)); }), b: b.b ? 1 : 0,
-        t: (b.t || []).filter(function (id) { return byId[id]; }).sort() }; // older links: fewer page types, retired items
+      var s = { p: CONFIG.pages.map(function (p, i) { return Math.max(0, Math.min(p.max, Math.round(+b.p[i]) || 0)); }), b: b.b ? 1 : 0, t: [] };
+      var ids = knownIds(b.t); // older links: fewer page types, retired items
+      s.t = ids.filter(function (id) { var p = partOf[id]; return !p || (p === "brand" ? s.b : ids.indexOf(p) >= 0); }).sort();
       s.t.forEach(function (id) { var t = byId[id]; if (t && t.hourly) { s.h = s.h || {}; s.h[id] = clampHours(t, b.h && b.h[id]); } });
       return s;
     }
@@ -313,7 +382,7 @@
     function picked() {
       return CONFIG.pages.some(function (p) { return state.pages[p.id]; }) ||
         (state.brandOn && CONFIG.brand.items.some(function (t) { return state.toggles[t.id]; })) ||
-        CONFIG.toggles.some(function (t) { return !t.pct && state.toggles[t.id]; });
+        CONFIG.toggles.some(function (t) { return !t.pct && state.toggles[t.id] && priceOf(t) > 0; });
     }
 
     // The selected items as [label, price] lines, plus:
@@ -538,12 +607,30 @@
         set.appendChild(legend);
         set.appendChild(list);
         CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
+          if (t.parts) { makeParts(t, list); return; }
           var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
           list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
           if (t.hourly) list.appendChild(makeHours(t));
         });
         box.appendChild(set);
       });
+    }
+
+    // A switch that opens priced parts, like Branding (Members area). The first time on, its preset parts go on with it
+    function makeParts(t, list) {
+      var parent = makeItem(t, "", function () {
+        state.toggles[t.id] = !state.toggles[t.id];
+        if (state.toggles[t.id] && !state.touched[t.id]) { t.preset.forEach(function (id) { state.toggles[id] = true; }); state.touched[t.id] = true; }
+        render();
+      });
+      parent.classList.add("calc_item_parent");
+      parent.querySelector(".calc_toggle").setAttribute("aria-controls", "calc-subs-" + t.id);
+      list.appendChild(parent);
+      var subs = el("div", "calc_subs"); subs.id = "calc-subs-" + t.id; subs.hidden = true;
+      t.parts.forEach(function (p) {
+        subs.appendChild(makeItem(p, "+" + eur(p.price), function () { state.toggles[p.id] = !state.toggles[p.id]; render(); }));
+      });
+      list.appendChild(subs);
     }
 
     // Hourly item: switched on, a question with three choices opens under it (real radio buttons, so arrow keys work)
@@ -658,8 +745,14 @@
       $("price-brand").textContent = state.brandOn ? "+" + eur(brandSum()) : "";
 
       CONFIG.toggles.forEach(function (t) {
-        if (!t.hourly) return;
         var on = !!state.toggles[t.id];
+        if (t.parts) { // like Branding: the parts open with the switch, the row shows what they add up to
+          reveal($("subs-" + t.id), on);
+          root.querySelector('.calc_toggle[data-id="' + t.id + '"]').setAttribute("aria-expanded", String(on));
+          $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : "";
+          return;
+        }
+        if (!t.hourly) return;
         reveal($("hours-" + t.id), on);
         $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
         $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : eur(t.hourly) + " / hour";
@@ -689,9 +782,11 @@
 
     // Personal links: the address bar always holds the current version, so a reload keeps it
     function shareData() {
-      if (mode === "make") return { v: 1, n: $("make-name").value.trim(), m: $("make-line").value.trim(), d: today(), r: snap() };
-      var o = { v: 1, n: share.n, m: share.m, r: share.r }, s = snap();
+      // v 2: Members has parts. x: the prices of today, so this proposal keeps them
+      if (mode === "make") return { v: 2, n: $("make-name").value.trim(), m: $("make-line").value.trim(), d: today(), x: priceList(CONFIG), r: snap() };
+      var o = { v: 2, n: share.n, m: share.m, r: share.r }, s = snap();
       if (share.d) o.d = share.d;
+      if (share.x) o.x = share.x;
       if (!sameSnap(s, share.r)) o.c = s;
       return o;
     }
@@ -763,6 +858,9 @@
     function setupShare() {
       var C = CONFIG.copy, cta = $("cta");
       $("eyebrow").textContent = mode === "make" ? C.makeEyebrow : C.clientEyebrow;
+      // The day the link was made, quietly next to Your estimate. In Rimbo's view: today, as the lead will see it
+      var made = mode === "make" ? today() : share.d;
+      if (made) { $("date").textContent = C.dated.replace("{date}", niceDate(made)); $("date").hidden = false; }
 
       if (mode === "make") {
         // The header becomes the two fields, styled as what the lead will see

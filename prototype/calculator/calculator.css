@@ -103,6 +103,10 @@
 .calc_subs .calc_switch { width: 30px; height: 18px; }
 .calc_subs .calc_switch::after { width: 12px; height: 12px; }
 .calc_subs .calc_toggle[aria-checked="true"] .calc_switch::after { transform: translateX(12px); }
+/* A switch with parts in the middle of a box (Members area): the usual line under it when closed, and over the
+   next row when its parts are open */
+.calc_step > div > .calc_item_parent:has(+ .calc_subs[hidden]:not(:last-child)) { border-bottom: 1px solid var(--line); }
+.calc_subs:not([hidden]) + .calc_item { border-top: 1px solid var(--line); }
 
 /* Item sold by amount (content migration): three choices under its switch */
 .calc_hours { padding: 2px 0 20px; border-bottom: 1px solid var(--line); }
@@ -126,6 +130,10 @@
 /* Frosted, so the ball shows through when it grows behind the card */
 .calc_result { padding: 28px 24px 24px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
 .calc_result .calc_eyebrow::before { display: none; }
+/* Your estimate, with the day the link was made quietly on the right (the same faded capitals as EXCL. VAT) */
+.calc_est_row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.calc_est_row .calc_eyebrow { margin: 0; }
+.calc_date[hidden] { display: none; }
 /* The price, with EXCL. VAT quietly on the same line */
 .calc_price_row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
 .calc_vat { flex: none; font: 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6; }
