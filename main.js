@@ -541,8 +541,11 @@
 
   // The rip you hear: made here, no file to host. Rough noise that speeds up with the tip, a click on every tab, the last
   // tab letting go and a soft whoosh; backwards it plays reversed
+  // Off since 2026-11-10: nothing else on the site makes a sound, so with the volume up the rip came as a shock (Rimbo)
+  var TEAR_SOUND = false;
   var tearAudio = null, tearBuffers = null, tearPlaying = null;
   function tearSound(back, speed, offset) {
+    if (!TEAR_SOUND) return;
     try {
       if (!tearAudio) {
         var Ctx = window.AudioContext || window.webkitAudioContext;
@@ -656,6 +659,7 @@
           var y = back ? memory.y : window.scrollY;
           var ground = back ? memory.ground : (pass ? tearTable(pass) : TEAR_DARK);
           var parent = current.parentElement || document.body;
+          var passTop = pass ? pass.getBoundingClientRect().top : 0;
 
           var started = startCube(data, function () {
             if (!back) return;
@@ -692,6 +696,9 @@
             under.appendChild(current);
             under.appendChild(groundEl);
             gsap.set(current, { position: 'absolute', top: -leftAt, left: 0, width: '100%' });
+            // a page that pinned something higher up (the home's dial) is shorter now that its scroll effects are off:
+            // without this the page jumped up under the ticket, by two screens on the home
+            if (pass) gsap.set(current, { top: -leftAt + passTop - pass.getBoundingClientRect().top });
             gsap.set(next, { position: 'relative', zIndex: 998, backgroundColor: face, transformOrigin: '50% ' + window.innerHeight / 2 + 'px' });
             form = next;
           }
