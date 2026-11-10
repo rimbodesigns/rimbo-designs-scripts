@@ -1,0 +1,47 @@
+/* The 404 page with its hidden game. Class names are the ones the Webflow page would get (lost_*). */
+@font-face { font-family: IntegralNEW; src: url("https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68b025db738fc57555d5e08f_Integral-Heavy.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+@font-face { font-family: "RM MONO"; src: url("https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+
+:root { --color--brand: #E4441C; --color--brand_hover: #CC3C18; --color--black: #131313; --color--rimbobage: #F8F5EE; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--color--rimbobage); color: var(--color--black); font-family: "RM MONO", monospace; overflow: hidden; }
+
+.lost_logo { position: fixed; top: 1.5rem; left: 2rem; width: 2.4rem; z-index: 2; }
+.lost_logo img { display: block; width: 100%; filter: brightness(0); }   /* the logo file is beige: ink on this ground */
+
+.lost_wrap { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1rem; text-align: center; touch-action: manipulation; }
+.lost_wrap[data-lost-state="play"] { user-select: none; -webkit-user-select: none; }
+
+/* the seat: the face sits here, and while he is in the air his score sits here instead */
+.lost_slot { position: relative; width: clamp(5.5rem, 9vw, 7.5rem); aspect-ratio: 101 / 84; }
+.lost_face { position: absolute; inset: 0; z-index: 5; cursor: pointer; touch-action: none; will-change: transform; outline: none; -webkit-tap-highlight-color: transparent; }
+.lost_face:focus-visible { outline: 2px solid var(--color--brand); outline-offset: .5rem; border-radius: 50%; }
+.lost_in { position: absolute; inset: 0; }
+.lost_img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+.lost_img.is-happy { opacity: 0; }
+.lost_face.is-up .lost_img.is-happy { opacity: 1; }
+.lost_face.is-up .lost_img.is-scared { opacity: 0; }
+
+/* the only hint: he shivers now and then, and a bit harder under the pointer */
+@keyframes lost-shiver { 0%, 86%, 100% { transform: none; } 88% { transform: translate(-2px, 1px) rotate(-3deg); } 90% { transform: translate(2px, -1px) rotate(3deg); } 92% { transform: translate(-2px, 0) rotate(-2deg); } 94% { transform: translate(2px, 1px) rotate(2deg); } 96% { transform: translate(-1px, 0) rotate(-1deg); } }
+@keyframes lost-shake { 0%, 100% { transform: translate(-1px, 0) rotate(-2.5deg); } 50% { transform: translate(1px, 0) rotate(2.5deg); } }
+[data-lost-state="idle"] .lost_in, [data-lost-state="over"] .lost_in { animation: lost-shiver 3.6s steps(1) infinite; }
+@media (hover: hover) { [data-lost-state="idle"] .lost_face:hover .lost_in, [data-lost-state="over"] .lost_face:hover .lost_in { animation: lost-shake .14s steps(1) infinite; } }
+@media (prefers-reduced-motion: reduce) { .lost_in { animation: none !important; } }
+
+.lost_count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: IntegralNEW, Arial, sans-serif; font-weight: 900; font-size: clamp(2.4rem, 4.6vw, 3.6rem); line-height: 1; color: var(--color--brand); font-variant-numeric: tabular-nums; opacity: 0; pointer-events: none; }
+[data-lost-state="play"] .lost_count { opacity: 1; }
+
+.lost_title { margin: 1rem 0 1.5rem; font-family: IntegralNEW, Arial, sans-serif; font-weight: 900; font-size: clamp(1.9rem, 5vw, 3.2rem); line-height: 1.08; text-transform: uppercase; }
+
+.btn { display: inline-block; padding: .95em 1.4em; border: 1px solid var(--color--black); border-radius: .3em; background: var(--color--black); color: var(--color--rimbobage); font-family: "RM MONO", monospace; font-size: .72rem; line-height: 1; letter-spacing: .14em; text-transform: uppercase; text-decoration: none; }
+
+/* the result, under the button: nothing until he has been dropped once */
+.lost_note { display: flex; align-items: center; justify-content: center; gap: .7em; height: 1em; margin-top: 1.75rem; font-size: .72rem; line-height: 1; letter-spacing: .14em; text-transform: uppercase; visibility: hidden; }
+[data-lost-state="play"] .lost_note, [data-lost-state="over"] .lost_note { visibility: visible; }
+.lost_dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color--brand); }
+.lost_num { color: var(--color--brand_hover); font-variant-numeric: tabular-nums; }
+.lost_when { display: none; gap: .7em; align-items: center; }
+[data-lost-state="play"] .lost_when.is-play, [data-lost-state="over"] .lost_when.is-over { display: flex; }
+.lost_sep { opacity: .35; }

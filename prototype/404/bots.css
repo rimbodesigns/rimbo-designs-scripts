@@ -1,0 +1,77 @@
+/* The 404 page as a small arcade: pixel aliens spell 404, a fighter shoots them. Class names as the Webflow page has them (lost_*). */
+@font-face { font-family: IntegralNEW; src: url("https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/68b025db738fc57555d5e08f_Integral-Heavy.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+@font-face { font-family: "RM MONO"; src: url("https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/6ac9363138c51f68d508f25c_rmmono-regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+
+:root { --color--brand: #E4441C; --color--brand_hover: #CC3C18; --color--black: #131313; --color--rimbobage: #F8F5EE; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--color--black); }
+
+/* three colours run the whole thing, the canvas reads them too: change them here (or as Webflow variables) to re-skin it */
+.lost { --lost-bg: var(--color--black); --lost-fg: var(--color--rimbobage); --lost-accent: var(--color--brand);
+  position: relative; height: 100svh; min-height: 30rem; overflow: hidden; background: var(--lost-bg); color: var(--lost-fg);
+  font-family: "RM MONO", monospace; font-size: .72rem; line-height: 1; letter-spacing: .14em; text-transform: uppercase; touch-action: manipulation; }
+.lost[data-bots-theme="light"] { --lost-bg: var(--color--rimbobage); --lost-fg: var(--color--black); }
+.lost[data-bots-state="play"] { touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+
+.lost_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; color: var(--lost-accent); transition: opacity .4s; }
+[data-bots-state="over"] .lost_canvas { opacity: .2; }
+
+/* the site's grain picture, on top of the dark ground (the site's own .grain class sits behind the page) */
+.lost_grain { position: absolute; inset: 0; z-index: 1; opacity: .07; pointer-events: none; background-image: url("https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e1ea39aa716d6f6bddcb07_GRAIN%20V1.gif"); }
+
+.lost_logo { position: absolute; top: 1.5rem; left: 2rem; width: 2.4rem; z-index: 3; }
+.lost_logo img { display: block; width: 100%; }
+[data-bots-theme="light"] .lost_logo img { filter: brightness(0); }
+
+.lost_title { margin: 0; font-family: IntegralNEW, Arial, sans-serif; font-weight: 900; font-size: clamp(1.5rem, min(3.4vw, 5.2vh), 2.5rem); line-height: 1.08; letter-spacing: 0; text-transform: uppercase; }
+
+.btn { display: inline-block; padding: .95em 1.4em; border: 1px solid var(--lost-fg); border-radius: .3em; background: var(--lost-fg); color: var(--lost-bg); font: inherit; letter-spacing: inherit; text-transform: uppercase; text-decoration: none; cursor: pointer; }
+.btn.is-secondary { background: transparent; color: var(--lost-fg); }
+
+/* before: title, the way home, and the invitation. The script puts it in the middle of the gap between the aliens and the fighter. */
+.lost_copy { position: absolute; left: 0; right: 0; top: var(--lost-mid, 66%); transform: translateY(-50%); z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 1.1rem; padding: 0 1rem; text-align: center; transition: opacity .3s, visibility .3s; }
+.lost:not([data-bots-state="idle"]) .lost_copy { opacity: 0; visibility: hidden; }
+.lost_hint { display: flex; align-items: center; gap: .7em; margin: 0; padding: .6em .4em; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: uppercase; cursor: pointer; }
+.lost_dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lost-accent); animation: lost-blink 1s steps(1) infinite; }
+@keyframes lost-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .lost_dot { animation: none; } }
+.lost_touch { display: none; }
+@media (hover: none) { .lost_key { display: none; } .lost_touch { display: inline; } }
+
+/* during: score, how it works, lives */
+.lost_hud { position: absolute; left: 2rem; right: 2rem; bottom: 1.5rem; z-index: 2; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; }
+.lost_hud > * { opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; }
+[data-bots-state="play"] .lost_hud > * { opacity: 1; visibility: visible; }
+/* the controls are already there before the game, under the fighter */
+[data-bots-state="play"] .lost_hud-c, [data-bots-state="idle"] .lost_hud-c { opacity: .5; visibility: visible; }
+
+/* the opening: title, button and start line come up one after the other, then the controls */
+@keyframes lost-in { from { opacity: 0; transform: translateY(10px); } }
+.lost_copy > * { animation: lost-in .7s cubic-bezier(.2, .7, .2, 1) backwards; }
+.lost_copy > :nth-child(1) { animation-delay: .9s; }
+.lost_copy > :nth-child(2) { animation-delay: 1.05s; }
+.lost_copy > :nth-child(3) { animation-delay: 1.2s; }
+.lost_hud-c { animation: lost-in .7s 1.6s cubic-bezier(.2, .7, .2, 1) backwards; }
+@media (prefers-reduced-motion: reduce) { .lost_copy > *, .lost_hud-c { animation: none; } }
+.lost_hud-r { display: flex; justify-content: flex-end; align-items: center; gap: 1.25rem; }
+.lost_num { color: var(--lost-accent); font-variant-numeric: tabular-nums; }
+.lost_lives { display: flex; gap: 5px; }
+.lost_lives i { width: 8px; height: 8px; background: var(--lost-fg); }
+.lost_lives i.is-off { opacity: .2; }
+.lost_quit { padding: .5em 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: uppercase; opacity: .5; cursor: pointer; }
+.lost_quit:hover { opacity: 1; }
+@media (max-width: 767px) { .lost_hud { left: 1rem; right: 1rem; grid-template-columns: 1fr 1fr; } .lost_hud-c { display: none; } [data-bots-state="idle"] .lost_hud { grid-template-columns: 1fr; } [data-bots-state="idle"] .lost_hud-c { display: block; text-align: center; } [data-bots-state="idle"] .lost_hud-l, [data-bots-state="idle"] .lost_hud-r { display: none; } .lost_logo { left: 1rem; top: 1rem; } }
+
+/* between waves, and after: centred on the field */
+.lost_wave, .lost_boss, .lost_end { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 0 1rem; text-align: center; opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; pointer-events: none; }
+[data-bots-banner="clear"] .lost_wave, [data-bots-banner="boss"] .lost_boss { opacity: 1; visibility: visible; }
+.lost_off, [data-bots-muted] .lost_on { display: none; }
+[data-bots-muted] .lost_off { display: inline; }
+[data-bots-state="over"] .lost_end { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: .2s; }
+.lost_line, .lost_small { margin: 0; line-height: 1.5; }
+.lost_small { opacity: .6; }
+.lost_sep { opacity: .35; margin: 0 .3em; }
+.lost_row { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: .75rem; }
+
+.lost :focus-visible { outline: 2px solid var(--lost-accent); outline-offset: 3px; }

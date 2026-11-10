@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>404 lab · Rimbo Designs</title>
+<link rel="stylesheet" href="lost.css">
+</head>
+<body>
+<a class="lost_logo" href="/" aria-label="Rimbo Designs"><img src="/media/logo-f-brush.svg" alt=""></a>
+
+<main class="lost_wrap" data-lost data-lost-state="idle">
+  <div class="lost_slot" data-lost-slot>
+    <div class="lost_count" data-lost-n aria-hidden="true">00</div>
+    <div class="lost_face" data-lost-face role="button" tabindex="0" aria-label="Scared face. Tap him to keep him in the air.">
+      <div class="lost_in">
+        <img class="lost_img is-scared" src="scared.svg" alt="">
+        <img class="lost_img is-happy" src="happy.svg" alt="">
+      </div>
+    </div>
+  </div>
+
+  <h1 class="lost_title">Page not found</h1>
+  <a class="btn" href="/">Back to home</a>
+
+  <div class="lost_note" aria-live="polite">
+    <span class="lost_dot"></span>
+    <span class="lost_when is-play">Keep him up</span>
+    <span class="lost_when is-over">Dropped at <span class="lost_num" data-lost-last>00</span><span class="lost_sep">/</span>Best <span class="lost_num" data-lost-best>00</span></span>
+  </div>
+</main>
+
+<script src="lost.js"></script>
+<script>rdLost();</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>404 lab · Rimbo Designs</title>
+<link rel="stylesheet" href="bots.css">
+</head>
+<body>
+
+<main class="lost" data-bots data-bots-state="idle">
+  <canvas class="lost_canvas" data-bots-canvas aria-hidden="true"></canvas>
+  <div class="lost_grain" aria-hidden="true"></div>
+
+  <!-- the lab's stand-in for the site menu -->
+  <a class="lost_logo" href="/" aria-label="Rimbo Designs"><img src="/media/logo-f-brush.svg" alt=""></a>
+
+  <!-- before the game: a normal 404, with the aliens waiting above it -->
+  <div class="lost_copy">
+    <h1 class="lost_title">Secret level</h1>
+    <a class="btn" href="/">Back to home</a>
+    <button class="lost_hint" type="button" data-bots-start>
+      <span class="lost_dot"></span>
+      <span class="lost_key">Press space to play</span>
+      <span class="lost_touch">Tap to play</span>
+    </button>
+  </div>
+
+  <!-- during the game -->
+  <div class="lost_hud">
+    <div class="lost_hud-l">Score <span class="lost_num" data-bots-score>0000</span><span class="lost_sep">/</span>Wave <span class="lost_num" data-bots-wave>01</span></div>
+    <div class="lost_hud-c"><span class="lost_key">← → move / Space shoot / M sound / Esc quit</span><span class="lost_touch">Drag to move</span></div>
+    <div class="lost_hud-r">
+      <div class="lost_lives" aria-label="Lives"><i data-bots-life></i><i data-bots-life></i><i data-bots-life></i></div>
+      <button class="lost_quit" type="button" data-bots-sound>Sound <span class="lost_on">on</span><span class="lost_off">off</span></button>
+      <button class="lost_quit" type="button" data-bots-quit>Quit</button>
+    </div>
+  </div>
+
+  <!-- between two waves -->
+  <div class="lost_wave" aria-live="polite">
+    <div class="lost_title">All clear</div>
+    <p class="lost_small">Something big is coming.</p>
+  </div>
+  <div class="lost_boss" aria-live="polite">
+    <div class="lost_title">Mothership down</div>
+    <p class="lost_small">Still no page here. Wave <span class="lost_num" data-bots-next>02</span> is next.</p>
+  </div>
+
+  <!-- after the game -->
+  <div class="lost_end" aria-live="polite">
+    <h2 class="lost_title">They got you</h2>
+    <p class="lost_line">Score <span class="lost_num" data-bots-score>0000</span> <span class="lost_sep">/</span> Best <span class="lost_num" data-bots-best>0000</span> <span class="lost_sep">/</span> Wave <span class="lost_num" data-bots-wave>01</span></p>
+    <div class="lost_row">
+      <a class="btn" href="/">Back to home</a>
+      <button class="btn is-secondary" type="button" data-bots-start>Play again</button>
+    </div>
+  </div>
+</main>
+
+<script src="bots.js"></script>
+<script>
+  if (/[?&]theme=light/.test(location.search)) document.querySelector('[data-bots]').setAttribute('data-bots-theme', 'light');
+  rdBots();
+</script>
+</body>
+</html>
