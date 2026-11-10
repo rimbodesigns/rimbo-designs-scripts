@@ -6481,6 +6481,12 @@
       '.rdf { --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; -webkit-font-smoothing: antialiased; }',
       '.rdf a { text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles stay out
       '.rdf-prev { position: relative; z-index: 2 !important; }',
+      // a notched section above (a clip-path on it, e.g. is-notched): the footer starts 6rem higher, under the page, so its cut
+      // corners show the footer coming up, in the page's shade; the edge line goes, it would close the corners
+      '.rdf.is-under { margin-top: -6rem; height: calc(100svh + 6rem); }',
+      '.rdf.is-under .rdf-in { top: 6rem; }',
+      '.rdf.is-under .rdf-drop { border-top-color: transparent; height: calc(clamp(9rem, 34vh, 18rem) + 6rem); background-image: linear-gradient(to bottom, rgba(0, 0, 0, .62) 6rem, rgba(0, 0, 0, .384) calc(6rem + (100% - 6rem) * .16), rgba(0, 0, 0, .223) calc(6rem + (100% - 6rem) * .36), rgba(0, 0, 0, .099) calc(6rem + (100% - 6rem) * .58), rgba(0, 0, 0, .031) calc(6rem + (100% - 6rem) * .8), rgba(0, 0, 0, 0)); }',
+      '@media (max-width: 767px) { .rdf.is-under { height: auto; padding-top: 6rem; min-height: calc(100svh + 6rem); } .rdf.is-under .rdf-in { top: auto; } }',
       '.rdf .rdf-grain.grain { position: absolute; inset: 0; z-index: 7; pointer-events: none; }',
       '.rdf-in { will-change: transform; }',
       '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
@@ -6553,6 +6559,7 @@
     while (prev && prev.lastElementChild && getComputedStyle(prev).backgroundColor === 'rgba(0, 0, 0, 0)') prev = prev.lastElementChild;
     if (prev && prev.offsetWidth < foot.offsetWidth * .9) prev = top; // a small element at the end of the page (a language pill) is not a section
     if (prev) prev.classList.add('rdf-prev');
+    if (prev && getComputedStyle(prev).clipPath !== 'none') foot.classList.add('is-under'); // see .rdf.is-under
     // the same grain as the page: where it sits behind the page (city pages) the footer would cover it and look flat next to it
     var pageGrain = qs('.grain');
     if (pageGrain && !pageGrain.closest('.rdf-prev') && parseInt(getComputedStyle(pageGrain).zIndex, 10) < 0) {
