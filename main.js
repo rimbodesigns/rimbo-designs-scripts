@@ -2183,133 +2183,219 @@
   }
 
   // =========================================================
-  // QUIZ — /rimbo-quiz (was Slater 35662 QUIZ .js)
+  // QUIZ — /rimbo-quiz. The questions, answers and pictures are Rimbo's, from the old quiz, untouched.
+  // Markup and look are in the Designer (classes qz_*): section [data-quiz] with three screens,
+  // [data-quiz-screen="intro" | "play" | "end"]. This fills in the question, moves from one to the next, keeps the score,
+  // and sets the state classes is-picked / is-off / is-hover on the answers and is-done / is-now on the progress steps.
+  // Pictures are fetched two questions ahead and a question only comes in once its picture is there (or after a short
+  // wait), so a GIF never shows up one question late. Keys: A to D or 1 to 4 answer, Enter starts and restarts.
   // =========================================================
   function rdQuiz() {
+    var root = qs('[data-quiz]');
+    if (!root) return;
+
+    var CDN = 'https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/';
     var questions = [
-      {
-        text: "Who is this?",
-        choices: ["Swimming doggo", "Pool doggo", "Super doggo", "Gangster doggo"],
-        answer: "Pool doggo",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baacf801b7bf3d2952b5_swim%20doggo.avif"
-      },
-      {
-        text: "Do dolphins make rainbows?",
-        choices: ["Yes", "For sure !!", "HELL YEAAAHH!!", "no"],
-        answer: "no",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baabf7941818f9206d11_raredolphin.avif"
-      },
-      {
-        text: "Whaaat?¿",
-        choices: ["beans", "ǝɯ ʞɔᴉlʞƆ", "24", "get money"],
-        answer: "ǝɯ ʞɔᴉlʞƆ",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baac1c9bea03eb04d9a4_jake%20qute.gif"
-      },
-      {
-        text: "You will never beat my quiz",
-        choices: ["run", "do nothing", "be scared", "fight"],
-        answer: "fight",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baace5f540f75bcc8a81_batman.gif"
-      },
-      {
-        text: "69 * 420",
-        choices: ["28980", "38760", "24840", "18980"],
-        answer: "28980",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baaccf0f44a242318fcc_math.gif"
-      },
-      {
-        text: "This froggo is...",
-        choices: ["cute", "beautiful", "poisonous", "all answers are correct"],
-        answer: "all answers are correct",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baab8336152373ee545b_froggo.avif"
-      },
-      {
-        text: "Oops, you touched the froggo!",
-        choices: ["Whoobie doobie", "Dance with shroom", "Get it together", "Trip it out :3"],
-        answer: "Get it together",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9cca79bb46fd660bdc4a9_3333.gif"
-      },
-      {
-        text: "Do you think you're going to win?",
-        choices: ["I'm doing fine", "Uhhhh...", "I hope so", ":I"],
-        answer: "I'm doing fine",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baacd5cd5274f0549189_fine.gif"
-      },
-      {
-        text: "Boss, how do we make this guy lose?",
-        choices: ["lose now", "Click here", "Go final question", "call Rimbo"],
-        answer: "Go final question",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baae6f86c2474a3b427a_calling.gif"
-      },
-      {
-        text: "Who is Rimbo?",
-        choices: ["Cool dude", "God of vibes", "Funny guy", "My man!"],
-        answer: "God of vibes",
-        img: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9cb9663c31098a3e52ed9_MP4%20to%20GIF%20test.gif"
-      }
+      { text: 'Who is this?', choices: ['Swimming doggo', 'Pool doggo', 'Super doggo', 'Gangster doggo'], answer: 'Pool doggo', img: '67e9baacf801b7bf3d2952b5_swim%20doggo.avif' },
+      { text: 'Do dolphins make rainbows?', choices: ['Yes', 'For sure !!', 'HELL YEAAAHH!!', 'no'], answer: 'no', img: '67e9baabf7941818f9206d11_raredolphin.avif' },
+      { text: 'Whaaat?¿', choices: ['beans', 'ǝɯ ʞɔᴉlʞƆ', '24', 'get money'], answer: 'ǝɯ ʞɔᴉlʞƆ', img: '67e9baac1c9bea03eb04d9a4_jake%20qute.gif' },
+      { text: 'You will never beat my quiz', choices: ['run', 'do nothing', 'be scared', 'fight'], answer: 'fight', img: '67e9baace5f540f75bcc8a81_batman.gif' },
+      { text: '69 * 420', choices: ['28980', '38760', '24840', '18980'], answer: '28980', img: '67e9baaccf0f44a242318fcc_math.gif' },
+      { text: 'This froggo is...', choices: ['cute', 'beautiful', 'poisonous', 'all answers are correct'], answer: 'all answers are correct', img: '67e9baab8336152373ee545b_froggo.avif' },
+      { text: 'Oops, you touched the froggo!', choices: ['Whoobie doobie', 'Dance with shroom', 'Get it together', 'Trip it out :3'], answer: 'Get it together', img: '67e9cca79bb46fd660bdc4a9_3333.gif' },
+      { text: "Do you think you're going to win?", choices: ["I'm doing fine", 'Uhhhh...', 'I hope so', ':I'], answer: "I'm doing fine", img: '67e9baacd5cd5274f0549189_fine.gif' },
+      { text: 'Boss, how do we make this guy lose?', choices: ['lose now', 'Click here', 'Go final question', 'call Rimbo'], answer: 'Go final question', img: '67e9baae6f86c2474a3b427a_calling.gif' },
+      { text: 'Who is Rimbo?', choices: ['Cool dude', 'God of vibes', 'Funny guy', 'My man!'], answer: 'God of vibes', img: '67e9cb9663c31098a3e52ed9_MP4%20to%20GIF%20test.gif' }
     ];
     var endImages = {
-      low: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baac326fc8390883ba7e_sad.gif",
-      mid: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9baacd16a1ddbaa367246_clap.gif",
-      top: "https://cdn.prod.website-files.com/5b9ab5ab7d8a747bcc7b3216/67e9d1951ac3a50582bc8e90_Tim%20And%20Eric%20Reaction%20GIF.gif"
+      low: '67e9baac326fc8390883ba7e_sad.gif',
+      mid: '67e9baacd16a1ddbaa367246_clap.gif',
+      top: '67e9d1951ac3a50582bc8e90_Tim%20And%20Eric%20Reaction%20GIF.gif'
     };
+    function endImage() { return score < 5 ? endImages.low : score < questions.length ? endImages.mid : endImages.top; }
 
-    var questionEl = byId('QUESTION');
-    var buttons = ['BTN_1', 'BTN_2', 'BTN_3', 'BTN_4'].map(byId).filter(Boolean);
-    if (!questionEl || buttons.length < 4) return;
+    var screens = { intro: qs('[data-quiz-screen="intro"]', root), play: qs('[data-quiz-screen="play"]', root), end: qs('[data-quiz-screen="end"]', root) };
+    var questionEl = qs('[data-quiz-question]', root);
+    var imageEl = qs('[data-quiz-img]', root);
+    var endImageEl = qs('[data-quiz-end-img]', root);
+    var answers = qsa('[data-quiz-answer]', root);
+    var labels = answers.map(function (a) { return qs('[data-quiz-label]', a) || a; });
+    var steps = qsa('[data-quiz-step]', root);
+    var countEl = qs('[data-quiz-count]', root);
+    var scoreEl = qs('[data-quiz-score]', root);
+    if (!screens.intro || !screens.play || !screens.end || !questionEl || answers.length < 4) return;
 
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var state = 'intro';
     var index = 0;
     var score = 0;
+    var busy = false;
 
-    function show(el) { // like jQuery's .show(): drop the inline "none", then fall back to block
-      el.style.display = '';
-      if (getComputedStyle(el).display === 'none') el.style.display = 'block';
+    // ---- pictures: each file is fetched once, ahead of its question ----
+    var loaded = {};
+    function fetchImage(file) {
+      if (!loaded[file]) {
+        var image = new Image();
+        loaded[file] = new Promise(function (resolve) {
+          image.onload = image.onerror = function () { resolve(); };
+        });
+        image.src = CDN + file;
+      }
+      return loaded[file];
+    }
+    function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+    // the picture, or `ms` at most: a slow connection must not hold the quiz up
+    function imageOrWait(file, ms) { return Promise.race([fetchImage(file), wait(ms)]); }
+    // Puts a picture in its frame. Until the file is there the frame stays empty, it never shows the previous one
+    function showImage(el, file) {
+      if (!el) return;
+      el.setAttribute('data-quiz-file', file);
+      gsap.killTweensOf(el);
+      gsap.set(el, { opacity: 0 });
+      fetchImage(file).then(function () {
+        if (el.getAttribute('data-quiz-file') !== file) return; // the quiz moved on meanwhile
+        el.removeAttribute('srcset'); // Webflow's own responsive list would win over the new src
+        el.removeAttribute('sizes');
+        el.src = CDN + file;
+        gsap.to(el, { opacity: 1, duration: reduce ? 0 : 0.25, ease: 'power1.out' });
+      });
     }
 
-    function showQuestion() {
+    // ---- moving a screen's parts in and out ----
+    function parts(name) { return qsa('[data-quiz-move]', screens[name]); }
+    function leave(name) {
+      if (reduce) return Promise.resolve();
+      return new Promise(function (resolve) {
+        gsap.to(parts(name), { opacity: 0, y: -6, duration: 0.18, ease: 'power2.in', stagger: 0.015, overwrite: true, onComplete: resolve });
+      });
+    }
+    function enter(name) {
+      if (reduce) { gsap.set(parts(name), { clearProps: 'opacity,transform' }); return Promise.resolve(); }
+      return new Promise(function (resolve) {
+        gsap.fromTo(parts(name), { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out', stagger: 0.04, overwrite: true, clearProps: 'opacity,transform', onComplete: resolve });
+      });
+    }
+    function showScreen(name) {
+      Object.keys(screens).forEach(function (key) { screens[key].style.display = key === name ? 'flex' : 'none'; });
+      state = name;
+    }
+
+    function two(n) { return n < 10 ? '0' + n : String(n); }
+
+    function fillQuestion() {
       var q = questions[index];
       questionEl.textContent = q.text;
-      buttons.forEach(function (button, i) {
-        var label = qs('.btn-animate-chars__text', button) || button;
-        label.textContent = q.choices[i];
-        staggerChars(label); // new text means new letter spans for the hover effect
+      answers.forEach(function (answer, i) {
+        labels[i].textContent = q.choices[i];
+        answer.classList.remove('is-picked', 'is-off', 'is-hover');
       });
-      var image = byId('Quiz_IMG');
-      if (image) image.src = q.img;
-      var progress = byId('progress');
-      if (progress) progress.textContent = 'Question ' + (index + 1) + ' of ' + questions.length;
+      steps.forEach(function (step, i) {
+        step.classList.toggle('is-done', i < index);
+        step.classList.toggle('is-now', i === index);
+      });
+      if (countEl) countEl.textContent = two(index + 1);
+      showImage(imageEl, q.img);
+      // the next two pictures, and near the end the three possible endings
+      [index + 1, index + 2].forEach(function (i) { if (questions[i]) fetchImage(questions[i].img); });
+      if (index >= questions.length - 2) Object.keys(endImages).forEach(function (key) { fetchImage(endImages[key]); });
     }
 
-    function showScore() {
-      gsap.set('.ending_screen', { display: 'flex' });
-      gsap.set('.thequiz', { display: 'none' });
-      var image = byId('END_IMG');
-      if (image) image.src = score < 5 ? endImages.low : score < 10 ? endImages.mid : endImages.top;
-      var scoreEl = byId('SCORE');
-      if (scoreEl) scoreEl.textContent = 'Your score: ' + score + ' / ' + questions.length;
+    function fillEnd() {
+      showImage(endImageEl, endImage());
+      if (!scoreEl) return;
+      if (reduce) { scoreEl.textContent = score; return; }
+      var counter = { n: 0 };
+      scoreEl.textContent = '0';
+      gsap.to(counter, { n: score, duration: 0.3 + score * 0.08, delay: 0.3, ease: 'power1.out', onUpdate: function () { scoreEl.textContent = Math.round(counter.n); } });
     }
 
-    var startButton = byId('start_btn');
-    if (startButton) {
-      startButton.addEventListener('click', function () {
-        var opening = byId('OPENING');
-        var quiz = byId('TheQuiz');
-        if (opening) opening.style.display = 'none';
-        if (quiz) show(quiz);
+    function start() {
+      if (busy || state === 'play') return;
+      busy = true;
+      var from = state;
+      index = 0;
+      score = 0;
+      var gone = reduce ? Promise.resolve() : new Promise(function (resolve) {
+        gsap.to(from === 'intro' ? screens.intro : parts('end'), { opacity: 0, duration: 0.25, ease: 'power2.in', overwrite: true, onComplete: resolve });
+      });
+      Promise.all([gone, imageOrWait(questions[0].img, 900)]).then(function () {
+        fillQuestion();
+        showScreen('play');
+        busy = false; // the answers can be clicked while they come in
+        enter('play');
       });
     }
 
-    buttons.forEach(function (button, i) {
-      button.addEventListener('click', function () {
-        if (index >= questions.length) return;
-        if (questions[index].choices[i] === questions[index].answer) score++;
-        index++;
-        if (index < questions.length) showQuestion();
-        else showScore();
+    function pick(i) {
+      if (busy || state !== 'play') return;
+      busy = true;
+      if (questions[index].choices[i] === questions[index].answer) score++;
+      answers.forEach(function (answer, n) {
+        answer.classList.remove('is-hover');
+        answer.classList.add(n === i ? 'is-picked' : 'is-off');
       });
+      index++;
+      var last = index >= questions.length;
+      // hold the pressed answer for a beat, and give the next picture that time (and a little more) to arrive
+      Promise.all([wait(reduce ? 120 : 300), imageOrWait(last ? endImage() : questions[index].img, 1200)]).then(function () {
+        return leave('play');
+      }).then(function () {
+        if (last) {
+          fillEnd();
+          showScreen('end');
+        } else {
+          fillQuestion();
+        }
+        busy = false; // the next answers can be clicked while they come in
+        enter(state);
+      });
+    }
+
+    // ---- input ----
+    var startButton = qs('[data-quiz-start]', root);
+    var againButton = qs('[data-quiz-again]', root);
+    // In Webflow the buttons are link blocks: for the keyboard and a screen reader they are buttons
+    function asButton(el) {
+      if (!el || el.tagName === 'BUTTON') return;
+      el.setAttribute('role', 'button');
+      if (!el.hasAttribute('href')) el.setAttribute('tabindex', '0');
+      rdOn(el, 'keydown', function (e) {
+        if (e.key === ' ' || (e.key === 'Enter' && !el.hasAttribute('href'))) { e.preventDefault(); el.click(); }
+      });
+    }
+    [startButton, againButton].concat(answers).forEach(asButton);
+    if (startButton) rdOn(startButton, 'click', function (e) { e.preventDefault(); start(); });
+    if (againButton) rdOn(againButton, 'click', function (e) { e.preventDefault(); start(); });
+    answers.forEach(function (answer, i) {
+      rdOn(answer, 'click', function (e) { e.preventDefault(); pick(i); });
+      // hover is a class from the mouse only, so a tapped answer never keeps the hover look on a phone
+      rdOn(answer, 'pointerenter', function (e) { if (e.pointerType === 'mouse' && !busy) answer.classList.add('is-hover'); });
+      rdOn(answer, 'pointerleave', function () { answer.classList.remove('is-hover'); });
     });
 
-    showQuestion();
+    var nav = null;
+    function menuOpen() {
+      nav = nav || qs('[data-navigation-status]');
+      return !!nav && nav.getAttribute('data-navigation-status') === 'active';
+    }
+    rdOn(document, 'keydown', function (e) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || menuOpen() || !root.isConnected) return;
+      var target = e.target;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (state === 'play') {
+        var i = 'abcd'.indexOf(e.key.toLowerCase());
+        if (i < 0) i = '1234'.indexOf(e.key);
+        if (i > -1 && e.key.length === 1) { e.preventDefault(); pick(i); }
+      } else if (e.key === 'Enter' && (!target || !target.closest || target === document.body || target === document.documentElement)) { // nothing focused: Enter is the button on screen
+        e.preventDefault();
+        start();
+      }
+    });
+
+    // ---- first paint ----
+    showScreen('intro');
+    fetchImage(questions[0].img);
+    fetchImage(questions[1].img);
   }
 
   // =========================================================
