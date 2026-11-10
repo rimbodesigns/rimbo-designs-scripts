@@ -762,13 +762,28 @@
             if (back) {
               // the real ticket leans towards the mouse the whole time (card code): over the last 0.3 s the copies lean in
               // with it, so they hand over without a jump (Rimbo: "once it finishes it flickers to the mouse position")
+              // The foil in the photo and the layers that shift with the lean do the same: the real ticket is new on this
+              // page and its card code moves them to the mouse, while the copies were made at rest. They follow the real
+              // one's foil spot all the way and take on its strength and shift over that last 0.3 s (Rimbo: "it's the
+              // hologram effect on my image that kind of loads in")
               var copies = qsa('.tear_clone', stage), lean = /rotateX\(([-\d.]+)deg\) rotateY\(([-\d.]+)deg\)/;
+              var layers = '.pass_rose, .pass_earth, .pass_stamp, .pass_img, .pass_tex, .pass_holo', shift = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/;
+              var real = qsa(layers, pass), twins = copies.map(function (copy) { return qsa(layers, copy); });
+              var foil0 = parseFloat((copies[0] || pass).style.getPropertyValue('--hi')) || 0; // the strength the copies were made with
               tl.eventCallback('onUpdate', function () {
-                var t = tl.time(), a = lean.exec(pass.style.transform);
-                if (t >= 0.3 || !a) return;
-                var k = 1 - t / 0.3;
+                var t = tl.time(), a = lean.exec(pass.style.transform), k = t >= 0.3 ? 0 : 1 - t / 0.3;
                 k = k * k * (3 - 2 * k);
-                gsap.set(copies, { rotationX: +a[1] * k, rotationY: +a[2] * k });
+                if (a && t < 0.3) gsap.set(copies, { rotationX: +a[1] * k, rotationY: +a[2] * k });
+                var foil = parseFloat(pass.style.getPropertyValue('--hi'));
+                copies.forEach(function (copy, i) {
+                  copy.style.setProperty('--hx', pass.style.getPropertyValue('--hx'));
+                  copy.style.setProperty('--hy', pass.style.getPropertyValue('--hy'));
+                  if (!isNaN(foil)) copy.style.setProperty('--hi', (foil0 + (foil - foil0) * k).toFixed(3));
+                  twins[i].forEach(function (el, j) {
+                    var tf = real[j] && real[j].style.transform;
+                    if (tf) el.style.transform = tf.replace(shift, function (all, x, y) { return 'translate(' + (x * k).toFixed(2) + 'px,' + (y * k).toFixed(2) + 'px)'; });
+                  });
+                });
               });
               tl.timeScale(1.12).eventCallback('onReverseComplete', done).reverse();
               tearSound(true, 1.12, Math.max(0, (TEAR_PRESS + TEAR_RIP + TEAR_FLY + 0.2) - tl.duration()));
