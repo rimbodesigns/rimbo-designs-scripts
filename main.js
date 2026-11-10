@@ -2187,6 +2187,7 @@
   // Markup and look are in the Designer (classes qz_*): section [data-quiz] with three screens,
   // [data-quiz-screen="intro" | "play" | "end"]. This fills in the question, moves from one to the next, keeps the score,
   // and sets the state classes is-picked / is-off / is-hover on the answers and is-done / is-now on the progress steps.
+  // Under the mouse, and for a beat when picked, an answer's letters boil like the site's buttons (the look of rdButtons).
   // Pictures are fetched two questions ahead and a question only comes in once its picture is there (or after a short
   // wait), so a GIF never shows up one question late. Keys: A to D or 1 to 4 answer, Enter starts and restarts.
   // =========================================================
@@ -2298,11 +2299,52 @@
 
     function two(n) { return n < 10 ? '0' + n : String(n); }
 
+    // ---- the boil: the stop-motion of the site's buttons (rdButtons), on an answer's letters. Every letter has three
+    // poses and steps through them nine times a second; nothing tweens between frames, each one is set like a drawn frame ----
+    var rnd = gsap.utils.random;
+    var boiling = null;
+    rdTick(function () {
+      if (!boiling) return;
+      var frame = Math.floor((gsap.ticker.time - boiling.t0) * 9);
+      if (frame === boiling.frame) return;
+      boiling.frame = frame;
+      boiling.chars.forEach(function (c, n) { gsap.set(c, boiling.poses[n][(frame + n) % 3]); });
+    });
+    // one span per letter, so each can move on its own
+    function splitLabel(label, text) {
+      label.textContent = '';
+      Array.from(text).forEach(function (ch) {
+        var span = document.createElement('span');
+        span.className = 'qz_ch';
+        span.style.display = 'inline-block';
+        span.textContent = ch === ' ' ? '\u00a0' : ch; // a plain space in its own span would collapse to nothing
+        label.appendChild(span);
+      });
+    }
+    function boilStop() {
+      if (!boiling) return;
+      gsap.to(boiling.chars, { x: 0, y: 0, rotation: 0, duration: 0.35, ease: 'power3.out', overwrite: 'auto' });
+      boiling = null;
+    }
+    function boilStart(i) {
+      boilStop();
+      if (reduce) return;
+      var chars = qsa('.qz_ch', labels[i]);
+      if (!chars.length) return;
+      gsap.set(chars, { transformOrigin: '50% 55%' });
+      boiling = {
+        chars: chars, t0: gsap.ticker.time, frame: -1,
+        poses: chars.map(function () { return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; }); })
+      };
+    }
+
     function fillQuestion() {
       var q = questions[index];
+      boiling = null; // the letters are made again below
       questionEl.textContent = q.text;
       answers.forEach(function (answer, i) {
-        labels[i].textContent = q.choices[i];
+        splitLabel(labels[i], q.choices[i]);
+        answer.setAttribute('aria-label', q.choices[i]); // read as one answer, not letter by letter
         answer.classList.remove('is-picked', 'is-off', 'is-hover');
       });
       steps.forEach(function (step, i) {
@@ -2350,12 +2392,14 @@
         answer.classList.remove('is-hover');
         answer.classList.add(n === i ? 'is-picked' : 'is-off');
       });
+      boilStart(i); // the picked answer boils while it is held, on a phone too
       index++;
       var last = index >= questions.length;
       // hold the pressed answer for a beat, and give the next picture that time (and a little more) to arrive
       Promise.all([wait(reduce ? 120 : 300), imageOrWait(last ? endImage() : questions[index].img, 1200)]).then(function () {
         return leave('play');
       }).then(function () {
+        boiling = null; // the picked answer is out of sight
         if (last) {
           fillEnd();
           showScreen('end');
@@ -2385,8 +2429,15 @@
     answers.forEach(function (answer, i) {
       rdOn(answer, 'click', function (e) { e.preventDefault(); pick(i); });
       // hover is a class from the mouse only, so a tapped answer never keeps the hover look on a phone
-      rdOn(answer, 'pointerenter', function (e) { if (e.pointerType === 'mouse' && !busy) answer.classList.add('is-hover'); });
-      rdOn(answer, 'pointerleave', function () { answer.classList.remove('is-hover'); });
+      rdOn(answer, 'pointerenter', function (e) {
+        if (e.pointerType !== 'mouse' || busy) return;
+        answer.classList.add('is-hover');
+        boilStart(i);
+      });
+      rdOn(answer, 'pointerleave', function () {
+        answer.classList.remove('is-hover');
+        if (!busy) boilStop(); // a picked answer keeps boiling until the question leaves
+      });
     });
 
     var nav = null;
