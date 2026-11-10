@@ -88,6 +88,30 @@
       gsap.registerPlugin(plugin);
     });
   }
+  // FIRST LOAD, one thing at a time. Everything used to start in a single block of work when this file ran: on a phone
+  // that was well over half a second in which the page could neither paint its opening nor answer a touch. Now only what
+  // the first screen needs starts at once (the menu, the hero, the scroll reveals); soon() queues the rest (buttons, forms,
+  // footer, FAQ...) and the browser takes one piece at a time whenever it has a moment, each inside its own page's scope and
+  // GSAP context. After a page transition nothing waits: the screen is covered then, and it all has to stand before it lifts.
+  var firstLoad = true, idleJobs = [], idleBusy = false;
+  function soon(name, fn) {
+    if (!firstLoad) return run(name, fn);
+    var scope = scopeNow();
+    idleJobs.push(inZone(function () {
+      if (scope && scope.left) return; // the visitor has already gone on to another page
+      inContext(function () { run(name, fn); });
+    }));
+    if (!idleBusy) { idleBusy = true; idleNext(); }
+  }
+  function idleNext() {
+    var step = function () {
+      var job = idleJobs.shift();
+      if (job) job();
+      if (idleJobs.length) idleNext(); else idleBusy = false;
+    };
+    if (window.requestIdleCallback) window.requestIdleCallback(step, { timeout: 1200 }); // never later than this, also in a tab that stays busy
+    else browserTimeout(step, 60); // Safari
+  }
   function scopedObserver(Native) {
     return function (fn, options) {
       var observer = new Native(inZone(fn), options);
@@ -215,6 +239,7 @@
     run('full screen nav', rdNavFull); // before the band, so its opening can fade the logo + burger in last
     openPage();
     inPage(initPageFunctions);
+    firstLoad = false; // from here on (page transitions) soon() runs things at once
     // These wait for the whole page, like the old code they replaced
     onReady(function () {
       pageStyles = pageStyles.concat(qsa('body > style')); // a page's footer code comes after this file, so only now
@@ -2958,6 +2983,14 @@
       v.preload = 'auto'; // enough on its own: the browser picks the download up from here (a load() on top would start it twice)
       if (!hidden && !v.__off && v.__tuned) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
     };
+    // Who waits for the reveal: a phone, or a slow or metered connection. There the clip in front has the line to itself,
+    // so the loader is not kept waiting by four clips nobody can see yet (together 3.5 MB next to its own 1.4). On a wide
+    // screen with a good connection the sleeping clips are woken at once, which comes to the same as preload="auto"
+    var slowStart = function () {
+      var c = navigator.connection;
+      if (c && (c.saveData || /(^|-)(2g|3g)$/.test(c.effectiveType || '') || (c.downlink && c.downlink < 5))) return true;
+      return window.innerWidth < 768;
+    };
     var buildRing = function () {
       var drum = qs('.spatial-gsap-slider__collection', ring) || ring.firstElementChild;
       var list = qs('.spatial-gsap-slider__list', ring) || drum;
@@ -2973,6 +3006,7 @@
       // the card that faces you at the opening (k = 0, the first card): the loader only waits for its clip, the others load behind it
       ringFront = qsa('.band_panel-media', originals[0]);
       originals.slice(1).forEach(function (el) { qsa('video', el).forEach(function (v) { if (ringFront.indexOf(v) < 0 && (v.getAttribute('preload') || '') !== 'auto') { v.__wait = true; ringWait.push(v); } }); }); // preload="none" in the Designer: it stays asleep until the reveal or until its card turns to the front (wake)
+      if (ringWait.length && !slowStart()) ringWait.slice().forEach(wake); // a good connection: no reason to wait (tune, just below, plays them like the one in front)
       var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) { var panel = qs('[data-band-name]', el) || el; return { el: el, k: i <= mid ? i : i - N, name: panel.getAttribute('data-band-name') || '', fly: 0, tan: 0, gone: 0 }; }); // 0 = the first card, in front at rest; the last ones sit to its left; the line is what the dial says in its middle (data-ring-line on the panel, the name if there is none)
       var label = qs('.band_ring-name', hero); // Designer: band_ring-name, the script only writes in it
       if (!label) { label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label); }
@@ -3366,7 +3400,7 @@
     var ready = open;
     if (!loader) { ready(); return; }
     var num = qs('.band_loader-n', loader), bar = qs('.band_loader-fill', loader);
-    var t0 = performance.now(), shown = 0;
+    var t0 = performance.now(), shown = 0, lastTick = t0;
     var readiness = function () {
       var seen = {}, total = 0, done = 0;
       qsa('.band_panel-media', hero).forEach(function (m) {
@@ -3383,7 +3417,11 @@
       var elapsed = performance.now() - t0;
       var target = Math.max(readiness() * 100, Math.min(90, elapsed / 1300 * 90));
       if (elapsed > 5000) target = 100;
-      shown += (target - shown) * 0.09;
+      // the counter closes 9% of its gap per frame at 60 a second, and the same per second on a phone that only manages
+      // ten: counted per frame it took a slow phone seconds longer to reach 100, exactly where the wait is longest already
+      var nowTick = t0 + elapsed;
+      shown += (target - shown) * (1 - Math.pow(0.91, Math.min(500, nowTick - lastTick) / 16.67));
+      lastTick = nowTick;
       if (target >= 100 && shown > 99.3) shown = 100;
       if (num) num.textContent = (shown < 9.5 ? '0' : '') + Math.round(shown);
       if (bar) bar.style.transform = 'scaleX(' + (shown / 100).toFixed(3) + ')';
@@ -3445,7 +3483,7 @@
       var poses = chars.map(function () {
         return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; });
       });
-      gsap.set(chars, { transformOrigin: '50% 55%' });
+      chars.forEach(function (c) { c.style.transformOrigin = '50% 55%'; }); // a plain style: GSAP reads every element's transform the first time it touches it, and at start-up that was the whole cost of the buttons
       var step = stepper(FPS, function (f) {
         chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
       });
@@ -3468,10 +3506,21 @@
       var a = splitChars(qs('.btn_t', lineA)).concat(qsa('.btn_arrow', lineA));
       var bChars = splitChars(qs('.btn_t', lineB));
       var b = bChars.concat(qsa('.btn_arrow', lineB));
-      gsap.set(b, { yPercent: 120 });
+      // line B waits below the mask. As a plain style until the first hover: handing every letter to GSAP at start-up
+      // made the browser work out its styles again for each one (most of the buttons' start-up time on a phone, where
+      // the line is never shown). The first hover swaps the style for GSAP's own yPercent, in one go, nothing to see
+      b.forEach(function (el) { el.style.transform = 'translate(0, 120%)'; });
+      var primed = false;
+      var prime = function () {
+        if (primed) return;
+        primed = true;
+        b.forEach(function (el) { el.style.transform = ''; });
+        gsap.set(b, { yPercent: 120 });
+      };
       return {
         chars: bChars,
         to: function (showAlt) {
+          prime();
           gsap.to(a, { yPercent: showAlt ? -120 : 0, duration: 0.55, ease: 'expo.out', stagger: 0.012, overwrite: 'auto' });
           gsap.to(b, { yPercent: showAlt ? 0 : 120, duration: 0.55, ease: 'expo.out', stagger: 0.012, overwrite: 'auto' });
         }
@@ -6103,21 +6152,23 @@
     if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
     run('band', rdBand);   // builds the home-opening rows before the marquees start
     run('global', rdGlobal);
-    run('staging links', rdStagingLinks);
-    run('location faq button', rdLocFaqBtn);
-    run('location button lines', rdLocBtnAlt);
-    run('buttons', rdButtons);
-    run('form validation', rdFormValidation);
-    run('post cards', rdPostCards);
+    // from here: not needed to show the first screen, so on a first load these take their turn (soon, at the top of this file)
+    soon('staging links', rdStagingLinks);
+    soon('location faq button', rdLocFaqBtn);
+    soon('location button lines', rdLocBtnAlt);
+    soon('buttons', rdButtons);
+    soon('form validation', rdFormValidation);
+    soon('post cards', rdPostCards);
     // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
     var stagingHost = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname);
     // pages that keep the old footer for now: posts the refresh didn't touch (Dutch, live) and Resources on live
     var oldFooter = (path.indexOf('/post/') === 0 && !document.documentElement.classList.contains('rf')) || (path === '/resources' && !stagingHost);
     if (oldFooter) qsa('.rdf').forEach(function (el) { el.parentNode.removeChild(el); });
     else if (path === '/resources') run('old footer out', rdOldFooterOut);
-    run('footer', rdFooter);
+    soon('footer', rdFooter);
     run('location showcase', rdLocShow);
-    // city pages: the balls and the wall are far down the page, so their WebGL and slider start when they come near
+    // the balls and the wall are far down the page, so their WebGL and slider start when they come near (on every page:
+    // on the home the wall cost a sixth of the start-up, two screens and a pinned dial before anyone can see it)
     var later = function (sel, name, fn) {
       var el = qs(sel);
       if (!el) return;
@@ -6125,8 +6176,8 @@
       io.observe(el);
     };
     later('.loc_steps', 'location balls', rdLocBalls);
-    if (qs('.loc_page')) later('.wall_section', 'wall of love', rdWall); else run('wall of love', rdWall);
-    run('faq', rdFaq);
+    if (qs('.wall_section')) later('.wall_section', 'wall of love', rdWall); else soon('wall of love', rdWall); // a wall outside a .wall_section has nothing to watch for
+    soon('faq', rdFaq);
 
     if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
     else if (path === '/') run('home', rdHome);
@@ -6137,8 +6188,8 @@
     else if (path === '/resources') run('resources', rdResources);
     else if (path === '/rimbo-quiz') run('quiz', rdQuiz);
     else if (path.indexOf('/post/') === 0) {
-      run('scroll ruler', rdScrollRuler);
-      run('cover hue drift', rdCoverHueDrift);
+      soon('scroll ruler', rdScrollRuler);
+      soon('cover hue drift', rdCoverHueDrift);
     }
   }
 
