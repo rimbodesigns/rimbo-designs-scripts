@@ -18,8 +18,9 @@
   // With Barba the page swaps without a reload, so nothing clears the old page's listeners, clocks and loops any more.
   // Everything a page starts is written down here and stopped when it leaves. In this file that is automatic for
   // setTimeout, setInterval, requestAnimationFrame and the observers (the names below replace the browser's, inside
-  // this file only). For the rest use: rdOn(window, 'resize', fn) instead of rdOn(window, 'resize', fn),
-  // rdTick(fn) instead of rdTick(fn), rdHead(style) instead of rdHead(style).
+  // this file only). For the rest use: rdOn(window, 'resize', fn) instead of window.addEventListener('resize', fn),
+  // rdTick(fn) instead of gsap.ticker.add(fn), rdHead(style) instead of document.head.appendChild(style), rdDrag(draggable)
+  // around a new Draggable and rdGl(gl) around a new WebGL context.
   // Code that runs later without a known page (an animation's onComplete, a click) belongs to the page on screen. What has
   // to stay for the whole visit (the menu, Lenis) is started outside a page or inside stay(). Without Barba all of this
   // passes straight through.
@@ -60,6 +61,32 @@
     var scope = scopeNow();
     if (scope) scope.styles.push(el);
     rdUndo(function () { el.remove(); });
+  }
+  // A Draggable stays in GSAP's own list until it is killed, and with it the page it was made on; a WebGL context stays
+  // until the browser clears up, and it only allows about sixteen. Both leave with their page
+  function rdDrag(draggable) {
+    rdUndo(function () { draggable.kill(); });
+    return draggable;
+  }
+  function rdGl(gl) {
+    if (gl) rdUndo(function () { var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); });
+    return gl;
+  }
+  // What starts late (a section that waits until it comes near) still builds inside its page's GSAP context, so its
+  // timelines and ScrollTriggers are reverted with the page
+  function inContext(fn) {
+    var scope = scopeNow();
+    return scope && scope.gsap ? scope.gsap.add(fn) : fn();
+  }
+  // GSAP plugins are registered once per visit, not once per page: every gsap.registerPlugin(Draggable) puts one more
+  // listener on the document for good
+  var pluginsOn = [];
+  function rdPlugins() {
+    Array.prototype.forEach.call(arguments, function (plugin) {
+      if (!plugin || pluginsOn.indexOf(plugin) > -1) return;
+      pluginsOn.push(plugin);
+      gsap.registerPlugin(plugin);
+    });
   }
   function scopedObserver(Native) {
     return function (fn, options) {
@@ -373,7 +400,7 @@
   function holdPins(scope, scrollY) {
     if (!scope) return;
     scope.triggers.forEach(function (trigger) {
-      if (trigger.pin && trigger.isActive) gsap.set(trigger.pin, { top: (parseFloat(getComputedStyle(trigger.pin).top) || 0) + scrollY });
+      if (trigger.pin && scope.pinned.indexOf(trigger) > -1) gsap.set(trigger.pin, { top: (parseFloat(getComputedStyle(trigger.pin).top) || 0) + scrollY });
     });
   }
 
@@ -1028,8 +1055,12 @@
     var scope = pageScope;
     if (!scope) return null;
     pageScope = null;
+    scope.left = true;
     scope.triggers = hasScrollTrigger ? ScrollTrigger.getAll() : [];
-    scope.triggers.forEach(function (trigger) { trigger.disable(false); });
+    scope.pinned = scope.triggers.filter(function (trigger) { return trigger.pin && trigger.isActive; }); // noted now, while they still say so: holdPins() needs to know which pins were holding
+    // kill(false), not disable(false): both leave the page exactly as it stands, but a disabled trigger stays on
+    // ScrollTrigger's list, and the refresh for the new page then takes its pin out of place (the dial jumped up on the cube)
+    scope.triggers.forEach(function (trigger) { trigger.kill(false); });
     scope.htmlClasses = PAGE_HTML_CLASSES.filter(function (name) { return document.documentElement.classList.contains(name); });
     document.documentElement.classList.remove.apply(document.documentElement.classList, PAGE_HTML_CLASSES);
     scope.styles.forEach(function (el) { el.removeAttribute('id'); }); // a new page checks by id whether its CSS is there: this copy is on its way out
@@ -1064,7 +1095,8 @@
       var value = doc.documentElement.getAttribute(name);
       if (value === null) root.removeAttribute(name); else root.setAttribute(name, value);
     });
-    var details = 'meta[name="description"], meta[property^="og:"], meta[name^="twitter:"], link[rel="canonical"], link[rel="alternate"]';
+    // the structured data too: a page's own code adds its FAQ or breadcrumb to the head, and those stayed behind, one more per visit
+    var details = 'meta[name="description"], meta[property^="og:"], meta[name^="twitter:"], link[rel="canonical"], link[rel="alternate"], script[type="application/ld+json"]';
     qsa(details, document.head).forEach(function (el) { el.remove(); });
     qsa(details, doc.head).forEach(function (el) { document.head.appendChild(document.importNode(el, true)); });
 
@@ -1319,9 +1351,12 @@
     var xTo = gsap.quickTo(cursor, 'x', { ease: 'power3' });
     var yTo = gsap.quickTo(cursor, 'y', { ease: 'power3' });
 
+    var cursorWidth = -1; // read once per label: asking on every mouse move made the browser lay the page out each time
+    rdOn(window, 'resize', function () { cursorWidth = -1; }, { passive: true });
     rdOn(window, 'mousemove', function (e) {
       // Flip to the left near the right edge, and above the pointer near the bottom
-      var edge = cursor.offsetWidth + 16;
+      if (cursorWidth < 0) cursorWidth = cursor.offsetWidth;
+      var edge = cursorWidth + 16;
       var xPercent = e.clientX > window.innerWidth - edge ? -100 : xOffset;
       var yPercent = e.clientY > window.innerHeight * 0.9 ? -30 : yOffset;
 
@@ -1342,6 +1377,7 @@
         if (text === lastText) return;
         label.innerHTML = text;
         lastText = text;
+        cursorWidth = -1;
       });
     });
   }
@@ -1502,6 +1538,7 @@
       submitWrap.addEventListener('click', trySubmit);
       form.addEventListener('keydown', function (event) {
         if (event.key !== 'Enter' || event.target.tagName === 'TEXTAREA') return;
+        if (event.target.closest && event.target.closest('a, button, summary, [role="button"]')) return; // Enter on a link or a button inside the form (a privacy link, say) is that link's own
         event.preventDefault();
         trySubmit();
       });
@@ -1704,7 +1741,11 @@
           height: container.scrollHeight,
           duration: 1,
           ease: 'power2.inOut',
-          onComplete: function () { container.style.height = 'auto'; }
+          onComplete: function () {
+            container.style.height = 'auto';
+            if (window.lenis) window.lenis.resize();
+            ScrollTrigger.refresh(); // the page is longer now: what sits below measures its scroll positions again
+          }
         });
         gsap.to(button, {
           opacity: 0,
@@ -1822,10 +1863,11 @@
         last = f;
         chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
       }
+      rdUndo(function () { gsap.ticker.remove(tick); }); // noted once: one note per hover would pile up for as long as the page stays
       btn.addEventListener('pointerenter', function (e) {
         if (e.pointerType !== 'mouse' || running) return;
         running = true; last = -1; t0 = gsap.ticker.time;
-        rdTick(tick);
+        gsap.ticker.add(tick);
       });
       btn.addEventListener('pointerleave', function () {
         if (!running) return;
@@ -2306,8 +2348,15 @@
   async function rdGlassCarousel() {
     var wrappers = document.querySelectorAll('[data-glass-carousel]');
     if (!wrappers.length) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; // nothing is built then, so three.js is not fetched either
 
-    var THREE = await import('https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.min.js');
+    // The wait for three.js puts the rest of this function outside its page: the page is remembered here, the build is
+    // skipped if the visitor has moved on meanwhile, and the carousel is taken down when the page leaves
+    var home = scopeNow();
+    var THREE;
+    try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.min.js'); }
+    catch (err) { console.error('[rimbo-designs] glass carousel: three.js did not load', err); return; }
+    if (home && (home.left || home.dead)) return;
 
     var panelHeight = 0.55; // 1 is the full height of the section (78svh on the test page, so this is about 43svh)
     var panelGap = 40; // px between images
@@ -3467,7 +3516,8 @@
         el.removeEventListener('pointerenter', onEnter);
         el.removeEventListener('pointerleave', onLeave);
         el.removeEventListener('click', onClick);
-        renderer.dispose();
+        // the renderer goes last: it is what frees the others' memory on the graphics card, and then the WebGL context
+        // itself is handed back (the browser only keeps about sixteen)
         rt.dispose();
         lensQuad.geometry.dispose();
         lensMat.dispose();
@@ -3475,6 +3525,8 @@
         pool.forEach(function (p) { p.mat.dispose(); if (p.rim) p.rim.material.dispose(); });
         if (maskTex) maskTex.dispose();
         sources.forEach(function (s) { if (s.tex) s.tex.dispose(); });
+        renderer.dispose();
+        renderer.forceContextLoss();
         wrapper.setAttribute('data-glass-carousel', '');
       }
 
@@ -3495,6 +3547,7 @@
         instances.length = 0;
       };
     });
+    if (home) home.undo.push(function () { mm.revert(); }); // the page leaves: the carousel and its WebGL context with it
   }
 
   // =========================================================
@@ -3504,12 +3557,12 @@
   // Needs Draggable, InertiaPlugin and CustomEase (loaded in those pages' head code).
   // =========================================================
   function initRadialCardsSlider() {
-    gsap.registerPlugin(Draggable, InertiaPlugin, CustomEase);
+    rdPlugins(Draggable, InertiaPlugin, CustomEase);
     CustomEase.create("radial", "0.25, 0.1, 0, 1");
     const slideDuration = 1;
     const clickEase = 'radial';
 
-    document.querySelectorAll('[data-radial-slider-init]').forEach(container => {
+    qsa('[data-radial-slider-init]', nextPage).forEach(container => { // the page coming in only: on the cube the old page is still in the document
       if (container._radialSliderDraggable) container._radialSliderDraggable.kill();
       if (container._radialSliderProxy) gsap.killTweensOf(container._radialSliderProxy);
       if (container._radialSliderProxyEl) container._radialSliderProxyEl.remove();
@@ -3810,6 +3863,7 @@
         onDragStart: () => container.setAttribute('data-radial-slider-drag-status', 'grabbing'),
         onRelease: () => container.setAttribute('data-radial-slider-drag-status', 'grab')
       })[0];
+      rdDrag(container._radialSliderDraggable);
 
       render();
     });
@@ -3822,12 +3876,12 @@
   }
 
   function initSpatialCardsSlider() {
-    gsap.registerPlugin(Draggable, InertiaPlugin, CustomEase);
+    rdPlugins(Draggable, InertiaPlugin, CustomEase);
     CustomEase.create("spatial", "0.25, 0.1, 0, 1");
     const slideDuration = 1;
     const clickEase = 'spatial';
 
-    document.querySelectorAll('[data-spatial-slider-init]').forEach(container => {
+    qsa('[data-spatial-slider-init]', nextPage).forEach(container => { // the page coming in only: on the cube the old page is still in the document
       if (container._spatialSliderDraggable) container._spatialSliderDraggable.kill();
       if (container._spatialSliderImageObserver) container._spatialSliderImageObserver.disconnect();
       if (container._spatialSliderProxy) {
@@ -4096,6 +4150,7 @@
         onDragStart: () => container.setAttribute('data-spatial-slider-drag-status', 'grabbing'),
         onRelease: () => container.setAttribute('data-spatial-slider-drag-status', 'grab')
       })[0];
+      rdDrag(container._spatialSliderDraggable);
 
       render();
 
@@ -4160,10 +4215,14 @@
     // the slider lays the cards out and clones them; everything else here (clips, loader, opening, fades) applies as is.
     var osmoInit = function () {
       if (band) return;
+      if (!window.Draggable || !window.InertiaPlugin || !window.CustomEase) { console.warn('[rimbo-designs] band: GSAP plugins for the slider are missing'); return; }
       if (qs('[data-radial-slider-init]', hero)) initRadialCardsSlider();
       if (qs('[data-spatial-slider-init]', hero)) initSpatialCardsSlider();
     };
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var lab = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname); // the ?knobs in the address are for trying things out: staging and local only, the live site reads the Designer's attributes alone
+    var query = lab ? location.search : '';
+    var myScope = scopeNow(); // this page: the opening must not finish on a page that is already leaving
     // ---- the stepped auto-advance on an Osmo slider (home-v4's spatial arc; Rimbo: "a 1, 2, 3, 4, 5 switch"; the
     // home-v3 wheel can run it too): every few seconds the slider moves one card on, as if Next were pressed on a
     // timer. It goes through the slider's own Next control: a hidden button added before Osmo's init, which wires it
@@ -4175,18 +4234,18 @@
     var kind = slider && slider.hasAttribute('data-radial-slider-init') ? 'radial' : 'spatial'; // which Osmo slider: its data- attributes, and the handles its init leaves on the root
     var wheel = kind === 'radial' ? slider : null;
     var param = function (name, attr, fallback) { // ?name=N on the URL, else data-band-attr="N" on the section, else the default
-      var v = parseFloat((new RegExp('[?&]' + name + '=(-?[\\d.]+)').exec(location.search) || [])[1]);
+      var v = parseFloat((new RegExp('[?&]' + name + '=(-?[\\d.]+)').exec(query) || [])[1]);
       if (isNaN(v)) v = parseFloat(hero.getAttribute('data-band-' + attr));
       return isNaN(v) ? fallback : v;
     };
     var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
-    var pinScreens = ring ? param('pin', 'pin', 2) : 0; // home-extreme: screens of scroll the hero stays pinned while the dial tips over, turns and closes
+    var pinScreens = ring && !reduced ? param('pin', 'pin', 2) : 0; // home-extreme: screens of scroll the hero stays pinned while the dial tips over, turns and closes
     var ringSlots = ring ? param('slots', 'slots', 15) : 0; // home-extreme: cards on the dial; the works repeat to fill it (fifteen = the five works three times, 24° apart: a whole cylinder, so at rest it keeps going round like home-v4; ten = twice, each opposite itself, a part-cylinder that slides open)
     var ringGrow = ring ? param('grow', 'grow', 1.15) : 1; // home-extreme: how much wider the flat dial is than the drum, so the cards slide outward as it tips
-    var ringOut = ring ? ((/[?&]out=(\w+)/.exec(location.search) || [])[1] || hero.getAttribute('data-band-out') || 'roll') : ''; // home-extreme: how the dial leaves: roll (off to the left, still spinning), shoot (the cards fly out one by one) or fade
-    var ringBlur = ring ? param('blur', 'blur', 4) : 0; // home-extreme: motion blur on the cards while the drum turns fast, in screen px at full speed (0 = off)
+    var ringOut = ring ? ((/[?&]out=(\w+)/.exec(query) || [])[1] || hero.getAttribute('data-band-out') || 'roll') : ''; // home-extreme: how the dial leaves: roll (off to the left, still spinning), shoot (the cards fly out one by one) or fade
+    var ringBlur = ring && !reduced ? param('blur', 'blur', 4) : 0; // home-extreme: motion blur on the cards while the drum turns fast, in screen px at full speed (0 = off)
     var ringFull = ring && 360 / Math.max(1, ringSlots) <= 26; // fourteen or more: the spacing stretches to close the cylinder (15 → 24°, 16 → 22.5°), so at rest it loops like home-v4 and the clock may run; fewer stay a part-cylinder at 22.5°
-    if (ring && !ringFull && !/[?&]step=/.test(location.search)) stepEvery = 0; // a part-cylinder cannot loop at rest, so the clock stays off there unless asked for
+    if (ring && !ringFull && !/[?&]step=/.test(query)) stepEvery = 0; // a part-cylinder cannot loop at rest, so the clock stays off there unless asked for
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
     var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
     var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
@@ -4196,7 +4255,7 @@
     // resting pose while it turns back onto its card (the landing), and only then the title comes in. On the way back up
     // the copy does not un-blur along the scroll: it simply appears (fadeBehind). Keyed by data-band-opening="land" on the
     // section (?opening=land tries it on any staging drum page); home-v4 itself is untouched.
-    var opening = (/(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname) && (/[?&]opening=(\w+)/.exec(location.search) || [])[1]) || hero.getAttribute('data-band-opening') || '';
+    var opening = (/[?&]opening=(\w+)/.exec(query) || [])[1] || hero.getAttribute('data-band-opening') || '';
     var landing = opening === 'land' && !!slider && kind === 'spatial' && !reduced && !!window.gsap;
     var landDur = param('land', 'land', 2.4); // seconds the landing takes (expo.out: quick in, a long settle)
     var landDelay = param('landdelay', 'land-delay', 0.25); // seconds the drum hangs at the top first, so it is seen setting off once the loader has gone
@@ -4227,7 +4286,7 @@
     // (background tab) or the hero has scrolled away; every hold restarts the wait, so a step never lands right
     // after a hand has let go or the pointer has left.
     var autoStep = function () {
-      if (!stepNext && !(ringApi && stepEvery > 0)) return;
+      if (reduced || (!stepNext && !(ringApi && stepEvery > 0))) return; // with reduced motion nothing turns by itself, the dial included
       var zone = ring || qs('[data-' + kind + '-slider-collection]', slider) || slider, over = false;
       zone.addEventListener('pointerenter', function () { over = true; });
       zone.addEventListener('pointerleave', function () { over = false; });
@@ -4384,7 +4443,7 @@
       var list = qs('.spatial-gsap-slider__list', ring) || drum;
       var originals = qsa('.spatial-gsap-slider__item', list);
       if (!drum || originals.length < 2) return null;
-      var N = Math.max(originals.length, Math.round(ringSlots)), FULL = 360 / N, REST = ringFull ? FULL : 22.5, mid = Math.floor(N / 2), rad = Math.PI / 180;
+      var N = Math.max(originals.length, Math.min(60, Math.round(ringSlots))), FULL = 360 / N, REST = ringFull ? FULL : 22.5, mid = Math.floor(N / 2), rad = Math.PI / 180;
       var works = originals.length, closeLine = hero.getAttribute('data-band-close') || 'Create'; // the word the dial closes on
       // what the dial says on the way round: data-band-lines on the section ("one|two|three"), general lines about the work,
       // not captions of the cards (Rimbo); the panels' data-ring-line or names only if the section has none
@@ -4403,7 +4462,7 @@
       var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
       var arcR = function () { return st.pitch / (2 * Math.sin(REST / 2 * rad)); }; // the drum's cylinder: the cards a pitch apart along it
       var dialR = function () { return Math.max(arcR() * ringGrow, st.w / (2 * Math.sin(Math.PI / N)) + st.h * 0.3); }; // the flat dial: the drum grown a little, and never so tight that the cards pile up in the middle
-      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))); st.top = ring.offsetTop; }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
+      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))) || 0.45; st.top = ring.offsetTop; }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
       var spacing = function () { return REST + (FULL - REST) * st.open; };
       var render = function () {
         var sp = spacing(), turn = st.steps + st.scroll, s = st.scale.toFixed(4);
@@ -4453,7 +4512,11 @@
           var want = Math.min(ringBlur, speed * ringBlur / 6); // the full width at six cards a second
           blurNow += (want - blurNow) * (want > blurNow ? 0.5 : 0.2); // quick to come, slower to go
           var on = blurNow > 0.15;
-          if (on !== st.blurOn) { st.blurOn = on; items.forEach(function (it) { it.el.style.filter = on ? 'url(#band-mblur)' : ''; }); }
+          if (on || st.blurOn) items.forEach(function (it) { // only the cards that face you: a card seen from behind paints nothing, a filter on it would still cost a layer
+            var want = on && !(it.media && it.media.__face === false);
+            if (want !== !!it.blur) { it.blur = want; it.el.style.filter = want ? 'url(#band-mblur)' : ''; }
+          });
+          st.blurOn = on;
           if (on) feBlur.setAttribute('stdDeviation', (blurNow / Math.max(0.2, st.scale)).toFixed(2) + ' 0'); // in the card's own px: the dial's cards are scaled down
         });
       }
@@ -4479,7 +4542,7 @@
         },
         scroll: function (q) { // q: 0..1 over the pinned distance
           var screens = q * pinScreens, gone = clamp01(screens / fadeFrac); // the copy goes within fadeFrac of a screen, as on home-v4
-          if (copy) { copy.style.transition = 'none'; gsap.set(copy, { opacity: 1 - gone, filter: 'blur(' + (10 * gone).toFixed(1) + 'px)' }); }
+          if (copy && gone !== st.copyGone) { st.copyGone = gone; copy.style.transition = 'none'; gsap.set(copy, { opacity: 1 - gone, filter: gone ? 'blur(' + (10 * gone).toFixed(1) + 'px)' : 'none' }); } // only when it changes; a blur(0) left on the copy would keep it on its own layer for nothing
           if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - clamp01(screens / 0.07) }); }
           var e = ease3(q / 0.35), x = clamp01((q - 0.75) / 0.25); // e: the tip-over; x: the way out (a quarter of the hold: Rimbo found it too fast)
           st.closing = x > 0;
@@ -4849,15 +4912,16 @@
     //   s     one end goes back and the other comes forward: an S in depth
     //   plane the band bends within its own plane, like an S drawn on the table
     // A negative N flips the direction of whichever shape.
-    curve = parseFloat((/[?&]curve=(-?[\d.]+)/.exec(location.search) || [])[1]);
+    curve = parseFloat((/[?&]curve=(-?[\d.]+)/.exec(query) || [])[1]);
     if (isNaN(curve)) curve = parseFloat(hero.getAttribute('data-band-curve')) || 0;
-    var flat = parseFloat((/[?&]flat=([\d.]+)/.exec(location.search) || [])[1]);
+    var flat = parseFloat((/[?&]flat=([\d.]+)/.exec(query) || [])[1]);
     if (isNaN(flat)) flat = parseFloat(hero.getAttribute('data-band-flat')) || 0;
-    var bendMode = (/[?&]bend=(\w+)/.exec(location.search) || [])[1] || hero.getAttribute('data-band-bend') || 'cyl';
+    var bendMode = (/[?&]bend=(\w+)/.exec(query) || [])[1] || hero.getAttribute('data-band-bend') || 'cyl';
     // ?p3d=1 (or data-band-3d): the band keeps its children in 3D (transform-style: preserve-3d on the band in
     // the Designer), so the panels really leave the band's plane under the stage's own perspective; the
     // per-panel perspective() is then left out
-    var p3d = /[?&]p3d=1/.test(location.search) || hero.hasAttribute('data-band-3d');
+    var p3d = /[?&]p3d=1/.test(query) || hero.hasAttribute('data-band-3d');
+    if (!band) curve = 0; // the curve bends the single band's panels: a drum or a dial has none
     if (p3d && curve) band.style.transformStyle = 'preserve-3d';
     if (curve && !reduced) {
       var crow = qs('.band_row:not(.is-names)', hero), cscroll = crow && qs('[data-marquee-scroll-target]', crow);
@@ -4889,7 +4953,7 @@
 
     // ---- the opening, in order: the band rises, the title letters come up like the old hero,
     // the eyebrow and the buttons follow, the scroll line, and last the logo and the burger.
-    nav.forEach(function (el) { gsap.set(el, { opacity: 0 }); });
+    nav.forEach(function (el) { el.style.opacity = '0'; }); // a plain style, not gsap.set: the page's revert on leaving would clear it again after the next page's opening had hidden the logo
     var opened = false;
     var open = function () {
       if (opened) return; opened = true;
@@ -4923,6 +4987,7 @@
       if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
+        if (myScope && myScope.left) return; // a link was followed mid-opening: the clock, the drift and the scroll fades are not for a page on its way out
         if (scrollLine) scrollLine.classList.add('is-ready');
         window.dispatchEvent(new CustomEvent('band:stage-in')); // the stage is in by now whichever way it opened (a glass carousel waits for this)
         autoStep(); startDrift();
@@ -4952,7 +5017,7 @@
       }
       var chars = title ? split(title).chars : [];
       var t0 = landing ? 0.3 : 0; // the landing shows the copy from the timeline's start and the letters follow a beat later, as home-v4's delay does
-      var tl = gsap.timeline({ delay: landing ? titleAt : 0.3, onComplete: done });
+      var tl = gsap.timeline({ delay: landing ? titleAt : 0.3, onComplete: inZone(done) }); // inZone: what done() starts (clock, tickers, timers) belongs to this page, whenever it runs
       if (landing && copy) tl.call(function () { copy.classList.add('is-ready'); }, null, 0);
       tl.from(chars, heroCharsIn(), t0)
         .from(eyebrow, { opacity: 0, y: 8, duration: 0.8, ease: 'expo.out' }, t0 + 0.35)
@@ -5065,8 +5130,9 @@
         var f = Math.floor((gsap.ticker.time - t0) * fps);
         if (f !== last) { last = f; fn(f); }
       }
+      rdUndo(function () { gsap.ticker.remove(tick); }); // noted once, here, for this page: start() runs later, from a hover or a timer, when "the page on screen" can already be the next one
       return {
-        start: function () { if (running || reduce) return; running = true; last = -1; t0 = gsap.ticker.time; rdTick(tick); },
+        start: function () { if (running || reduce) return; running = true; last = -1; t0 = gsap.ticker.time; gsap.ticker.add(tick); },
         stop: function () { if (!running) return false; running = false; gsap.ticker.remove(tick); return true; }
       };
     }
@@ -5112,22 +5178,27 @@
 
     // The magnet: within the reach the button follows the pointer, the label a little more.
     // activate / release fire when the button takes and loses the pointer.
-    var magnets = [];
+    var magnets = [], layoutStamp = 0; // layoutStamp: goes up when the page has moved under the buttons
 
     function magnet(btn, o) {
       var inner = qs('.btn_in', btn);
       var active = false;
+      var box = null, boxStamp = -1, boxAt = 0;
       var m = {
         el: btn,
         visible: true,
         measure: function (e) {
-          var r = btn.getBoundingClientRect();
-          // the rect moves with the button: take the current offset out again
-          var cx = r.left + r.width / 2 - (gsap.getProperty(btn, 'x') || 0);
-          var cy = r.top + r.height / 2 - (gsap.getProperty(btn, 'y') || 0);
-          var dx = e.clientX - cx, dy = e.clientY - cy;
-          var w = btn.offsetWidth / 2 + REACH, h = btn.offsetHeight / 2 + REACH;
-          return { inside: Math.abs(dx) <= w && Math.abs(dy) <= h, dist: Math.max(Math.abs(dx) / w, Math.abs(dy) / h), dx: dx, dy: dy };
+          // where the button rests is read from the page at most every 120 ms, and again after a scroll or a resize: asking
+          // the browser on every pointer move made it lay the page out again each time, in the middle of whatever was animating
+          var now = performance.now();
+          if (!box || boxStamp !== layoutStamp || now - boxAt > 120) {
+            var r = btn.getBoundingClientRect();
+            // the rect moves with the button: take the current offset out again
+            box = { cx: r.left + r.width / 2 - (gsap.getProperty(btn, 'x') || 0), cy: r.top + r.height / 2 - (gsap.getProperty(btn, 'y') || 0), w: btn.offsetWidth / 2 + REACH, h: btn.offsetHeight / 2 + REACH };
+            boxStamp = layoutStamp; boxAt = now;
+          }
+          var dx = e.clientX - box.cx, dy = e.clientY - box.cy;
+          return { inside: Math.abs(dx) <= box.w && Math.abs(dy) <= box.h, dist: Math.max(Math.abs(dx) / box.w, Math.abs(dy) / box.h), dx: dx, dy: dy };
         },
         pull: function (d) {
           if (!active) {
@@ -5199,7 +5270,10 @@
     if (!finePointer) return; // touch: the press only; the magnet needs a pointer that hovers
 
     // One listener for the page: the nearest button within reach takes the pointer, the rest let go
+    rdOn(window, 'scroll', function () { layoutStamp++; }, { passive: true });
+    rdOn(window, 'resize', function () { layoutStamp++; }, { passive: true });
     rdOn(document, 'pointermove', function (e) {
+      if (e.pointerType === 'touch') return; // a finger on a touch-screen laptop: it would pull a button and leave it hovered
       var nearest = null, best = Infinity;
       magnets.forEach(function (m) {
         m.d = m.visible ? m.measure(e) : null;
@@ -5322,7 +5396,14 @@
     t = t.replace(/^\S+,\s+/, function (lead) { return /\s/.test(lead.trim()) ? lead : ''; }); // a lone "So," in front goes
     // only what comes before a colon, question mark, comma, dash or bracket, or a full stop that ends
     // a sentence (not the one in "vs." or "2.0")
-    var head = t.split(/[:?!,—–(]|(?<!\bvs)\.(?=\s|$)/i)[0].trim() || t;
+    // (found by hand, not with a look-behind: Safari before 16.4 cannot read one, and then none of this file runs)
+    var cut = -1, stop = /[:?!,—–(]|\.(?=\s|$)/g, hit;
+    while ((hit = stop.exec(t))) {
+      if (hit[0] === '.' && /\bvs$/i.test(t.slice(0, hit.index))) continue;
+      cut = hit.index;
+      break;
+    }
+    var head = (cut < 0 ? t : t.slice(0, cut)).trim() || t;
     var words = head.split(' '), out = [];
     for (var i = 0; i < words.length; i++) {
       if (out.length && (out.join(' ') + ' ' + words[i]).length > LABEL_MAX) break;
@@ -5584,9 +5665,11 @@
         function scrollToPosition(top) { window.scrollTo({ top: top, behavior: reduceMotion ? "auto" : "smooth" }); }
         function scrollToPart(partIndex) { scrollToPosition(parts[partIndex].getBoundingClientRect().top + window.scrollY); }
         function findPart(position) { let partIndex = 0; partStarts.forEach((start, index) => { if (start <= position) partIndex = index; }); return partIndex; }
+        const rulerNarrow = window.matchMedia("(max-width: 991px)"); let asleep = false; // the ruler is display: none on narrow screens and when the article leaves it no room: no frames spent on it then
         function update(time) {
+          if (rulerNarrow.matches || root.classList.contains("is-compact")) { asleep = true; return; }
           const frame = Math.min(gsap.ticker.deltaRatio(60), 3);
-          const scrollY = window.scrollY; const scrollDelta = scrollY - lastScroll; lastScroll = scrollY;
+          const scrollY = window.scrollY; if (asleep) { asleep = false; lastScroll = scrollY; } const scrollDelta = scrollY - lastScroll; lastScroll = scrollY;
           const speedNow = reduceMotion ? 0 : Math.min(Math.abs(scrollDelta) / window.innerHeight / frame / 0.04, 1);
           const speedEase = speedNow > speed ? 0.3 : 0.05;
           speed += (speedNow - speed) * Math.min(speedEase * frame, 1);
@@ -5615,7 +5698,7 @@
           const nextStatus = time - lastActive < idleDelay ? "active" : "idle";
           if (nextStatus !== rootStatus) { rootStatus = nextStatus; root.setAttribute("data-scroll-ruler-status", rootStatus); }
         }
-        rdOn(window, "pointermove", (event) => { if (event.pointerType !== "mouse") return; const rect = list.getBoundingClientRect(); const reach = rect.height * 0.25; const distance = Math.max(event.clientX - rect.left - root.offsetWidth * 0.5, 0); cursorTarget = gsap.utils.clamp(0, 1, 1 - distance / reach); pointerPosition = (event.clientY - rect.top) / rect.height; });
+        rdOn(window, "pointermove", (event) => { if (event.pointerType !== "mouse" || asleep) return; const rect = list.getBoundingClientRect(); const reach = rect.height * 0.25; const distance = Math.max(event.clientX - rect.left - root.offsetWidth * 0.5, 0); cursorTarget = gsap.utils.clamp(0, 1, 1 - distance / reach); pointerPosition = (event.clientY - rect.top) / rect.height; });
         rdOn(document.documentElement, "pointerleave", () => { cursorTarget = 0; });
         root.addEventListener("click", (event) => { const rect = list.getBoundingClientRect(); const position = gsap.utils.clamp(0, 1, (event.clientY - rect.top) / rect.height); if (usingParts) scrollToPart(findPart(position)); else scrollToPosition(position * rangeLength); });
         gsap.matchMedia().add("(prefers-reduced-motion: reduce)", () => { reduceMotion = true; return () => { reduceMotion = false; }; });
@@ -5881,13 +5964,17 @@
       var wide = window.matchMedia('(min-width: 1200px)');
       toc.open = wide.matches;
       var follow = function () { toc.open = wide.matches; };
-      if (wide.addEventListener) wide.addEventListener('change', follow); else if (wide.addListener) wide.addListener(follow);
+      if (wide.addEventListener) rdOn(wide, 'change', follow); // rdOn: a media query with a listener is kept by the browser, and with it this whole post, after the page has gone
+      else if (wide.addListener) { wide.addListener(follow); rdUndo(function () { wide.removeListener(follow); }); }
       qs('summary', toc).addEventListener('click', function (e) { if (wide.matches) e.preventDefault(); });
       side.appendChild(toc);
       // arriving with a section address (#what-is-webflow): go there once the page has settled
       if (location.hash.length > 1) {
         var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-        if (target && article.contains(target)) rdOn(window, 'load', function () { setTimeout(function () { postJumpTo(target); }, 300); });
+        if (target && article.contains(target)) {
+          var jump = function () { setTimeout(function () { postJumpTo(target); }, 300); };
+          if (document.readyState === 'complete') jump(); else rdOn(window, 'load', jump); // after a page transition the window's load is long past
+        }
       }
     }
     hero.appendChild(main); hero.appendChild(side);
@@ -6018,6 +6105,13 @@
   function rdNavFull() {
     var wrapEl = qs('.bold-nav-wrap');
     if (!wrapEl || qs('body > .bold-nav-full')) return; // a page without the component keeps its old nav
+    // every part this needs, checked before anything is touched: a part renamed or deleted in the Designer then leaves the
+    // old navigation in place, instead of hiding it and failing halfway with no menu at all
+    var nav = qs('.bold-nav-full', wrapEl), bar = qs('.bold-nav-full__bar', wrapEl);
+    if (!nav || !bar || !qs('.bold-nav-full__logo', bar) || !qs('.bold-nav-full__ul', nav) || !qs('.bold-nav-full__tile', nav) || !qs('[data-navigation-toggle="toggle"]', bar)) {
+      console.warn('[rimbo-designs] full screen nav: a part of the Nav_full component is missing, the old navigation stays');
+      return;
+    }
     var nl = /^\/nl(\/|$)/.test(location.pathname);
     var prefix = nl ? '/nl' : '';
     function clean(href) {
@@ -6091,18 +6185,21 @@
     // it can't live in a page: it moves out here, and Barba drops the copy in every page it fetches. The links and the
     // language are filled in here: they differ per page
     var lis = menuLinks();
-    var nav = qs('.bold-nav-full', wrapEl), bar = qs('.bold-nav-full__bar', wrapEl);
-    document.body.appendChild(nav);
-    document.body.appendChild(bar);
+    // first in the page, logo and burger before the menu: the keyboard reaches the burger first and the menu's links right
+    // after it, not after the whole page and its footer (both are fixed with their own z-index, so nothing moves on screen)
+    document.body.insertBefore(bar, document.body.firstChild);
+    document.body.insertBefore(nav, bar.nextSibling);
     qsa('.bold-nav-wrap').forEach(function (el) { el.parentNode.removeChild(el); });
     nav.setAttribute('data-navigation-status', 'not-active');
     nav.setAttribute('aria-label', 'Main');
     bar.setAttribute('data-navigation-status', 'not-active');
     qs('.bold-nav-full__logo', bar).setAttribute('href', prefix || '/');
     qs('.bold-nav-full__ul', nav).innerHTML = lis;
-    if (nl) qs('[data-nav-country]', nav).textContent = 'Nederland';
+    var country = qs('[data-nav-country]', nav);
+    if (nl && country) country.textContent = 'Nederland';
     var langEl = qs('.bold-nav__lang', nav);
-    if (locales.length > 1) {
+    if (!langEl) {} // no language pill in the component: nothing to fill
+    else if (locales.length > 1) {
       langEl.innerHTML = locales.map(function (a) {
         return '<a class="bold-nav__lang-link" hreflang="' + a.getAttribute('hreflang') + '" href="' + a.getAttribute('href') + '"' +
           (a.classList.contains('w--current') ? ' aria-current="page"' : '') + '>' + a.textContent.trim() + '</a>';
@@ -6134,12 +6231,21 @@
 
     var tl;
     var isOpen = false;
+    var behind = []; // what the open menu covers: out of reach of the keyboard and screen readers until it closes
     function set(active) {
       if (active === isOpen) return;
       isOpen = active;
       [nav, bar].forEach(function (el) { el.setAttribute('data-navigation-status', active ? 'active' : 'not-active'); });
       btn.setAttribute('aria-expanded', active ? 'true' : 'false');
       tile.setAttribute('aria-hidden', active ? 'false' : 'true');
+      if (active) {
+        behind = Array.prototype.filter.call(document.body.children, function (el) { return el !== nav && el !== bar && !el.inert && !/^(SCRIPT|STYLE|NOSCRIPT|LINK)$/.test(el.tagName); });
+        behind.forEach(function (el) { el.inert = true; });
+      } else {
+        behind.forEach(function (el) { el.inert = false; });
+        behind = [];
+        if (nav.contains(document.activeElement)) btn.focus({ preventScroll: true }); // Escape on a menu link: focus goes back to the burger, not nowhere
+      }
       if (window.lenis) { if (active) window.lenis.stop(); else window.lenis.start(); }
       if (tl) tl.kill();
       if (active) { tile.style.backgroundColor = 'rgba(12, 12, 12, ' + (pageIsLight() ? '.97' : '.9') + ')'; readPage(); }
@@ -6225,6 +6331,7 @@
     });
 
     var clock = qs('[data-nav-clock]', nav);
+    if (!clock) return;
     function tick() { clock.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }); }
     tick(); setInterval(tick, 15000);
   }
@@ -6262,7 +6369,7 @@
   function rdLocBalls() {
     var cards = qsa('.loc_steps .loc_step');
     if (!cards.length) return;
-    var gl = document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+    var gl = rdGl(document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true }));
     if (!gl) return;
     var FRAG = "#version 300 es\n" +
       "precision highp float;\n" +
@@ -6987,7 +7094,7 @@
     var wrapper = qs('[data-centered-slider="wrapper"]');
     if (!wrapper) return;
     if (!window.Draggable || !window.InertiaPlugin || !window.CustomEase || !window.ScrollTrigger) { console.warn('[rimbo-designs] wall of love: GSAP plugins missing'); return; }
-    gsap.registerPlugin(CustomEase, ScrollTrigger, Draggable, InertiaPlugin);
+    rdPlugins(CustomEase, ScrollTrigger, Draggable, InertiaPlugin);
     CustomEase.create('osmo-ease', '0.625, 0.05, 0, 1');
     CustomEase.create('wall-glide', '0.45, 0, 0.15, 1'); // Osmo's ease over .725 s moved half the distance in 85 ms
 
@@ -7118,6 +7225,7 @@
           }
         }
 
+        rdUndo(stopAutoplay); // the page leaves: the chain of delayed calls would keep turning a slider that is gone
         // Start/stop autoplay based on viewport visibility via ScrollTrigger
         ScrollTrigger.create({
           trigger: sliderWrapper,
@@ -7268,7 +7376,13 @@
             populateOffsets();
             deep && tl.draggable ? tl.time(times[curIndex], true) : tl.progress(progress, true);
           },
-          onResize = () => refresh(true),
+          lastWidth = window.innerWidth, lastItemWidth = items[0] ? items[0].offsetWidth : 0,
+          onResize = () => { // a phone's address bar sliding away is a resize too: the loop is only rebuilt when a width really changed
+            const itemWidth = items[0] ? items[0].offsetWidth : 0;
+            if (window.innerWidth === lastWidth && itemWidth === lastItemWidth) return;
+            lastWidth = window.innerWidth; lastItemWidth = itemWidth;
+            refresh(true);
+          },
           proxy;
         gsap.set(items, {x: 0});
         populateWidths();
@@ -7355,7 +7469,7 @@
               wasPlaying && tl.play();
             }
           })[0];
-          tl.draggable = draggable;
+          tl.draggable = rdDrag(draggable);
         }
         tl.closestIndex(true);
         lastIndex = curIndex;
@@ -7417,7 +7531,7 @@
         "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
         "}";
 
-    const gl = document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+    const gl = rdGl(document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true }));
     const U = {};
     if (gl) {
       const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
@@ -7705,7 +7819,7 @@
     var later = function (sel, name, fn) {
       var el = qs(sel);
       if (!el) return;
-      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); run(name, fn); } }, { rootMargin: '100% 0px' });
+      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); inContext(function () { run(name, fn); }); } }, { rootMargin: '100% 0px' });
       io.observe(el);
     };
     later('.loc_steps', 'location balls', rdLocBalls);
