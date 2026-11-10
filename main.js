@@ -4328,7 +4328,17 @@
     // into its middle and fading, so the next section is there when the pin lets go. Drags turn it: at rest the
     // five cannot loop, so the drag is held to the five (a rubber band past the ends); once flat it goes round. The
     // step clock is off here unless ?step=N asks for it (at rest it walks 1-2-3-4-5 and back). ?pin=N sets the screens.
-    var ringApi = null;
+    var ringApi = null, ringFront = [], ringWait = []; // ringFront: the media on the card in front at the opening; ringWait: clips asleep until the reveal
+    // a copied card must not fetch its clips: the copy's video only keeps its address in data-src, for dedupeClips to find the master by
+    var stripClips = function (el) { qsa('video', el).forEach(function (v) { var src = v.getAttribute('src'); if (src) { v.setAttribute('data-src', src); v.removeAttribute('src'); } v.setAttribute('preload', 'none'); }); };
+    // wake a sleeping clip (preload="none" in the Designer): load it now and play it like the others
+    var wake = function (v) {
+      if (!v.__wait) return;
+      v.__wait = false;
+      ringWait = ringWait.filter(function (w) { return w !== v; });
+      v.preload = 'auto'; // enough on its own: the browser picks the download up from here (a load() on top would start it twice)
+      if (!hidden && !v.__off && v.__tuned) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+    };
     var buildRing = function () {
       var drum = qs('.spatial-gsap-slider__collection', ring) || ring.firstElementChild;
       var list = qs('.spatial-gsap-slider__list', ring) || drum;
@@ -4340,7 +4350,10 @@
       // not captions of the cards (Rimbo); the panels' data-ring-line or names only if the section has none
       var lines = (hero.getAttribute('data-band-lines') || '').split('|').map(function (t) { return t.trim(); }).filter(Boolean);
       if (!lines.length) lines = originals.map(function (el) { var pn = qs('[data-band-name]', el) || el; return pn.getAttribute('data-ring-line') || pn.getAttribute('data-band-name') || ''; });
-      for (var ci = originals.length; ci < N; ci++) { var cl = originals[ci % originals.length].cloneNode(true); cl.setAttribute('data-ring-clone', ''); cl.setAttribute('aria-hidden', 'true'); list.appendChild(cl); } // the works repeat round the dial; dedupeClips turns the copies into canvases
+      for (var ci = originals.length; ci < N; ci++) { var cl = originals[ci % originals.length].cloneNode(true); cl.setAttribute('data-ring-clone', ''); cl.setAttribute('aria-hidden', 'true'); stripClips(cl); list.appendChild(cl); } // the works repeat round the dial; dedupeClips turns the copies into canvases
+      // the card that faces you at the opening (k = 0, the first card): the loader only waits for its clip, the others load behind it
+      ringFront = qsa('.band_panel-media', originals[0]);
+      originals.slice(1).forEach(function (el) { qsa('video', el).forEach(function (v) { if (ringFront.indexOf(v) < 0 && (v.getAttribute('preload') || '') !== 'auto') { v.__wait = true; ringWait.push(v); } }); }); // preload="none" in the Designer: it stays asleep until the reveal or until its card turns to the front (wake)
       var items = qsa('.spatial-gsap-slider__item', list).map(function (el, i) { var panel = qs('[data-band-name]', el) || el; return { el: el, k: i <= mid ? i : i - N, name: panel.getAttribute('data-band-name') || '', fly: 0, tan: 0, gone: 0 }; }); // 0 = the first card, in front at rest; the last ones sit to its left; the line is what the dial says in its middle (data-ring-line on the panel, the name if there is none)
       var label = qs('.band_ring-name', hero); // Designer: band_ring-name, the script only writes in it
       if (!label) { label = document.createElement('div'); label.className = 'band_ring-name'; label.setAttribute('aria-hidden', 'true'); hero.appendChild(label); }
@@ -4350,7 +4363,7 @@
       var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
       var arcR = function () { return st.pitch / (2 * Math.sin(REST / 2 * rad)); }; // the drum's cylinder: the cards a pitch apart along it
       var dialR = function () { return Math.max(arcR() * ringGrow, st.w / (2 * Math.sin(Math.PI / N)) + st.h * 0.3); }; // the flat dial: the drum grown a little, and never so tight that the cards pile up in the middle
-      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))); }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count
+      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))); st.top = ring.offsetTop; }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
       var spacing = function () { return REST + (FULL - REST) * st.open; };
       var render = function () {
         var sp = spacing(), turn = st.steps + st.scroll, s = st.scale.toFixed(4);
@@ -4362,6 +4375,17 @@
         // the fade sits on the cards, never on the drum: opacity below 1 flattens a preserve-3d element's children into its
         // own plane, and the drum's plane is edge-on when the dial lies flat, so a faded drum painted nothing at all
         items.forEach(function (it) { it.el.style.transform = 'rotateY(' + (it.k * sp).toFixed(3) + 'deg) translate3d(' + (-it.tan).toFixed(1) + 'px,0,' + (R + it.fly).toFixed(1) + 'px) rotateX(' + (-st.tip).toFixed(3) + 'deg)'; it.el.style.opacity = Math.min(st.fade, 1 - it.gone).toFixed(3); }); // a card's own x is the tangent of its travel, so a fling (tan) rides the spin
+        // which cards face away: their backs are hidden, so a copy there need not be repainted. How much a card faces you is
+        // the depth part of its normal: sin²(tip) + cos²(tip) × cos(its angle round the drum) (1 = straight at you; flat, every card faces up at you)
+        var t = st.tip * rad, s2 = Math.sin(t) * Math.sin(t), c2 = 1 - s2, moved = !!(st.steps || st.scroll);
+        items.forEach(function (it) {
+          if (!it.media || !it.media.parentNode) it.media = qs('.band_panel-media', it.el); // dedupeClips swaps the copies' videos for canvases after the first render
+          var m = it.media; if (!m) return;
+          var on = s2 + c2 * Math.cos((ang + it.k * sp) * rad) > 0.1, was = m.__face;
+          if (was !== on) { m.__face = on; if (on && was === false && m.__master && !hidden && m.__vis !== false) { if (m.__master.readyState >= 2) paintOne(m.__master, m); else posterInto(m.__master, m); } } // back in front: the latest frame at once, not on the next one (the poster while the clip has none)
+          var mm = m.__master || m;
+          if (on && moved && mm.__wait) wake(mm); // a sleeping clip whose card turns to the front before the reveal has woken it
+        });
         var front = ((Math.round(turn) % N) + N) % N; st.front = front;
         // what the middle says: on the way round the lines take turns, each for an equal share of the round (five changes),
         // counted from the scroll alone so the first line is always first; as the dial closes, one word
@@ -4369,7 +4393,7 @@
         if (text !== st.text) { st.text = text; label.textContent = text; }
         // the text sits at the hole's centre: the flat ring lies at one depth (z = -R), so its centre is the drum's centre
         // projected towards the camera, and nothing about the turn moves it
-        label.style.top = (ring.offsetTop + (st.y + 0) * persp / (persp + R)).toFixed(1) + 'px';
+        label.style.top = (st.top + (st.y + 0) * persp / (persp + R)).toFixed(1) + 'px';
       };
       measure(); render();
       var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
@@ -4405,6 +4429,7 @@
       var ease3 = function (q) { q = clamp01(q); return 1 - Math.pow(1 - q, 3); };
       return {
         busy: function () { return !!down; },
+        refresh: render, // dedupeClips: once the copies are canvases, mark the ones facing away straight away
         state: function () { return { steps: st.steps, scroll: st.scroll, tip: st.tip, open: st.open, scale: st.scale, fade: st.fade, front: st.front, cards: N, works: works, fit: st.fit, text: st.text, labelTop: label.style.top }; },
         step: function (n) {
           var cur = Math.round(st.steps), next = cur + n * st.dir;
@@ -4443,22 +4468,60 @@
     // ---- clips: play every video once (the marquee clones the row after this; re-touching a running video makes it hiccup)
     function tune() {
       qsa('video', hero).forEach(function (v) {
-        if (v.__tuned) return;
+        if (v.__tuned || !v.getAttribute('src')) return; // a ring copy has no address: it becomes a canvas
         v.__tuned = true;
         var rate = parseFloat(v.getAttribute('data-rate')) || 1.5;
         v.muted = true; v.loop = true; v.playsInline = true;
         var apply = function () { if (v.playbackRate !== rate) v.playbackRate = rate; };
         if (v.readyState >= 1) apply(); else v.addEventListener('loadedmetadata', apply, { once: true });
-        if (v.paused && !hidden && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+        if (v.paused && !hidden && !v.__off && !v.__wait) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } // play() would load a sleeping clip too
       });
     }
     tune(); setTimeout(tune, 0); setTimeout(tune, 1500); setTimeout(tune, 4000);
 
-    // ---- one download and one decoder per clip: the clones' videos become canvases painted from the master video
+    // ---- one download and one decoder per clip: the clones' videos become canvases painted from the master video.
+    // It runs again after every width change (the Osmo sliders re-clone), so the observer, the frame callbacks and the
+    // listeners are made once: a second run only picks up new copies.
+    var clipIO = null, rafOnes = [], rafRunning = false;
+    function paintOne(m, c) {
+      if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
+      c.getContext('2d').drawImage(m, 0, 0);
+      c.__frame = true;
+    }
+    // the loader no longer waits for every clip, so a copy can be on screen before its master has a frame: it gets the
+    // master's poster drawn in, at the poster's own size so the panel's cover fit crops it like the master's poster.
+    // Drawn, not a CSS background: a canvas drawing never counts as the page's largest paint the way a background does.
+    // Only where it is needed: a copy facing you whose master is asleep (preload="none") or still has no frame at the
+    // reveal. With every clip on preload="auto" they all have frames long before the reveal, so nothing is drawn at all
+    function posterInto(m, c) {
+      var url = m.getAttribute('poster');
+      if (!url || m.readyState >= 2 || c.__frame || c.__face === false) return;
+      if (!m.__poster) {
+        // the same address as the master's poster, so it comes from the cache, not a second download; turned into a bitmap
+        // once, off the main thread, so drawing it after that is a plain copy
+        var img = new Image(); img.decoding = 'async'; img.src = url;
+        m.__poster = window.createImageBitmap && img.decode
+          ? img.decode().then(function () { return createImageBitmap(img); }).catch(function () { return null; })
+          : Promise.resolve(null);
+      }
+      m.__poster.then(function (img) {
+        if (!img || c.__frame || m.readyState >= 2 || !c.isConnected) return; // the clip got there first: its frames take over
+        if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
+        c.getContext('2d').drawImage(img, 0, 0);
+      });
+    }
+    function paintClones(m) {
+      if (m.readyState < 2 || !m.__canvases) return;
+      m.__canvases.forEach(function (c) {
+        if (c.__vis === false || c.__face === false) return; // off screen, or a ring card facing away: nothing to show
+        paintOne(m, c);
+      });
+    }
     function dedupeClips() {
       var masters = {};
       qsa('video', hero).forEach(function (v) {
-        var src = v.getAttribute('src');
+        var src = v.getAttribute('src') || v.getAttribute('data-src'); // a ring copy keeps its address in data-src
+        if (!src) return;
         if (!masters[src]) { masters[src] = v; return; }
         var c = document.createElement('canvas');
         c.className = v.className; c.setAttribute('aria-hidden', 'true');
@@ -4468,19 +4531,12 @@
         (masters[src].__canvases = masters[src].__canvases || []).push(c);
       });
       var all = Object.keys(masters).map(function (k) { return masters[k]; });
-      var paintClones = function (m) {
-        if (m.readyState < 2 || !m.__canvases) return;
-        m.__canvases.forEach(function (c) {
-          if (c.__vis === false) return; // off-screen clone: nothing to show
-          if (c.width !== m.videoWidth) { c.width = m.videoWidth; c.height = m.videoHeight; }
-          c.getContext('2d').drawImage(m, 0, 0);
-        });
-      };
+      all.forEach(function (m) { if (m.__canvases) m.__canvases = m.__canvases.filter(function (c) { return c.isConnected; }); }); // a re-clone throws the old copies away
       // ---- only what is on screen costs anything: a clip decodes while one of its panels (master or clone)
       // is near the viewport, and a clone is repainted only while it is on screen and only when the master
       // presents a new frame (requestVideoFrameCallback), not on every display refresh
       if ('IntersectionObserver' in window) {
-        var io = new IntersectionObserver(function (entries) {
+        if (!clipIO) clipIO = new IntersectionObserver(function (entries) {
           var touched = [];
           entries.forEach(function (en) {
             var media = qs('.band_panel-media', en.target);
@@ -4493,21 +4549,22 @@
             var shown = (m.__vis !== false ? 1 : 0) + (m.__canvases || []).filter(function (c) { return c.__vis !== false; }).length;
             m.__off = shown === 0;
             if (m.__off) { if (!m.paused) m.pause(); }
-            else if (m.paused && !hidden && m.__tuned) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
+            else if (m.paused && !hidden && m.__tuned && !m.__wait) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
           });
         }, { rootMargin: '5% 10%', threshold: 0 }); // a panel resumes ~150 px before its edge enters: 1.5 s of lead at the band's pace
-        qsa('.band_panel', hero).forEach(function (p) { io.observe(p); });
+        qsa('.band_panel', hero).forEach(function (p) { if (p.__clipIO) return; p.__clipIO = true; clipIO.observe(p); });
       }
-      var painters = all.filter(function (m) { return m.__canvases; });
-      if (!painters.length) return;
-      var rafOnes = [];
-      painters.forEach(function (m) {
+      all.filter(function (m) { return m.__canvases && m.__canvases.length; }).forEach(function (m) {
+        if (m.__painting) return;
+        m.__painting = true;
         if (!m.requestVideoFrameCallback) { rafOnes.push(m); return; }
         var arm = function () { m.requestVideoFrameCallback(function () { if (!hidden) paintClones(m); arm(); }); };
         arm(); // stays armed across pauses: it only fires when a frame is presented
         m.addEventListener('seeked', function () { if (!hidden) paintClones(m); }); // the restart at the reveal shows frame 0 on the clones too
       });
-      if (rafOnes.length) (function paint() { if (!hidden) rafOnes.forEach(paintClones); requestAnimationFrame(paint); })();
+      if (rafOnes.length && !rafRunning) { rafRunning = true; (function paint() { if (!hidden) rafOnes.forEach(paintClones); requestAnimationFrame(paint); })(); }
+      if (ringApi) ringApi.refresh(); // sets which copies face you
+      all.forEach(function (m) { if (m.__wait && m.__canvases) m.__canvases.forEach(function (c) { posterInto(m, c); }); }); // a sleeping clip has no frame until after the reveal
     }
     setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
     if (!band) { var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { tune(); dedupeClips(); }, 450); }); } // the Osmo sliders re-clone on a width change (200 ms debounce); the clones become canvases again after
@@ -4517,7 +4574,7 @@
     // sleep in a hidden tab, so the marquee, the clone canvases and the tilt stop by themselves.
     rdOn(document, 'visibilitychange', function () {
       if (document.hidden) qsa('video', hero).forEach(function (v) { v.pause(); });
-      else if (!hidden) qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
+      else if (!hidden) qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off && !v.__wait) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
     });
 
     // ---- the name chip shows while the pointer rests on a panel; nothing lifts, nothing dims (Rimbo tried
@@ -4739,7 +4796,7 @@
       ScrollTrigger.create({
         trigger: scrollRef, start: 'top top', end: 'bottom top',
         onLeave: function () { hidden = true; hero.style.visibility = 'hidden'; qsa('video', hero).forEach(function (v) { v.pause(); }); },
-        onEnterBack: function () { hidden = false; hero.style.visibility = ''; qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }); }
+        onEnterBack: function () { hidden = false; hero.style.visibility = ''; qsa('video', hero).forEach(function (v) { if (v.paused && !v.__off && !v.__wait) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }); }
       });
     };
 
@@ -4798,7 +4855,9 @@
       if (opened) return; opened = true;
       // every clip starts from its first frame as the band reveals, so the visitor sees each opening
       // (Echo's own loader, say) instead of whatever was playing behind the black
-      qsa('video', hero).forEach(function (v) { try { v.currentTime = 0; } catch (e) {} if (v.paused && !hidden && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
+      ringWait.slice().forEach(wake); // the sleeping clips load now, behind the one in front that the loader waited for
+      if (ringApi) qsa('canvas.band_panel-media', hero).forEach(function (c) { if (c.__master) posterInto(c.__master, c); }); // a slow clip the loader did not wait for: its copies show the poster until it has a frame
+      qsa('video', hero).forEach(function (v) { if (!v.getAttribute('src')) return; try { v.currentTime = 0; } catch (e) {} if (v.paused && !hidden && !v.__off) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } });
       // home-v4 (Rimbo): the copy first, then the cards. No rise and no fade for the stage (Rimbo: not needed);
       // once the title is nearly in, each whole card (frame, shadow and clip as one) grows from one pixel at its
       // centre to full size, the middle card first and the rest following outward.
@@ -4894,6 +4953,7 @@
       }
     };
     var ready = function () {
+      if (!band) return open(); // startAt looks for the marquee rows; a hero without them (the Osmo sliders, the dial) would wait 90 frames for nothing
       var tries = 0;
       (function go() { if (!startAt() && tries++ < 90) return requestAnimationFrame(go); open(); })();
     };
@@ -4904,6 +4964,7 @@
       var seen = {}, total = 0, done = 0;
       qsa('.band_panel-media', hero).forEach(function (m) {
         if (m.tagName === 'CANVAS') return;
+        if (ringFront.length && ringFront.indexOf(m) < 0) return; // the dial: only the card in front at the opening; the rest load behind it (open wakes the sleeping ones)
         var key = m.currentSrc || m.getAttribute('src');
         var ok = (m.tagName === 'VIDEO') ? m.readyState >= 3 : (m.complete && m.naturalWidth > 0);
         if (!seen[key]) seen[key] = { ok: ok }; else if (ok) seen[key].ok = true;
@@ -6892,7 +6953,7 @@
       .centered-slider-bullet.active .wall_face-open { color: var(--_wall-of-love---wall-text); }
       .centered-slider-bullet:focus-visible, .centered-slider-button:focus-visible { outline: 1px solid var(--color--brand); outline-offset: 2px; }
     `;
-    document.head.appendChild(style);
+    rdHead(style); // through rdHead: it goes again when the page leaves, so a Barba return does not stack another copy
 
     function el(cls, html) { var d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
     // a copy of the wall without faces or arrows in the Designer: built from its slides, with the Designer's classes
@@ -7454,7 +7515,7 @@
 
     // hover: only straight on the ball, the spot under the mouse warms up
     addEventListener('pointermove', function (e) {
-      if (e.pointerType !== 'mouse') return;
+      if (e.pointerType !== 'mouse' || !seen) return; // the wall off screen: no ball to touch, so nothing to measure
       balls.forEach(function (b) {
         var box = b.canvas.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
         var on = Math.hypot(x - b.cx, y - b.cy) < b.r * 1.05 && x < b.s && y < b.s;
@@ -7463,12 +7524,15 @@
     }, { passive: true });
 
     function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
-    var seen = true, last = 0;
-    new IntersectionObserver(function (e) { seen = e[0].isIntersecting; }).observe(document.querySelector('.wall_section'));
+    // the loop only runs while the wall is on screen: off screen it stops asking for frames, and the observer starts it again
+    var seen = true, last = 0, running = false;
+    function start() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
+    new IntersectionObserver(function (e) { seen = e[0].isIntersecting; if (seen) start(); }).observe(document.querySelector('.wall_section'));
     function loop(now) {
-      requestAnimationFrame(loop);
       var dt = Math.min((now - last) / 1000, .05); last = now;
-      if (!seen || document.hidden) return;
+      if (!seen) { running = false; return; }
+      requestAnimationFrame(loop);
+      if (document.hidden) return;
       var mid = row.getBoundingClientRect().left + row.clientWidth / 2;
       balls.forEach(function (b) {
         var box = b.card.getBoundingClientRect(), off = Math.abs(box.left + box.width / 2 - mid) / box.width;
@@ -7483,7 +7547,7 @@
         if (box.right > 0 && box.left < innerWidth) paint(b);
       });
     }
-    requestAnimationFrame(loop);
+    start();
   }
 
   // =========================================================
