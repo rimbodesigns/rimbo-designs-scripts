@@ -2338,1543 +2338,10 @@
   }
 
   // =========================================================
-  // GLASS CAROUSEL — any page with [data-glass-carousel] (new site, 2026-10)
-  // Osmo Supply's Liquid Glass Carousel (lens shader and scroll model adapted
-  // from Yousuf Soomro's liquid-glass-carousel, MIT). Kept as published, plus
-  // an intro: the panels start stacked in the middle and spread out to their
-  // places while they grow, the lens opens with them, then caption and
-  // counter fade in. Three.js loads only on pages that have the carousel.
+  // OSMO SLIDER — Osmo Supply's Spatial Cards Slider (osmo.supply) as shipped, only their DOMContentLoaded auto-init is
+  // left out: the city pages' showcase (rdLocShow) and a hero that carries [data-spatial-slider-init] (home V4) call it.
+  // Needs Draggable, InertiaPlugin and CustomEase (site footer).
   // =========================================================
-  async function rdGlassCarousel() {
-    var wrappers = document.querySelectorAll('[data-glass-carousel]');
-    if (!wrappers.length) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; // nothing is built then, so three.js is not fetched either
-
-    // The wait for three.js puts the rest of this function outside its page: the page is remembered here, the build is
-    // skipped if the visitor has moved on meanwhile, and the carousel is taken down when the page leaves
-    var home = scopeNow();
-    var THREE;
-    try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.min.js'); }
-    catch (err) { console.error('[rimbo-designs] glass carousel: three.js did not load', err); return; }
-    if (home && (home.left || home.dead)) return;
-
-    var panelHeight = 0.55; // 1 is the full height of the section (78svh on the test page, so this is about 43svh)
-    var panelGap = 40; // px between images
-    var panelHeightNarrow = 0.86; // below 768px the centre panel takes most of the screen
-    var panelGapNarrow = 14;
-    var wheel = 'horizontal'; // "horizontal" | "all" | "off"
-
-    // Oval size
-    var lensWidth = 1;
-    var lensHeight = 0.6;
-    var lensRotation = 90; // degrees
-    var lensWidthNarrow = 1; // the same three, below 768px
-    var lensHeightNarrow = 0.7;
-    var lensRotationNarrow = 90;
-
-    var lensColor = '#e4441c'; // the ring and its aura (brand orange)
-    var lensGlow = 4; // brightness of the ring, the outline and the centre, 0 to 17
-    var lensRing = 1; // the coloured ring, 0 removes it
-    var lensRingRadius = 0.49; // 0.1 sits near the middle, 0.49 on the edge
-    var lensRingWidth = 0.01; // higher is softer and wider
-    var lensRimLine = 1; // the white outline, 0 removes it
-    var lensNova = 0; // white bloom in the middle, 0 to 1 (off: its falloff is wider than the canvas and lifted the black by ~5 levels)
-    var lensDispersion = 11; // how far red and blue split near the edge
-    var lensRimWave = 0.3; // how much the edge ripples
-    var lensZoom = 0.4; // how much the glass magnifies, 0 is flat
-    var lensVignette = 0; // darkens the corners of the section, 0 to 1
-    var lensShimmer = true; // animates the ring
-
-    // Intro: once the text is in, every image grows from nothing to fill its own place in the
-    // row, like the photos on the ECHO site: the middle one first, the neighbours just after
-    var introDelay = 1.6; // seconds after the page is ready, so the text comes first
-    var introDuration = 1.1; // seconds for one image to grow
-    var introEase = 'expo.out';
-    var introSpread = 0.09; // delay per panel away from the middle, as a share of the intro (about 0.1 s, like the cards on home-v4)
-    var introCaptionDelay = 0.6; // the caption follows after this many seconds
-
-    // Autoplay: the row rolls left on its own and pauses while you touch it
-    var autoDrift = 26; // px per second, 0 switches it off
-    var driftResume = 1.2; // seconds of quiet after a drag or wheel before it rolls again
-    var clickHold = 3.5; // seconds a clicked panel stays in the middle before the row rolls on
-    var driftEase = 0.12;
-
-    // Finer shader detail, rarely worth touching
-    var lensNovaSize = 12;
-    var lensShimmerFreq = 12;
-    var lensShimmerSpeed = 3.5;
-    var lensShimmerDepth = 0.12;
-    var lensRimStart = 0.578;
-    var lensRimFreq1 = 2;
-    var lensRimFreq2 = 1;
-    var lensRimLinePos = 0.488;
-    var lensRimLineWidth = 0.003;
-    var lensVignetteSize = 0.3;
-    var lensSamples = 16;
-
-    var textureDetail = 1.5; // texture resolution over the size it is drawn at
-    var panelWidthMax = 0.78; // the widest image never passes this share of the section width
-    var panelWidthMaxNarrow = 0.94;
-    var narrowBreakpoint = 768;
-
-    // The wheel (home-v5, Rimbo: "steal everything from V3, apply the liquid effect to that"): with
-    // data-glass-carousel-arc="29.5" (degrees per panel) on the wrapper the row becomes Osmo's radial wheel inside
-    // the canvas — the panels sit on a circle whose hub is arcRadius panel heights below the middle panel, each
-    // turned to face out — and the lens refracts the whole wheel. The scroll model is unchanged (px along the rim
-    // map to degrees), so drag, mouse wheel, snap and click work as on the row. V3's numbers are the defaults:
-    var arcRadius = 2.5; // hub distance in panel heights (V3: 300% of the card height from its top = 2.5 from its centre)
-    var arcNarrow = 14; // below 768px: degrees per panel, hub distance and panel width (V3's phone wheel)
-    var arcRadiusNarrow = 4.25;
-    var panelWidthNarrowWheel = 0.62;
-    // The wheel's opening, V3's (Rimbo, 2026-11-05: "look at V3: the first one comes in, followed by the rest; in V5
-    // you see them all at once spinning"): every panel starts hidden and the wheel rolls one full loop from the
-    // reveal, so each panel comes in from the right exactly once and is shown the moment it comes round past
-    // entryDeg (still off screen). The roll's extra speed falls off as the square of the time left over arcRollDuration
-    // (quick at first, a long gentle tail) into the drift, so the wheel never stops: the roll becomes the loop. A hand
-    // on the wheel ends the roll where it is and fades the rest in. ?rollin=N rolls N degrees instead of one loop
-    // (data-glass-carousel-rollin), ?roll=S (-roll) the seconds. ?rollin=0 is the rejected fly-in below.
-    var arcRollIn = -1; // degrees for the roll-in; -1 = one full loop (every panel once); 0 = the fly-in
-    var arcRollDuration = 6; // seconds until the roll's extra speed is gone and the drift alone carries on
-    var entryDeg = 100; // a panel this far round on the right is off screen on every layout: shown there, it arrives unseen
-    var flyDuration = 0.9; // s, the first card's slide (the ?rollin=0 opening, rejected on V5 and V3)
-    var fillStart = 0.5; // s after the first card sets off, the others begin to grow in
-    var fillStagger = 0.1; // s per card away from the top
-    var fillDuration = 0.8; // s for one card to grow
-    var arcDrift = 3; // degrees a second at rest, the same way round as the opening (0 = off; replaces autoDrift on the wheel); it eases up to speed over about a second and a half
-    var arcStep = 0; // seconds between stepped turns of one card (V4's "1, 2, 3" clock) instead of the drift; 0 = drift (?step=3.5 to try)
-    var arcSpin = 24; // degrees the wheel turns while the hero scrolls away, back again on the way up (0 = off)
-    var panelCorner = 0.5; // rounded corners, vw (V3's cards: .5vw); 0 = square
-    var panelBorder = 1; // hairline rim in px (V3: 1px rgba(248,245,238,.14)); 0 = none
-    var panelBorderColor = '#f8f5ee';
-    var panelBorderAlpha = 0.14;
-
-    var repeats = 4;
-    var ease = 0.09;
-    var wheelSpeed = 1.4;
-    var dragSpeed = 1.6;
-    var touchSpeed = 1;
-    var touchEase = 0.22;
-    var friction = 0.865;
-    var snapIdle = 120;
-    var snapEase = 0.14; // quick enough to actually arrive before anything else moves the row
-    var shrinkMax = 60;
-    var shrinkAttack = 0.25;
-    var shrinkDecay = 0.06;
-    var clickSlop = 6;
-    var touchClickSlop = 12;
-    var flickIdle = 90;
-
-    var vertexShader = [
-      'varying vec2 vUv;',
-      'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
-    ].join('\n');
-
-    var fragmentShader = [
-      '#define PI 3.14159265',
-      'precision highp float;',
-      'varying vec2 vUv;',
-      'uniform sampler2D uTex;',
-      'uniform vec2  uRes;',
-      'uniform vec2  uCenter;',
-      'uniform float uSizeX;',
-      'uniform float uSizeY;',
-      'uniform float uAspect;',
-      'uniform float uZoom;',
-      'uniform float uDispersion;',
-      'uniform float uGlow;',
-      'uniform float uWhiteGlow;',
-      'uniform float uNovaSize;',
-      'uniform float uBlueRing;',
-      'uniform float uRingRadius;',
-      'uniform float uRingWidth;',
-      'uniform float uShimmer;',
-      'uniform float uShimmerFreq;',
-      'uniform float uShimmerSpeed;',
-      'uniform float uShimmerDepth;',
-      'uniform float uTime;',
-      'uniform float uRimStart;',
-      'uniform float uRimTangential;',
-      'uniform float uRimFreq1;',
-      'uniform float uRimFreq2;',
-      'uniform vec3  uBlueColor;',
-      'uniform float uRimLine;',
-      'uniform float uRimLinePos;',
-      'uniform float uRimLineWidth;',
-      'uniform float uVignette;',
-      'uniform float uVignetteSize;',
-      'uniform float uRotation;',
-      'uniform int   uSamples;',
-      'const int MAX_SAMPLES = 16;',
-      'vec3 discLens(vec2 center, float aspectCorrect, out float outA) {',
-      '  vec2 p = (vUv - center);',
-      '  p.x *= aspectCorrect;',
-      '  float ca = cos(uRotation), sa = sin(uRotation);',
-      '  p = mat2(ca, -sa, sa, ca) * p;',
-      '  vec2 halfSize = vec2(uSizeX, uSizeY);',
-      '  float dist = length(p / halfSize);',
-      '  outA = 0.0;',
-      '  float maskND = dist;',
-      '  if (maskND > 1.0) return vec3(0.0);',
-      '  float shapeND = clamp(maskND, 0.0, 1.0);',
-      '  float nd = clamp(dist, 0.0, 1.0);',
-      '  vec2  offset = vUv - center;',
-      '  vec2  radialDir = normalize(offset + 1e-6);',
-      '  vec2  tangentDir = vec2(-radialDir.y, radialDir.x);',
-      '  float angle = atan(p.y, p.x);',
-      '  float pull = uZoom * 0.30 * (nd * nd);',
-      '  float rimStrength = smoothstep(uRimStart, 1.0, nd);',
-      '  float fluidWave = sin(angle * uRimFreq1) * 0.55 + sin(angle * uRimFreq2) * 0.25;',
-      '  float rScreen = (uSizeX + uSizeY) * 0.5;',
-      '  vec2  rimOff = tangentDir * fluidWave * rimStrength * rScreen * uRimTangential;',
-      '  vec2 baseUV = center + offset * (1.0 - pull) + rimOff;',
-      '  float rimMask = smoothstep(0.55, 1.0, nd);',
-      '  vec2  dispDir = offset * uDispersion * 0.004 * rimMask;',
-      '  int N = uSamples;',
-      '  if (N < 2) N = 2;',
-      '  if (N > MAX_SAMPLES) N = MAX_SAMPLES;',
-      '  vec3 col = vec3(0.0);',
-      '  vec3 caW = vec3(0.0);',
-      '  for (int i = 0; i < MAX_SAMPLES; i++) {',
-      '    if (i >= N) break;',
-      '    float t = float(i) / float(N - 1);',
-      '    vec2 sUV = baseUV + dispDir * (t - 0.5);',
-      '    vec3 s = texture2D(uTex, sUV).rgb;',
-      '    vec3 w = vec3(',
-      '      exp(-pow((t - 0.00) / 0.38, 2.0)),',
-      '      exp(-pow((t - 0.50) / 0.38, 2.0)),',
-      '      exp(-pow((t - 1.00) / 0.38, 2.0))',
-      '    );',
-      '    col += s * w;',
-      '    caW += w;',
-      '  }',
-      '  col /= max(caW, vec3(0.001));',
-      '  col *= mix(0.91, 1.0, smoothstep(0.0, 0.38, shapeND));',
-      '  float r2 = shapeND * shapeND * 0.25;',
-      '  float gs = max(uNovaSize * uGlow * 0.003, 0.004);',
-      '  float nova = exp(-r2 / gs) + exp(-r2 / (gs * 7.0)) * 0.18;',
-      '  nova *= uWhiteGlow * (uGlow / 17.0) * 1.15;',
-      '  col += vec3(nova);',
-      '  float dC = shapeND * 0.5;',
-      '  float tR = clamp(uRingRadius, 0.1, 0.49);',
-      '  float rW = max(uRingWidth, 0.003);',
-      '  float ring = exp(-pow((dC - tR) / rW, 2.0));',
-      '  ring *= uBlueRing * (uGlow / 17.0) * 1.8;',
-      '  if (uShimmer > 0.5) ring *= sin(angle * uShimmerFreq + uTime * uShimmerSpeed) * uShimmerDepth + (1.0 - uShimmerDepth);',
-      '  float ringAura = exp(-pow((dC - tR) / (rW * 6.0), 2.0)) * 0.28 * uBlueRing * (uGlow / 17.0);',
-      '  col += uBlueColor * (ring + ringAura);',
-      '  col += vec3(exp(-pow((dC - uRimLinePos) / max(uRimLineWidth, 0.0001), 2.0)) * uRimLine);',
-      '  outA = smoothstep(1.0, 0.93, maskND);',
-      '  return col;',
-      '}',
-      'void main(){',
-      '  vec3 base = texture2D(uTex, vUv).rgb;',
-      '  vec3 outc = base;',
-      '  float a = 0.0;',
-      '  vec3 c = discLens(uCenter, uAspect, a);',
-      '  outc = mix(outc, c, a);',
-      '  if (uVignette > 0.001) {',
-      '    vec2 vc = vUv - 0.5;',
-      '    vc.x *= uAspect;',
-      '    float d = length(vc) / max(uVignetteSize, 0.0001);',
-      '    float vig = 1.0 - uVignette * smoothstep(0.5, 1.0, d);',
-      '    outc *= clamp(vig, 0.0, 1.0);',
-      '  }',
-      '  gl_FragColor = vec4(outc, 1.0);',
-      '}'
-    ].join('\n');
-
-    // The lens pass copies the render target straight to the screen, so everything that goes
-    // into that render target must already be in screen colour: the clear colour, the
-    // textures and the ring colour are all kept as-is instead of being converted to linear.
-    // That is what makes the canvas black the same black as the page.
-    function screenColor(css) {
-      return new THREE.Color().setStyle(css, THREE.LinearSRGBColorSpace);
-    }
-
-    function backgroundOf(element) {
-      var node = element;
-      while (node && node !== document.documentElement) {
-        var color = getComputedStyle(node).backgroundColor;
-        if (color && color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
-        node = node.parentElement;
-      }
-      return '#ffffff';
-    }
-
-    function setupInstance(wrapper) {
-      var mount = wrapper.querySelector('[data-glass-carousel-canvas]');
-      var items = Array.from(wrapper.querySelectorAll('[data-glass-carousel-item]'));
-      if (!mount || !items.length) return null;
-      if (wrapper.getAttribute('data-glass-carousel') === 'canvas') return null;
-
-      var captionEl = wrapper.querySelector('[data-glass-carousel-caption]');
-      var counterEl = wrapper.querySelector('[data-glass-carousel-counter]');
-
-      var total = items.length;
-      var W = Math.max(1, mount.clientWidth);
-      var H = Math.max(1, mount.clientHeight);
-      var narrow = W < narrowBreakpoint;
-      var panelH = 0;
-      // Per-section overrides, set as attributes on the wrapper:
-      // data-glass-carousel-height="0.46" (share of the section) and data-glass-carousel-intro-delay="0.4" (s)
-      var panelShare = parseFloat(wrapper.getAttribute('data-glass-carousel-height')) || panelHeight;
-      var introWait = parseFloat(wrapper.getAttribute('data-glass-carousel-intro-delay'));
-      if (isNaN(introWait)) introWait = introDelay;
-      // data-glass-carousel-intro-event="name": the intro also waits for that window event (a page loader, say).
-      // The section itself fires "glass-carousel:ready" on window once its first texture is in.
-      // data-glass-carousel-start="right": the first item begins at the right edge instead of the
-      // middle, so with the row rolling left it crosses the whole screen before it leaves
-      var startEdge = wrapper.getAttribute('data-glass-carousel-start') || 'center';
-      // The wheel: data-glass-carousel-arc (degrees per panel) switches it on; -radius, -width (panel width as a share
-      // of the canvas width), -arc-narrow, -radius-narrow, -width-narrow, -rollin, -drift and -spin override the
-      // settings above, and ?rollin= ?drift= ?spin= on the URL win while tuning (0 switches one off)
-      var attrNum = function (name, fallback) { var v = parseFloat(wrapper.getAttribute('data-glass-carousel-' + name)); return isNaN(v) ? fallback : v; };
-      var urlNum = function (name, fallback) { var m = new RegExp('[?&]' + name + '=(-?[\\d.]+)').exec(location.search); return m ? parseFloat(m[1]) : fallback; };
-      var arc = attrNum('arc', 0), arcDegNarrow = attrNum('arc-narrow', arcNarrow);
-      var radiusShare = attrNum('radius', arcRadius), radiusShareNarrow = attrNum('radius-narrow', arcRadiusNarrow);
-      var widthShare = attrNum('width', 0), widthShareNarrow = attrNum('width-narrow', arc ? panelWidthNarrowWheel : 0);
-      var rollInDeg = urlNum('rollin', attrNum('rollin', arcRollIn)), driftDeg = urlNum('drift', attrNum('drift', arcDrift)), spinDeg = urlNum('spin', attrNum('spin', arcSpin));
-      var stepEvery = urlNum('step', attrNum('step', arcStep));
-      if (!arc) rollInDeg = driftDeg = spinDeg = stepEvery = 0;
-      if (stepEvery > 0) driftDeg = 0; // the stepped turn replaces the drift
-      var opening = false, introStart = 0; // the wheel's own opening (the fly-in and the fill), while it runs
-      var expoOut = gsap.parseEase('expo.out');
-      var driftV = 0, lastStep = 0;
-      var hero = wrapper.closest('[data-band]') || wrapper.parentElement; // the spin follows this element scrolling away
-      var arcDeg = function () { return narrow ? arcDegNarrow : arc; };
-      var hubRadius = function () { return (narrow ? radiusShareNarrow : radiusShare) * panelH; };
-      var pxPerDeg = function () { return (totalWidth / Math.max(1, total)) / Math.max(1, arcDeg()); }; // one slot along the rim is one arc
-      var rollDur = Math.max(0.1, urlNum('roll', attrNum('roll', arcRollDuration)));
-      var rolling = false, rollWait = 0, rollLeft = 0, rollExtra = 0, rollFresh = false; // the roll-in: extra speed on the scroll model itself
-      var rollEnded = !(arc && rollInDeg !== 0); // until the roll has ended (or there is none) the panels wait hidden for their turn
-      var spinOffset = 0;
-      var introEvent = wrapper.getAttribute('data-glass-carousel-intro-event');
-      var introEventFired = !introEvent;
-      if (introEvent) {
-        rdOn(window, introEvent, function () { introEventFired = true; queueIntro(); }, { once: true });
-      }
-
-      var renderer;
-      try {
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, canvas: mount });
-      } catch (err) {
-        return null; // no webgl, the authored list stays as it is
-      }
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(W, H, false);
-      renderer.setClearColor(screenColor(backgroundOf(wrapper)), 1);
-
-      var scene = new THREE.Scene();
-      var camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, -100, 100);
-      camera.position.z = 10;
-
-      var maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
-
-      // An item's picture is an <img>, or a muted looping <video> for a moving panel
-      var sources = items.map(function (item) {
-        var media = item.querySelector('[data-glass-carousel-image]') || item.querySelector('video, img');
-        return {
-          tex: null,
-          aspect: 1,
-          image: media,
-          video: media && media.tagName === 'VIDEO',
-          entered: true, // the wheel's roll-in hides every clip until its panel comes round
-          fadeFrom: 0
-        };
-      });
-
-      var loader = new THREE.TextureLoader();
-      loader.setCrossOrigin('anonymous');
-
-      // Intro state: 0 = nothing there yet, 1 = every image at full size
-      var intro = { value: 0 };
-      var introStarted = false;
-      var introDone = false;
-      var introQueued = false;
-      var textureReady = false;
-      var readyAt = performance.now();
-      if (captionEl) gsap.set(captionEl, { autoAlpha: 0 });
-      if (counterEl) gsap.set(counterEl, { autoAlpha: 0 });
-
-      function startIntro() {
-        if (introStarted) return;
-        introStarted = true;
-        var finish = function () {
-          intro.value = 1;
-          introDone = true;
-          opening = false;
-          lastStep = performance.now(); // the first stepped turn comes stepEvery after the opening
-          lensStrength();
-          window.dispatchEvent(new CustomEvent('glass-carousel:intro-done', { detail: { wrapper: wrapper } }));
-        };
-        var wheelOpening = arc && !rollInDeg;
-        if (arc && rollInDeg) { // the roll-in: one loop (or rollInDeg degrees) of extra speed on top of the drift, the panels shown as they come round
-          var rollPx = rollInDeg < 0 ? totalWidth : rollInDeg * pxPerDeg();
-          var driftNow = driftDeg * pxPerDeg();
-          rolling = true; rollFresh = true;
-          rollWait = 0.15; rollLeft = rollDur;
-          rollExtra = Math.max(0, 3 * (rollPx - driftNow * rollDur) / rollDur);
-          driftV = driftNow; // sets off at full drift speed, so the roll's tail runs straight into the loop
-          sources.forEach(function (src) { src.entered = false; src.fadeFrom = 0; }); // per clip: the same clip's other copies sit a loop away, off screen
-          pool.forEach(function (p) { p.prevTheta = undefined; });
-        }
-        if (wheelOpening) { // the first card flies in, the rest fill in (drawn in layout from introStart); done once the farthest card is in
-          opening = true;
-          introStart = performance.now();
-          var rings = Math.ceil(108 / Math.max(1, arcDeg())); // cards each side that are on screen at all
-          gsap.delayedCall(fillStart + rings * fillStagger + fillDuration + 0.05, finish);
-        }
-        gsap.to(intro, { // the lens opens with the first card
-          value: 1,
-          duration: introDuration,
-          ease: introEase,
-          onComplete: function () { if (!wheelOpening) finish(); }
-        });
-        gsap.to([captionEl, counterEl].filter(Boolean), {
-          autoAlpha: 1, duration: 0.8, ease: 'power2.out', delay: introCaptionDelay, overwrite: true
-        });
-      }
-
-      function rollDone() { // the roll's extra speed is spent, or a hand took the wheel: whatever is still hidden fades in where it is
-        rolling = false; rollEnded = true; rollLeft = 0;
-        var now = performance.now();
-        sources.forEach(function (src) { if (!src.entered) { src.entered = true; src.fadeFrom = now; } });
-      }
-
-      // The pop waits for two things: the first texture, and introDelay seconds after the page was ready
-      function queueIntro() {
-        if (introQueued || !textureReady || !introEventFired) return;
-        introQueued = true;
-        var wait = Math.max(0, introWait - (performance.now() - readyAt) / 1000);
-        gsap.delayedCall(wait, startIntro);
-      }
-
-      function fitToPanel(image) {
-        var cap = Math.round(panelH * Math.min(window.devicePixelRatio || 1, 2) * textureDetail);
-        var height = image.naturalHeight || image.height;
-        var width = image.naturalWidth || image.width;
-        if (!height || height <= cap) return image;
-        var scaled = document.createElement('canvas');
-        scaled.width = Math.max(1, Math.round(width * (cap / height)));
-        scaled.height = cap;
-        scaled.getContext('2d').drawImage(image, 0, 0, scaled.width, scaled.height);
-        return scaled;
-      }
-
-      function adoptVideo(source) {
-        var video = source.image;
-        if (!video.videoWidth || !video.videoHeight || source.tex) return;
-        source.aspect = video.videoWidth / video.videoHeight;
-        measurePanel();
-        var tex = new THREE.VideoTexture(video);
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        tex.generateMipmaps = false;
-        tex.anisotropy = maxAnisotropy;
-        tex.colorSpace = THREE.NoColorSpace; // screen colour in, screen colour out
-        source.tex = tex;
-        recomputeTotal();
-        if (!userInteracted && !introStarted) {
-          scroll = startScroll();
-          target = scroll;
-        }
-        video.muted = true;
-        video.loop = true;
-        video.playsInline = true;
-        var playing = video.play();
-        if (playing && playing.catch) playing.catch(function () {});
-        markReady();
-      }
-
-      function markReady() {
-        if (!textureReady) {
-          textureReady = true;
-          window.dispatchEvent(new CustomEvent('glass-carousel:ready', { detail: { wrapper: wrapper } }));
-        }
-        queueIntro();
-      }
-
-      function adoptTexture(source) {
-        if (source.video) return adoptVideo(source);
-        var image = source.image;
-        if (!image || source.adopted) return;
-        if (!image.naturalWidth || !image.naturalHeight) { // not decoded yet: come back when it is
-          if (!source.waiting) {
-            source.waiting = true;
-            waitForImage(image, function () { source.waiting = false; adoptTexture(source); });
-          }
-          return;
-        }
-        source.adopted = true;
-        source.aspect = image.naturalWidth / image.naturalHeight;
-        measurePanel();
-        var url = image.currentSrc || image.src;
-        loader.load(url, function (tex) {
-          source.full = tex.image; // kept, so the texture can be refitted when the section grows
-          tex.image = fitToPanel(tex.image);
-          tex.minFilter = THREE.LinearMipmapLinearFilter;
-          tex.magFilter = THREE.LinearFilter;
-          tex.generateMipmaps = true;
-          tex.anisotropy = maxAnisotropy;
-          tex.colorSpace = THREE.NoColorSpace; // screen colour in, screen colour out
-          tex.needsUpdate = true;
-          source.tex = tex;
-          measurePanel();
-          recomputeTotal();
-          if (!userInteracted && !introStarted) { // before anything is visible; never yank a moving row back
-            scroll = startScroll();
-            target = scroll;
-          }
-          // The first texture is in: the panels have something to show
-          markReady();
-        }, undefined, function () {
-          console.warn('Glass Carousel: image failed to load', url);
-        });
-      }
-
-      // "load" alone is not enough: an <img> can report complete while its size is still 0,
-      // and a cached one may never fire load again. decode() settles both cases.
-      function waitForImage(image, done) {
-        var called = false;
-        var once = function () { if (!called) { called = true; done(); } };
-        image.addEventListener('load', once, { once: true });
-        if (image.decode) image.decode().then(once, function () {}); // a failed decode leaves it to the load/error path
-      }
-
-      function bindTextures() {
-        sources.forEach(function (source) {
-          if (!source.image) return;
-          if (source.video) {
-            var video = source.image;
-            video.muted = true; // a muted video may start on its own, and play() makes the browser load it
-            video.loop = true;
-            video.playsInline = true;
-            if (video.readyState >= 2) adoptVideo(source);
-            else video.addEventListener('loadeddata', function () { adoptVideo(source); }, { once: true });
-            video.addEventListener('error', function () { console.warn('Glass Carousel: video failed to load', video.currentSrc); }, { once: true });
-            var kick = video.play();
-            if (kick && kick.catch) kick.catch(function () {});
-            return;
-          }
-          if (source.image.complete && source.image.naturalWidth) adoptTexture(source);
-          else waitForImage(source.image, function () { adoptTexture(source); });
-        });
-      }
-
-      function measurePanel() {
-        var widest = 1;
-        for (var i = 0; i < sources.length; i++) widest = Math.max(widest, sources[i].aspect);
-        var phone = W < narrowBreakpoint;
-        panelGap = phone ? panelGapNarrow : 40;
-        var widthNow = phone ? (widthShareNarrow || widthShare) : widthShare;
-        panelH = widthNow
-          ? (W * widthNow) / widest // the widest panel is exactly that share of the canvas width (V3's 30vw cards)
-          : Math.min(H * (phone ? Math.max(panelShare, panelHeightNarrow) : panelShare), (W * (phone ? panelWidthMaxNarrow : panelWidthMax)) / widest);
-        wrapper.style.setProperty('--glass-carousel-panel', Math.round(panelH) + 'px'); // the CSS puts the caption under the row
-        if (panelCorner) makeMask();
-      }
-      measurePanel();
-
-      function slotWidth(index) {
-        return sources[index].aspect * panelH + panelGap;
-      }
-
-      var offsets = [];
-      var totalWidth = 0;
-      function recomputeTotal() {
-        offsets = [];
-        var acc = 0;
-        for (var i = 0; i < sources.length; i++) {
-          offsets.push(acc);
-          acc += slotWidth(i);
-        }
-        totalWidth = acc;
-      }
-      recomputeTotal();
-
-      function slotCenter(index) {
-        return offsets[index] + slotWidth(index) / 2 - panelGap / 2;
-      }
-
-      function centerForIndex(index) {
-        var loop = Math.floor(index / total);
-        var s = ((index % total) + total) % total;
-        return slotCenter(s) + loop * totalWidth;
-      }
-
-      // where the row starts: the first item in the middle, or just inside the right/left edge
-      function startScroll() {
-        var w = sources[0].aspect * panelH;
-        if (startEdge === 'right') return centerForIndex(0) - (W / 2 - w / 2 - panelGap);
-        if (startEdge === 'left') return centerForIndex(0) + (W / 2 - w / 2 - panelGap);
-        return centerForIndex(0);
-      }
-
-      function nearestIndex(value) {
-        if (!totalWidth) return 0;
-        var best = 0;
-        var bestDist = Infinity;
-        for (var i = 0; i < total; i++) {
-          var center = slotCenter(i);
-          var k = Math.round((value - center) / totalWidth);
-          var dist = Math.abs(center + k * totalWidth - value);
-          if (dist < bestDist) {
-            bestDist = dist;
-            best = i + k * total;
-          }
-        }
-        return best;
-      }
-
-      function sourceIndex(value) {
-        return ((nearestIndex(value) % total) + total) % total;
-      }
-
-      var panelGeometry = new THREE.PlaneGeometry(1, 1);
-      // V3's cards have rounded corners and a hairline rim: every panel gets a rounded-rectangle alpha mask (redrawn
-      // whenever the panel size changes, so the corner stays panelCorner vw) and a slightly larger plane behind it
-      // in the rim colour, which shows only along the edge
-      var maskTex = null;
-      function makeMask() {
-        var aspect = sources[0] ? sources[0].aspect : 1;
-        var w = Math.max(2, panelH * aspect), tw = 256, th = Math.max(2, Math.round(tw / aspect));
-        var c = document.createElement('canvas'); c.width = tw; c.height = th;
-        var g = c.getContext('2d');
-        g.fillStyle = '#000'; g.fillRect(0, 0, tw, th);
-        var r = Math.min(tw / 2, th / 2, (panelCorner * window.innerWidth / 100) * (tw / w));
-        g.fillStyle = '#fff'; g.beginPath();
-        g.moveTo(r, 0); g.lineTo(tw - r, 0); g.arcTo(tw, 0, tw, r, r); g.lineTo(tw, th - r); g.arcTo(tw, th, tw - r, th, r);
-        g.lineTo(r, th); g.arcTo(0, th, 0, th - r, r); g.lineTo(0, r); g.arcTo(0, 0, r, 0, r); g.closePath(); g.fill();
-        if (!maskTex) { maskTex = new THREE.CanvasTexture(c); maskTex.colorSpace = THREE.NoColorSpace; }
-        else { maskTex.image = c; maskTex.needsUpdate = true; }
-      }
-      if (panelCorner) makeMask();
-      var pool = [];
-      for (var r = 0; r < repeats; r++) {
-        for (var i = 0; i < total; i++) {
-          var rim = null;
-          if (panelBorder) {
-            rim = new THREE.Mesh(panelGeometry, new THREE.MeshBasicMaterial({ color: screenColor(panelBorderColor), transparent: true, opacity: panelBorderAlpha, alphaMap: maskTex, depthWrite: false }));
-            rim.visible = false;
-            scene.add(rim);
-          }
-          var mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, alphaMap: maskTex });
-          var mesh = new THREE.Mesh(panelGeometry, mat);
-          mesh.visible = false;
-          scene.add(mesh);
-          pool.push({ mesh: mesh, mat: mat, rim: rim, srcIndex: i, bound: false, prevTheta: undefined });
-        }
-      }
-
-      var scroll = startScroll();
-      var target = scroll;
-      var userInteracted = false;
-      var velocity = 0;
-      var prevScroll = 0;
-      var scrollEnergy = 0;
-      var lastInput = performance.now();
-      var holdUntil = 0; // after a click, the drift waits until this time
-      var snapped = false;
-      var lastCenter = -1;
-
-      var dpr = renderer.getPixelRatio() || 1;
-      var bufferW = function () { return Math.max(1, Math.round(W * dpr)); };
-      var bufferH = function () { return Math.max(1, Math.round(H * dpr)); };
-      var rt = new THREE.WebGLRenderTarget(bufferW(), bufferH());
-      var lensScene = new THREE.Scene();
-      var lensCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      var lensUniforms = {
-        uTex: { value: rt.texture },
-        uRes: { value: new THREE.Vector2(bufferW(), bufferH()) },
-        uCenter: { value: new THREE.Vector2(0.5, 0.5) },
-        uSizeX: { value: (narrow ? lensWidthNarrow : lensWidth) * (W / H) },
-        uSizeY: { value: (narrow ? lensHeightNarrow : lensHeight) * (W / H) },
-        uRotation: { value: 0 },
-        uAspect: { value: W / H },
-        uZoom: { value: lensZoom },
-        uDispersion: { value: lensDispersion },
-        uGlow: { value: lensGlow },
-        uWhiteGlow: { value: lensNova },
-        uNovaSize: { value: lensNovaSize },
-        uBlueRing: { value: lensRing },
-        uRingRadius: { value: lensRingRadius },
-        uRingWidth: { value: lensRingWidth },
-        uShimmer: { value: lensShimmer ? 1 : 0 },
-        uShimmerFreq: { value: lensShimmerFreq },
-        uShimmerSpeed: { value: lensShimmerSpeed },
-        uShimmerDepth: { value: lensShimmerDepth },
-        uTime: { value: 0 },
-        uRimStart: { value: lensRimStart },
-        uRimTangential: { value: lensRimWave },
-        uRimFreq1: { value: lensRimFreq1 },
-        uRimFreq2: { value: lensRimFreq2 },
-        uBlueColor: { value: screenColor(lensColor) },
-        uRimLine: { value: lensRimLine },
-        uRimLinePos: { value: lensRimLinePos },
-        uRimLineWidth: { value: lensRimLineWidth },
-        uVignette: { value: lensVignette },
-        uVignetteSize: { value: lensVignetteSize },
-        uSamples: { value: lensSamples }
-      };
-      var lensMat = new THREE.ShaderMaterial({ uniforms: lensUniforms, vertexShader: vertexShader, fragmentShader: fragmentShader });
-      var lensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lensMat);
-      lensScene.add(lensQuad);
-
-      function lensSize() {
-        lensUniforms.uSizeX.value = (narrow ? lensWidthNarrow : lensWidth) * (W / H);
-        lensUniforms.uSizeY.value = (narrow ? lensHeightNarrow : lensHeight) * (W / H);
-      }
-
-      // The lens is already in its place, but invisible on the empty canvas: its ring, glow,
-      // refraction and colour split come up together with the images
-      function lensStrength() {
-        var f = introDone ? 1 : gsap.utils.clamp(0, 1, intro.value);
-        lensUniforms.uBlueRing.value = lensRing * f;
-        lensUniforms.uRimLine.value = lensRimLine * f;
-        lensUniforms.uWhiteGlow.value = lensNova * f;
-        lensUniforms.uDispersion.value = lensDispersion * f;
-        lensUniforms.uZoom.value = lensZoom * f;
-        lensUniforms.uRimTangential.value = lensRimWave * f;
-      }
-
-      function refitTextures() { // the section was smaller (even 0 x 0) when the textures were made
-        var cap = Math.round(panelH * Math.min(window.devicePixelRatio || 1, 2) * textureDetail);
-        sources.forEach(function (source) {
-          if (!source.tex || !source.full) return;
-          var current = source.tex.image.height || 0;
-          if (current >= cap || current >= source.full.height) return;
-          source.tex.image = fitToPanel(source.full);
-          source.tex.needsUpdate = true;
-        });
-      }
-
-      function applyLook() {
-        renderer.setClearColor(screenColor(backgroundOf(wrapper)), 1);
-        var active = sourceIndex(scroll);
-        measurePanel();
-        refitTextures();
-        recomputeTotal();
-        scroll = centerForIndex(active);
-        target = scroll;
-        lensUniforms.uAspect.value = W / H;
-        lensSize();
-        lensUniforms.uRotation.value = ((narrow ? lensRotationNarrow : lensRotation) * Math.PI) / 180;
-      }
-
-      var panelRects = [];
-      var centeredPanel = null;
-
-      function layout() {
-        panelRects = [];
-        centeredPanel = null;
-        var centeredDist = Infinity;
-        var half = W / 2;
-        var buffer = panelH;
-        var view = scroll + spinOffset; // what is seen: the scroll model plus the scroll turn
-        var nowL = performance.now();
-        var degPx = arc ? pxPerDeg() : 0, radius = arc ? hubRadius() : 0;
-        var reach = arc ? Math.PI * 0.6 * degPx * 180 / Math.PI : 0; // beyond ~108° a panel is under the hub
-
-        pool.forEach(function (p, poolIdx) {
-          var rep = Math.floor(poolIdx / total);
-          var i = p.srcIndex;
-          var src = sources[i];
-
-          var x = slotCenter(i) - view;
-          x = ((x % totalWidth) + totalWidth) % totalWidth;
-          x += (rep - Math.floor(repeats / 2)) * totalWidth;
-          if (x > half + totalWidth) x -= totalWidth * repeats;
-
-          var centerX = x;
-          if (arc ? Math.abs(centerX) > reach : (centerX < -half - buffer || centerX > half + buffer)) {
-            p.mesh.visible = false;
-            if (p.rim) p.rim.visible = false;
-            return;
-          }
-
-          // Intro: the row expands from the middle — every image starts as a point at the centre and slides
-          // out to its own place while it grows, the middle one first and its neighbours following (like the
-          // cards on home-v4). While they still overlap, the ones nearer the middle draw in front.
-          // (The wheel rolls in instead: full-size panels, the roll-in offset above.)
-          var grow = 1, depth = 0;
-          if (!introDone && !arc) {
-            var ring = Math.round(Math.abs(centerX) / Math.max(1, totalWidth / total));
-            grow = gsap.utils.clamp(0, 1, (intro.value - ring * introSpread) / Math.max(0.05, 1 - ring * introSpread));
-            centerX *= grow;
-            depth = -ring * 0.01;
-          }
-
-          var shrink = (1 - 0.25 * scrollEnergy) * grow;
-          var h = panelH * shrink;
-          var w = src.aspect * panelH * shrink;
-
-          if (src.tex && !p.bound) {
-            p.mat.map = src.tex;
-            p.mat.color.set(0xffffff);
-            p.mat.needsUpdate = true;
-            p.bound = true;
-          }
-
-          // on the wheel the rim position becomes an angle from the top: the panel sits on the circle and faces out
-          var cx = centerX, cy = 0, tilt = 0;
-          if (arc) {
-            tilt = (centerX / degPx) * Math.PI / 180;
-            cx = Math.sin(tilt) * radius;
-            cy = Math.cos(tilt) * radius - radius;
-          }
-          if (arc && opening) { // the opening: the top card slides straight in from beyond the right edge, the others grow in at their places
-            var tOpen = (performance.now() - introStart) / 1000;
-            var ringO = Math.round(Math.abs(x) / Math.max(1, totalWidth / total));
-            if (ringO === 0) {
-              var e1 = expoOut(gsap.utils.clamp(0, 1, tOpen / flyDuration));
-              var fromX = half + w / 2 + 40;
-              cx = fromX + (cx - fromX) * e1;
-              cy *= e1;
-              tilt *= e1;
-            } else {
-              var e2 = expoOut(gsap.utils.clamp(0, 1, (tOpen - fillStart - (ringO - 1) * fillStagger) / fillDuration));
-              if (e2 <= 0) { p.mesh.visible = false; if (p.rim) p.rim.visible = false; return; }
-              w *= e2;
-              h *= e2;
-            }
-          }
-          if (arc && !rollEnded) { // the roll-in: a clip is shown the moment its panel comes round past entryDeg on the right
-            var theta = centerX / degPx, was = p.prevTheta;
-            p.prevTheta = theta;
-            if (!src.entered) {
-              if (was === undefined) was = 9999; // first look: counts as arriving only if it is already round on the right
-              if (theta - was > 90) was = 9999; // wrapped from the far left to the far right this frame
-              var offRight = theta > 0 && theta <= entryDeg && (cx - (Math.abs(w / 2 * Math.cos(tilt)) + Math.abs(h / 2 * Math.sin(tilt))) >= half || -cy - (Math.abs(w / 2 * Math.sin(tilt)) + Math.abs(h / 2 * Math.cos(tilt))) >= H / 2);
-              if (rollFresh && offRight) src.entered = true; // already waiting off screen on the right: it comes in first
-              else if (was > entryDeg && theta <= entryDeg && theta > 0) src.entered = true;
-              if (!src.entered) { p.mesh.visible = false; if (p.rim) p.rim.visible = false; return; }
-            }
-          }
-          var alpha = 1;
-          if (src.fadeFrom) { alpha = gsap.utils.clamp(0, 1, (nowL - src.fadeFrom) / 500); if (alpha >= 1) src.fadeFrom = 0; }
-          if (p.mat.opacity !== alpha) p.mat.opacity = alpha;
-          if (p.rim && p.rim.material.opacity !== alpha * panelBorderAlpha) p.rim.material.opacity = alpha * panelBorderAlpha;
-          p.mesh.visible = true;
-          p.mesh.position.set(cx, cy, depth);
-          p.mesh.rotation.z = -tilt;
-          p.mesh.scale.set(w, h, 1);
-          if (p.rim) {
-            p.rim.visible = true;
-            p.rim.position.set(cx, cy, depth - 0.002);
-            p.rim.rotation.z = -tilt;
-            p.rim.scale.set(w + 2 * panelBorder, h + 2 * panelBorder, 1);
-          }
-
-          var sx = cx + W / 2;
-          var sy = H / 2 - cy;
-          var ex = Math.abs(w / 2 * Math.cos(tilt)) + Math.abs(h / 2 * Math.sin(tilt)); // the turned panel's box
-          var ey = Math.abs(w / 2 * Math.sin(tilt)) + Math.abs(h / 2 * Math.cos(tilt));
-          panelRects.push({
-            left: sx - ex,
-            right: sx + ex,
-            top: sy - ey,
-            bottom: sy + ey,
-            poolIdx: poolIdx,
-            srcIndex: i,
-            centerX: x
-          });
-
-          if (Math.abs(centerX) < centeredDist) {
-            centeredDist = Math.abs(centerX);
-            centeredPanel = { srcIndex: i, poolIdx: poolIdx };
-          }
-        });
-        rollFresh = false;
-      }
-
-      var el = mount;
-      wrapper.setAttribute('data-glass-carousel-wheel', wheel);
-
-      function rectOf(px, py) {
-        var bounds = el.getBoundingClientRect();
-        var x = px - bounds.left;
-        var y = py - bounds.top;
-        for (var i = 0; i < panelRects.length; i++) {
-          var r = panelRects[i];
-          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return r;
-        }
-        return null;
-      }
-
-      var dragging = false;
-      var dragPointerId = null;
-      var dragLastX = 0;
-      var dragDist = 0;
-      var dragVel = 0;
-      var dragMoveT = 0;
-      var suppressClick = false;
-      var dragPointerType = 'mouse';
-      var lastPointerX = NaN;
-      var lastPointerY = NaN;
-      var pointerInside = false;
-      var lastPointerType = 'mouse';
-      var pointerState = '';
-
-      function setPointer(v) {
-        if (v === pointerState) return;
-        pointerState = v;
-        wrapper.setAttribute('data-glass-carousel-pointer', v);
-      }
-
-      function setHover(on) {
-        setPointer(dragging ? 'grabbing' : on ? 'grab' : '');
-      }
-
-      var focusState = false;
-      function setFocus(on) { // the pointer rests on the centred panel
-        on = !!on;
-        if (on === focusState) return;
-        focusState = on;
-        if (on) wrapper.setAttribute('data-glass-carousel-focus', 'center');
-        else wrapper.removeAttribute('data-glass-carousel-focus');
-      }
-
-      function hoverAt(x, y) {
-        var hit = rectOf(x, y);
-        setHover(hit !== null);
-        setFocus(hit && centeredPanel && hit.poolIdx === centeredPanel.poolIdx);
-      }
-
-      function refreshHover() {
-        if (!pointerInside || lastPointerType !== 'mouse') return;
-        if (!Number.isFinite(lastPointerX)) return;
-        hoverAt(lastPointerX, lastPointerY);
-      }
-
-      function onWheel(e) {
-        if (wheel === 'off') return;
-        var sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-        if (wheel === 'horizontal' && !sideways) return;
-        e.preventDefault();
-        userInteracted = true;
-        target += (sideways ? e.deltaX : e.deltaY) * wheelSpeed;
-        lastInput = performance.now();
-        snapped = false;
-      }
-
-      function onPointerDown(e) {
-        suppressClick = false;
-        if (dragging) return;
-        if (e.button !== 0 && e.pointerType === 'mouse') return;
-        if (rolling) rollDone(); // a hand on the wheel ends the roll-in where it is and shows the rest
-        dragging = true;
-        dragPointerId = e.pointerId;
-        dragPointerType = e.pointerType || 'mouse';
-        try { el.setPointerCapture(e.pointerId); } catch (err) {}
-        dragLastX = e.clientX;
-        lastPointerX = e.clientX;
-        lastPointerY = e.clientY;
-        dragDist = 0;
-        dragVel = 0;
-        dragMoveT = performance.now();
-        setHover(false);
-        velocity = 0;
-        userInteracted = true;
-        snapped = false;
-        lastInput = dragMoveT;
-      }
-
-      function onPointerMove(e) {
-        if (dragging && e.pointerId === dragPointerId) {
-          var sens = dragPointerType === 'mouse' ? dragSpeed : touchSpeed;
-          var dx = e.clientX - dragLastX;
-          dragLastX = e.clientX;
-          dragDist += Math.abs(dx);
-          target -= dx * sens;
-          dragVel = dragVel * 0.6 + -dx * sens * 0.4;
-          dragMoveT = performance.now();
-          lastInput = dragMoveT;
-          snapped = false;
-        }
-        lastPointerX = e.clientX;
-        lastPointerY = e.clientY;
-        lastPointerType = e.pointerType || 'mouse';
-        pointerInside = true;
-        if (e.pointerType !== 'mouse') return;
-        hoverAt(e.clientX, e.clientY);
-      }
-
-      function onPointerUp(e) {
-        if (!dragging) return;
-        if (e && dragPointerId !== null && e.pointerId !== dragPointerId) return;
-        dragging = false;
-        if (dragPointerId !== null) {
-          try { el.releasePointerCapture(dragPointerId); } catch (err) {}
-          dragPointerId = null;
-        }
-        velocity = performance.now() - dragMoveT > flickIdle ? 0 : dragVel;
-        dragVel = 0;
-        lastInput = performance.now();
-        snapped = false;
-        suppressClick = dragDist > (dragPointerType === 'mouse' ? clickSlop : touchClickSlop);
-        if (dragPointerType === 'mouse') hoverAt(lastPointerX, lastPointerY);
-        else { setHover(false); setFocus(false); }
-      }
-
-      function onEnter(e) {
-        pointerInside = true;
-        lastPointerType = e.pointerType || 'mouse';
-      }
-
-      function onLeave() {
-        pointerInside = false;
-        setHover(false);
-        setFocus(false);
-      }
-
-      function onClick(e) {
-        if (suppressClick) {
-          suppressClick = false;
-          return;
-        }
-        var hit = rectOf(e.clientX, e.clientY);
-        if (!hit) return;
-        if (centeredPanel && hit.poolIdx === centeredPanel.poolIdx) {
-          followLink(hit.srcIndex, e);
-          return;
-        }
-        userInteracted = true;
-        velocity = 0;
-        target = centerForIndex(nearestIndex(scroll + hit.centerX));
-        snapped = true;
-        holdUntil = performance.now() + clickHold * 1000; // you asked for this one: let it sit
-        setHover(false);
-      }
-
-      function followLink(srcIndex, e) {
-        var item = items[srcIndex];
-        var link = item && (item.matches('a[href]') ? item : item.querySelector('a[href]'));
-        if (!link) return;
-        if (e.metaKey || e.ctrlKey || e.shiftKey || link.target === '_blank') {
-          window.open(link.href, link.target || '_blank', 'noopener');
-          return;
-        }
-        link.click();
-      }
-
-      function showActive(index) {
-        if (counterEl) {
-          counterEl.textContent = String(index + 1).padStart(2, '0') + '/' + String(total).padStart(2, '0');
-        }
-        var content = items[index].querySelector('[data-glass-carousel-content]');
-        if (captionEl && content) {
-          captionEl.replaceChildren(content.cloneNode(true));
-          if (introStarted) {
-            gsap.fromTo(captionEl, { yPercent: 25, autoAlpha: 0 }, { yPercent: 0, autoAlpha: 1, duration: 0.4, ease: 'power3.out' });
-          }
-        }
-      }
-
-      el.addEventListener('wheel', onWheel, { passive: false });
-      el.addEventListener('pointerdown', onPointerDown);
-      el.addEventListener('pointermove', onPointerMove);
-      el.addEventListener('pointerup', onPointerUp);
-      el.addEventListener('pointercancel', onPointerUp);
-      el.addEventListener('pointerenter', onEnter);
-      el.addEventListener('pointerleave', onLeave);
-      el.addEventListener('click', onClick);
-
-      var raf = 0;
-      var lastFrame = performance.now();
-      var drifting = false;
-      function tick() {
-        if (!wrapper.isConnected) return destroy();
-        var now = performance.now();
-        var dt = Math.min(0.05, (now - lastFrame) / 1000);
-        lastFrame = now;
-        var idle = now - lastInput;
-        var box = el.getBoundingClientRect();
-        if (box.bottom <= 0 || box.top >= window.innerHeight) { raf = requestAnimationFrame(tick); return; } // scrolled away: nothing moves, nothing is drawn
-        var driftPx = arc ? driftDeg * pxPerDeg() : autoDrift; // the wheel drifts in degrees a second (V3), the row in px
-        spinOffset = spinDeg ? gsap.utils.clamp(0, 1, (window.pageYOffset || 0) / Math.max(1, hero.offsetHeight)) * spinDeg * pxPerDeg() : 0;
-
-        if (!dragging) {
-          target += velocity;
-          velocity *= friction;
-          if (Math.abs(velocity) < 0.05) velocity = 0;
-
-          if (rolling) { // the roll-in: the drift's speed plus an extra that falls off as the square of the time left
-            if (rollWait > 0) rollWait -= dt;
-            else {
-              var leftR = rollLeft / rollDur;
-              target += (driftV + rollExtra * leftR * leftR) * dt;
-              snapped = false;
-              rollLeft -= dt;
-              if (rollLeft <= 0) rollDone();
-            }
-          }
-          drifting = driftPx > 0 && idle > driftResume * 1000 && now > holdUntil && !rolling && !opening; // also during the row's intro: it moves from the start; the wheel waits for its opening
-          var wantV = (drifting || rolling) ? driftPx : 0; // the roll-in rides on the drift's speed
-          driftV += (wantV - driftV) * Math.min(1, dt * (arc ? (wantV ? 1.5 : 6) : 60)); // the wheel eases up to speed (V3), the row is at speed at once
-          if (drifting) {
-            target += driftV * dt; // the row rolls left on its own
-            snapped = false;
-          } else if (stepEvery > 0 && !opening && !rolling && introDone && idle > driftResume * 1000 && now > holdUntil) {
-            // the stepped turn: one card on, every stepEvery seconds; any hold (a drag, a click, a wheel) restarts the wait
-            if (now - Math.max(lastStep, lastInput, holdUntil) > stepEvery * 1000) {
-              lastStep = now;
-              target = centerForIndex(nearestIndex(scroll) + 1);
-              snapped = true;
-            }
-          } else if (!snapped && !rolling && idle > snapIdle) { // (never while the roll-in moves the target itself)
-            target = centerForIndex(nearestIndex(scroll));
-            snapped = true;
-          }
-        } else {
-          drifting = false;
-        }
-
-        var follow = dragging && dragPointerType !== 'mouse'
-          ? touchEase
-          : drifting
-            ? driftEase
-            : snapped
-              ? snapEase
-              : ease;
-        // the eases are "per frame at 60fps"; scale them by the real frame time so a slow
-        // machine or a phone settles in the same half second as a fast one
-        scroll += (target - scroll) * (1 - Math.pow(1 - follow, dt * 60));
-
-        var ci = sourceIndex(scroll);
-        if (ci !== lastCenter) {
-          lastCenter = ci;
-          showActive(ci);
-        }
-
-        var rawSpeed = scroll - prevScroll;
-        prevScroll = scroll;
-        var norm = Math.min(1, Math.abs(rawSpeed) / Math.max(1, shrinkMax));
-        var k = norm > scrollEnergy ? shrinkAttack : shrinkDecay;
-        scrollEnergy += (norm - scrollEnergy) * k;
-
-        layout();
-        refreshHover();
-        if (!introDone) lensStrength();
-
-        lensUniforms.uTime.value = performance.now() * 0.001;
-
-        renderer.setRenderTarget(rt);
-        renderer.render(scene, camera);
-        renderer.setRenderTarget(null);
-        renderer.render(lensScene, lensCam);
-
-        raf = requestAnimationFrame(tick);
-      }
-
-      function onResize() {
-        var nextW = mount.clientWidth;
-        var nextH = mount.clientHeight;
-        if (!nextW || !nextH) return;
-        W = nextW;
-        H = nextH;
-        renderer.setSize(W, H, false);
-        camera.left = -W / 2;
-        camera.right = W / 2;
-        camera.top = H / 2;
-        camera.bottom = -H / 2;
-        camera.updateProjectionMatrix();
-        rt.setSize(bufferW(), bufferH());
-        lensUniforms.uRes.value.set(bufferW(), bufferH());
-        narrow = W < narrowBreakpoint;
-        applyLook();
-      }
-
-      var resizeObserver = new ResizeObserver(onResize);
-      resizeObserver.observe(mount);
-
-      wrapper.setAttribute('data-glass-carousel', 'canvas');
-      // read-only peek for tooling: positions and state of the row (no behaviour depends on it)
-      wrapper.glassCarousel = {
-        get rects() { return panelRects.slice(); },
-        get centered() { return centeredPanel; },
-        get scroll() { return scroll; },
-        get target() { return target; },
-        get width() { return W; },
-        get panel() { return panelH; },
-        get aspects() { return sources.map(function (s) { return s.aspect; }); },
-        get intro() { return { value: intro.value, done: introDone, started: introStarted }; }
-      };
-      bindTextures();
-      showActive(0);
-      lensSize();
-      lensStrength();
-      tick();
-
-      function destroy() {
-        cancelAnimationFrame(raf);
-        resizeObserver.disconnect();
-        el.removeEventListener('wheel', onWheel);
-        el.removeEventListener('pointerdown', onPointerDown);
-        el.removeEventListener('pointermove', onPointerMove);
-        el.removeEventListener('pointerup', onPointerUp);
-        el.removeEventListener('pointercancel', onPointerUp);
-        el.removeEventListener('pointerenter', onEnter);
-        el.removeEventListener('pointerleave', onLeave);
-        el.removeEventListener('click', onClick);
-        // the renderer goes last: it is what frees the others' memory on the graphics card, and then the WebGL context
-        // itself is handed back (the browser only keeps about sixteen)
-        rt.dispose();
-        lensQuad.geometry.dispose();
-        lensMat.dispose();
-        panelGeometry.dispose();
-        pool.forEach(function (p) { p.mat.dispose(); if (p.rim) p.rim.material.dispose(); });
-        if (maskTex) maskTex.dispose();
-        sources.forEach(function (s) { if (s.tex) s.tex.dispose(); });
-        renderer.dispose();
-        renderer.forceContextLoss();
-        wrapper.setAttribute('data-glass-carousel', '');
-      }
-
-      return { destroy: destroy };
-    }
-
-    var instances = [];
-    var mm = gsap.matchMedia();
-
-    mm.add('(prefers-reduced-motion: no-preference)', function () {
-      wrappers.forEach(function (wrapper) {
-        var instance = setupInstance(wrapper);
-        if (instance) instances.push(instance);
-      });
-
-      return function () {
-        instances.forEach(function (instance) { instance.destroy(); });
-        instances.length = 0;
-      };
-    });
-    if (home) home.undo.push(function () { mm.revert(); }); // the page leaves: the carousel and its WebGL context with it
-  }
-
-  // =========================================================
-  // OSMO SLIDERS — the home-v3 (Radial Cards Slider) and home-v4 (Spatial Cards Slider) explorations.
-  // Osmo Supply's code as shipped (osmo.supply), only their DOMContentLoaded auto-init is left out:
-  // rdBand calls the right one on a hero that carries [data-radial-slider-init] / [data-spatial-slider-init].
-  // Needs Draggable, InertiaPlugin and CustomEase (loaded in those pages' head code).
-  // =========================================================
-  function initRadialCardsSlider() {
-    rdPlugins(Draggable, InertiaPlugin, CustomEase);
-    CustomEase.create("radial", "0.25, 0.1, 0, 1");
-    const slideDuration = 1;
-    const clickEase = 'radial';
-
-    qsa('[data-radial-slider-init]', nextPage).forEach(container => { // the page coming in only: on the cube the old page is still in the document
-      if (container._radialSliderDraggable) container._radialSliderDraggable.kill();
-      if (container._radialSliderProxy) gsap.killTweensOf(container._radialSliderProxy);
-      if (container._radialSliderProxyEl) container._radialSliderProxyEl.remove();
-
-      const collection = container.querySelector('[data-radial-slider-collection]');
-      const track = container.querySelector('[data-radial-slider-list]');
-      if (!collection || !track) return;
-
-      container.querySelectorAll('[data-radial-slider-clone]').forEach(el => el.remove());
-
-      const originalItems = Array.from(container.querySelectorAll('[data-radial-slider-item]:not([data-radial-slider-clone])'));
-      if (!originalItems.length) return;
-
-      container.setAttribute('role', 'region');
-      container.setAttribute('aria-roledescription', 'carousel');
-      container.setAttribute('aria-label', container.getAttribute('aria-label') || 'Radial Cards Slider');
-
-      track.setAttribute('role', 'group');
-      track.setAttribute('aria-label', 'Slides');
-
-      const dotsWrap = container.querySelector('[data-radial-slider-generate-dots]');
-      if (dotsWrap) {
-        const dots = Array.from(dotsWrap.querySelectorAll('[data-radial-slider-control]'));
-        if (dots.length) {
-          const firstDot = dots[0];
-          dots.slice(1).forEach(dot => dot.remove());
-          firstDot.setAttribute('data-radial-slider-control', '1');
-          firstDot.setAttribute('data-radial-slider-control-status', 'not-active');
-          for (let i = 2; i <= originalItems.length; i++) {
-            const dot = firstDot.cloneNode(true);
-            dot.setAttribute('data-radial-slider-control', String(i));
-            dot.setAttribute('data-radial-slider-control-status', 'not-active');
-            dotsWrap.appendChild(dot);
-          }
-        }
-      }
-
-      const controls = Array.from(container.querySelectorAll('[data-radial-slider-control]'));
-      const totalEl = container.querySelector('[data-radial-slider-total-slide]');
-      const indicators = Array.from(container.querySelectorAll('[data-radial-slider-active-slide]'));
-
-      originalItems.forEach((item, index) => {
-        item.removeAttribute('data-radial-slider-item-status');
-        item.removeAttribute('aria-hidden');
-        item.setAttribute('role', 'group');
-        item.setAttribute('aria-label', `Slide ${index + 1} of ${originalItems.length}`);
-      });
-
-      controls.forEach(btn => {
-        const value = btn.getAttribute('data-radial-slider-control');
-        if (value === 'prev') btn.setAttribute('aria-label', 'Previous slide');
-        if (value === 'next') btn.setAttribute('aria-label', 'Next slide');
-        if (/^\d+$/.test(value)) {
-          btn.setAttribute('aria-label', `Go to slide ${value}`);
-          btn.setAttribute('aria-current', 'false');
-        }
-      });
-
-      track.style.height = '';
-
-      const setNumber = (el, value) => {
-        if (!el) return;
-        el.textContent = value < 10 ? '0' + value : String(value);
-      };
-
-      const mod = (value, total) => ((value % total) + total) % total;
-
-      setNumber(totalEl, originalItems.length);
-
-      const containerStyles = getComputedStyle(container);
-      const rotateStep = Math.abs(parseFloat(containerStyles.getPropertyValue('--slider-rotate'))) || 18;
-      const maxLoopItems = Math.max(1, Math.floor(360 / rotateStep));
-
-      const firstRect = originalItems[0].getBoundingClientRect();
-      const itemWidth = firstRect.width;
-      const itemHeight = firstRect.height;
-
-      const originParts = getComputedStyle(originalItems[0]).transformOrigin.split(' ');
-      const originY = parseFloat(originParts[1]) || itemHeight * 3.75;
-      const wheelRadius = Math.max(0, originY - itemHeight / 2);
-      const proxyRadius = wheelRadius + Math.max(itemWidth, itemHeight) * 0.525;
-
-      const getBoundsAtAngle = angle => {
-        const rad = angle * Math.PI / 180;
-        return {
-          x: Math.sin(rad) * wheelRadius,
-          y: originY - Math.cos(rad) * wheelRadius,
-          halfWidth: Math.abs(Math.cos(rad)) * itemWidth / 2 + Math.abs(Math.sin(rad)) * itemHeight / 2,
-          halfHeight: Math.abs(Math.sin(rad)) * itemWidth / 2 + Math.abs(Math.cos(rad)) * itemHeight / 2
-        };
-      };
-
-      const isOffsetInsideContainer = offset => {
-        const containerRect = container.getBoundingClientRect();
-        const trackRect = track.getBoundingClientRect();
-        const originX = trackRect.left + trackRect.width / 2;
-        const originYTop = trackRect.top;
-        const leftLimit = containerRect.left - originX;
-        const rightLimit = containerRect.right - originX;
-        const topLimit = containerRect.top - originYTop;
-        const bottomLimit = containerRect.bottom - originYTop;
-        const bounds = getBoundsAtAngle(offset * rotateStep);
-        const cardLeft = bounds.x - bounds.halfWidth;
-        const cardRight = bounds.x + bounds.halfWidth;
-        const cardTop = bounds.y - bounds.halfHeight;
-        const cardBottom = bounds.y + bounds.halfHeight;
-        return cardRight >= leftLimit && cardLeft <= rightLimit && cardBottom >= topLimit && cardTop <= bottomLimit;
-      };
-
-      const getVisibleOffsets = () => {
-        const offsets = [0];
-        const maxSide = Math.ceil(maxLoopItems / 2);
-        let leftEdge = 0;
-        let rightEdge = 0;
-        for (let i = 1; i <= maxSide; i++) {
-          if (!isOffsetInsideContainer(i)) break;
-          offsets.push(i);
-          rightEdge = i;
-        }
-        for (let i = 1; i <= maxSide; i++) {
-          if (!isOffsetInsideContainer(-i)) break;
-          offsets.unshift(-i);
-          leftEdge = -i;
-        }
-        const nextLeft = leftEdge - 1;
-        const nextRight = rightEdge + 1;
-        if (Math.abs(nextLeft) <= maxSide) offsets.unshift(nextLeft);
-        if (Math.abs(nextRight) <= maxSide) offsets.push(nextRight);
-        return offsets;
-      };
-
-      const visibleOffsets = getVisibleOffsets();
-      const minItemsNeeded = Math.min(maxLoopItems, Math.max(originalItems.length, visibleOffsets.length));
-      const neededItems = Math.ceil(minItemsNeeded / originalItems.length) * originalItems.length;
-
-      const currentItems = Array.from(container.querySelectorAll('[data-radial-slider-item]:not([data-radial-slider-clone])'));
-
-      for (let i = currentItems.length; i < neededItems; i++) {
-        const clone = currentItems[i % currentItems.length].cloneNode(true);
-        clone.setAttribute('data-radial-slider-clone', '');
-        clone.setAttribute('aria-hidden', 'true');
-        track.appendChild(clone);
-      }
-
-      const items = Array.from(track.querySelectorAll(':scope > [data-radial-slider-item]'));
-      const totalItems = items.length;
-
-      track.style.height = itemHeight + 'px';
-
-      items.forEach(item => {
-        item.setAttribute('data-radial-slider-item-status', 'not-active');
-      });
-
-      container.setAttribute('data-radial-slider-drag-status', 'grab');
-
-      const containerRect = container.getBoundingClientRect();
-      const collectionRect = collection.getBoundingClientRect();
-      const trackRect = track.getBoundingClientRect();
-
-      const proxyWrap = document.createElement('div');
-      proxyWrap.setAttribute('data-radial-slider-proxy-wrap', '');
-      Object.assign(proxyWrap.style, {
-        position: 'absolute',
-        left: containerRect.left - collectionRect.left + 'px',
-        top: containerRect.top - collectionRect.top + 'px',
-        width: containerRect.width + 'px',
-        height: containerRect.height + 'px',
-        overflow: 'hidden',
-        pointerEvents: 'none'
-      });
-
-      const proxy = document.createElement('div');
-      proxy.setAttribute('data-radial-slider-proxy', '');
-      Object.assign(proxy.style, {
-        position: 'absolute',
-        width: proxyRadius * 2 + 'px',
-        height: proxyRadius * 2 + 'px',
-        left: trackRect.left + trackRect.width / 2 - containerRect.left + 'px',
-        top: trackRect.top - containerRect.top + originY - proxyRadius + 'px',
-        transform: 'translateX(-50%)',
-        borderRadius: '50%',
-        pointerEvents: 'auto',
-        opacity: '0'
-      });
-
-      proxyWrap.appendChild(proxy);
-      collection.appendChild(proxyWrap);
-
-      container._radialSliderProxy = proxy;
-      container._radialSliderProxyEl = proxyWrap;
-
-      const setRotation = items.map(item => gsap.quickSetter(item, 'rotation', 'deg'));
-
-      gsap.set(proxy, { rotation: 0 });
-
-      const getIndexFromProxy = () => -gsap.getProperty(proxy, 'rotation') / rotateStep;
-
-      const nearestDelta = (index, realIndex, total) => {
-        const loop = Math.round((realIndex - index) / total);
-        return index - (realIndex - loop * total);
-      };
-
-      const nearestDeltaToSlideNumber = (targetNumber, realIndex) => {
-        let bestDelta = 0;
-        let bestDistance = Infinity;
-        items.forEach((item, index) => {
-          const slideNumber = index % originalItems.length;
-          if (slideNumber !== targetNumber) return;
-          const delta = nearestDelta(index, realIndex, totalItems);
-          const distance = Math.abs(delta);
-          if (distance < bestDistance) {
-            bestDistance = distance;
-            bestDelta = delta;
-          }
-        });
-        return bestDelta;
-      };
-
-      let lastActiveIndex = null;
-
-      const setIndicator = index => {
-        const value = index + 1;
-        const text = value < 10 ? '0' + value : String(value);
-        indicators.forEach(el => { el.textContent = text; });
-      };
-
-      const updateControlStatus = activeIndex => {
-        controls.forEach(btn => {
-          const value = btn.getAttribute('data-radial-slider-control');
-          if (!/^\d+$/.test(value)) return;
-          const index = Math.max(0, Math.min(originalItems.length - 1, parseInt(value, 10) - 1));
-          const isActive = index === activeIndex;
-          btn.setAttribute('data-radial-slider-control-status', isActive ? 'active' : 'not-active');
-          btn.setAttribute('aria-current', isActive ? 'true' : 'false');
-        });
-      };
-
-      const updateActiveUI = activeIndex => {
-        if (activeIndex === lastActiveIndex) return;
-        setIndicator(activeIndex);
-        updateControlStatus(activeIndex);
-        lastActiveIndex = activeIndex;
-      };
-
-      const render = () => {
-        const realIndex = getIndexFromProxy();
-        const activeIndex = mod(Math.round(realIndex), totalItems);
-        const activeSlideIndex = activeIndex % originalItems.length;
-        items.forEach((item, index) => {
-          const rotation = nearestDelta(index, realIndex, totalItems) * rotateStep;
-          item.setAttribute('data-radial-slider-item-status', index === activeIndex ? 'active' : 'inview');
-          setRotation[index](rotation);
-        });
-        updateActiveUI(activeSlideIndex);
-      };
-      container._radialSliderRender = render; // for rdBand: the wheel's roll-in, drift and scroll turn go through the proxy + this
-
-      controls.forEach(btn => {
-        btn.disabled = false;
-        const value = btn.getAttribute('data-radial-slider-control');
-        if (value === 'next' || value === 'prev') {
-          btn.onclick = () => {
-            gsap.killTweensOf(proxy);
-            const currentIndex = getIndexFromProxy();
-            const targetIndex = Math.round(currentIndex) + (value === 'next' ? 1 : -1);
-            gsap.to(proxy, { rotation: -targetIndex * rotateStep, duration: slideDuration, ease: clickEase, onUpdate: render });
-          };
-        }
-        if (/^\d+$/.test(value)) {
-          const targetSlideNumber = Math.max(0, Math.min(originalItems.length - 1, parseInt(value, 10) - 1));
-          btn.onclick = () => {
-            gsap.killTweensOf(proxy);
-            const currentIndex = getIndexFromProxy();
-            const delta = nearestDeltaToSlideNumber(targetSlideNumber, currentIndex);
-            gsap.to(proxy, { rotation: -(currentIndex + delta) * rotateStep, duration: slideDuration, ease: clickEase, onUpdate: render });
-          };
-        }
-      });
-
-      container._radialSliderDraggable = Draggable.create(proxy, {
-        type: 'rotation',
-        trigger: [proxy, ...items],
-        inertia: true,
-        throwResistance: 2000,
-        dragResistance: 0.05,
-        maxDuration: 1,
-        minDuration: 0.5,
-        edgeResistance: 0.75,
-        overshootTolerance: 0,
-        snap: value => Math.round(value / rotateStep) * rotateStep,
-        onDrag: render,
-        onThrowUpdate: render,
-        onThrowComplete: () => {
-          container.setAttribute('data-radial-slider-drag-status', 'grab');
-          render();
-        },
-        onPress: () => container.setAttribute('data-radial-slider-drag-status', 'grabbing'),
-        onDragStart: () => container.setAttribute('data-radial-slider-drag-status', 'grabbing'),
-        onRelease: () => container.setAttribute('data-radial-slider-drag-status', 'grab')
-      })[0];
-      rdDrag(container._radialSliderDraggable);
-
-      render();
-    });
-
-    if (initRadialCardsSlider._resize) {
-      window.removeEventListener('resize', initRadialCardsSlider._resize);
-    }
-    initRadialCardsSlider._resize = debounceOnWidthChange(initRadialCardsSlider, 200);
-    rdOn(window, 'resize', initRadialCardsSlider._resize);
-  }
-
   function initSpatialCardsSlider() {
     rdPlugins(Draggable, InertiaPlugin, CustomEase);
     CustomEase.create("spatial", "0.25, 0.1, 0, 1");
@@ -4198,47 +2665,41 @@
   // =========================================================
 
   // =========================================================
-  // BAND — the home opening on /home-copy: a single band of work sliding by in perspective.
-  // Everything visible lives in the Designer: the fixed section [data-band] (the stage with the
-  // band [data-band-rows]: a names row and a panel row, both Osmo marquees with real <video>
-  // elements; the copy; the scroll line; the loader) and the spacer [data-band-spacer] that keeps
-  // the page's scroll room, like the old hero. Styles, breakpoints and hover states are Webflow
-  // styles. This adds the behaviour: clip tuning, one decoder per clip (the marquee clones every
-  // panel), the pointer tilt, dragging, the loader, the opening sequence, and the fade-behind on scroll.
+  // BAND — the home's hero, section [data-band]: the dial ([data-ring], the home since 9 Nov) or home V4's drum
+  // (Osmo's spatial slider). Everything visible lives in the Designer: the stage with the cards and their real
+  // <video> elements, the copy, the scroll line, the loader. Styles, breakpoints and hover states are Webflow
+  // styles. This adds the behaviour: clip tuning, one decoder per clip (the copies are canvases), the loader, the
+  // opening sequence, the pinned dial and the fade-behind on scroll.
+  // The earlier heroes are gone since v1.7.156 (Rimbo, 10 Nov): the single band of /home-copy (V2), the radial wheel
+  // of /home-v3 and the glass carousel of /home-v5. Their code is in the git history up to tag v1.7.155.
   // =========================================================
   function rdBand() {
     var hero = qs('[data-band]');
-    var band = hero && qs('[data-band-rows]', hero);
     var stage = hero && qs('.band_stage', hero);
     if (!hero) return;
-    // A hero without [data-band-rows] carries an Osmo slider instead (home-v3 radial, home-v4 spatial):
-    // the slider lays the cards out and clones them; everything else here (clips, loader, opening, fades) applies as is.
+    // Home V4's hero carries Osmo's spatial slider: it lays the cards out and clones them; everything else here (clips,
+    // loader, opening, fades) is shared with the dial.
     var osmoInit = function () {
-      if (band) return;
       if (!window.Draggable || !window.InertiaPlugin || !window.CustomEase) { console.warn('[rimbo-designs] band: GSAP plugins for the slider are missing'); return; }
-      if (qs('[data-radial-slider-init]', hero)) initRadialCardsSlider();
       if (qs('[data-spatial-slider-init]', hero)) initSpatialCardsSlider();
     };
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var lab = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname); // the ?knobs in the address are for trying things out: staging and local only, the live site reads the Designer's attributes alone
     var query = lab ? location.search : '';
     var myScope = scopeNow(); // this page: the opening must not finish on a page that is already leaving
-    // ---- the stepped auto-advance on an Osmo slider (home-v4's spatial arc; Rimbo: "a 1, 2, 3, 4, 5 switch"; the
-    // home-v3 wheel can run it too): every few seconds the slider moves one card on, as if Next were pressed on a
-    // timer. It goes through the slider's own Next control: a hidden button added before Osmo's init, which wires it
-    // like any other control (and again after a width change), so each step is the slider's own click tween. ?step=N
-    // (or data-band-step="N" on the section) sets the seconds per step, 0 switches it off (the wheel's default: it
-    // drifts instead, below); off under prefers-reduced-motion. Clock: autoStep below.
-    var slider = band ? null : (qs('[data-spatial-slider-init]', hero) || qs('[data-radial-slider-init]', hero));
-    var ring = band || slider ? null : qs('[data-ring]', hero); // home-extreme: Rimbo's roulette, built below (buildRing), no Osmo code involved
-    var kind = slider && slider.hasAttribute('data-radial-slider-init') ? 'radial' : 'spatial'; // which Osmo slider: its data- attributes, and the handles its init leaves on the root
-    var wheel = kind === 'radial' ? slider : null;
+    // ---- the stepped auto-advance on the Osmo slider (home-v4's spatial arc; Rimbo: "a 1, 2, 3, 4, 5 switch"): every
+    // few seconds the slider moves one card on, as if Next were pressed on a timer. It goes through the slider's own
+    // Next control: a hidden button added before Osmo's init, which wires it like any other control (and again after a
+    // width change), so each step is the slider's own click tween. ?step=N (or data-band-step="N" on the section) sets
+    // the seconds per step, 0 switches it off; off under prefers-reduced-motion. Clock: autoStep below.
+    var slider = qs('[data-spatial-slider-init]', hero);
+    var ring = slider ? null : qs('[data-ring]', hero); // home-extreme: Rimbo's roulette, built below (buildRing), no Osmo code involved
     var param = function (name, attr, fallback) { // ?name=N on the URL, else data-band-attr="N" on the section, else the default
       var v = parseFloat((new RegExp('[?&]' + name + '=(-?[\\d.]+)').exec(query) || [])[1]);
       if (isNaN(v)) v = parseFloat(hero.getAttribute('data-band-' + attr));
       return isNaN(v) ? fallback : v;
     };
-    var stepEvery = param('step', 'step', wheel ? 0 : 3.5);
+    var stepEvery = param('step', 'step', 3.5);
     var pinScreens = ring && !reduced ? param('pin', 'pin', 2) : 0; // home-extreme: screens of scroll the hero stays pinned while the dial tips over, turns and closes
     var ringSlots = ring ? param('slots', 'slots', 15) : 0; // home-extreme: cards on the dial; the works repeat to fill it (fifteen = the five works three times, 24° apart: a whole cylinder, so at rest it keeps going round like home-v4; ten = twice, each opposite itself, a part-cylinder that slides open)
     var ringGrow = ring ? param('grow', 'grow', 1.15) : 1; // home-extreme: how much wider the flat dial is than the drum, so the cards slide outward as it tips
@@ -4247,8 +2708,8 @@
     var ringFull = ring && 360 / Math.max(1, ringSlots) <= 26; // fourteen or more: the spacing stretches to close the cylinder (15 → 24°, 16 → 22.5°), so at rest it loops like home-v4 and the clock may run; fewer stay a part-cylinder at 22.5°
     if (ring && !ringFull && !/[?&]step=/.test(query)) stepEvery = 0; // a part-cylinder cannot loop at rest, so the clock stays off there unless asked for
     var fadeFrac = param('fade', 'fade', 0.18); // the copy is gone within this fraction of a screen of scroll (home-v4 sets 0.12 on its section: "slightly too slow" at 0.18)
-    var drumTurn = kind === 'spatial' ? param('turn', 'turn', 2) : 0; // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
-    var exitTilt = kind === 'spatial' ? param('exit', 'exit', 60) : 0; // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
+    var drumTurn = param('turn', 'turn', 2); // home-v4: cards the drum turns over the first screen of scroll, back again on the way up (0 = still)
+    var exitTilt = param('exit', 'exit', 60); // home-v4: degrees the drum tips over about its centre as the hero leaves, the 3D exit (0 = flat; negative tips the top towards you)
     var exitDepth = param('exitdepth', 'exit-depth', 2400); // home-v4: the perspective of that tip in px; lower = the near half swells more
     // ---- home-v4-landing (Rimbo, 5 Nov: "reverse the scroll-up experience as the loading"): the opening is the exit played
     // backwards. The drum comes in from the top tipped over as it is at the end of the exit, descends and untips into its
@@ -4256,7 +2717,7 @@
     // the copy does not un-blur along the scroll: it simply appears (fadeBehind). Keyed by data-band-opening="land" on the
     // section (?opening=land tries it on any staging drum page); home-v4 itself is untouched.
     var opening = (/[?&]opening=(\w+)/.exec(query) || [])[1] || hero.getAttribute('data-band-opening') || '';
-    var landing = opening === 'land' && !!slider && kind === 'spatial' && !reduced && !!window.gsap;
+    var landing = opening === 'land' && !!slider && !reduced && !!window.gsap;
     var landDur = param('land', 'land', 2.4); // seconds the landing takes (expo.out: quick in, a long settle)
     var landDelay = param('landdelay', 'land-delay', 0.25); // seconds the drum hangs at the top first, so it is seen setting off once the loader has gone
     var landFrom = param('landfrom', 'land-from', 1.25); // screens above its resting place the drum sets off from (over 1 = fully out of view, no flash)
@@ -4269,14 +2730,12 @@
     if (slider && stepEvery > 0 && !reduced) {
       stepNext = document.createElement('button');
       stepNext.type = 'button'; stepNext.tabIndex = -1;
-      stepNext.setAttribute('data-' + kind + '-slider-control', 'next'); stepNext.setAttribute('aria-hidden', 'true');
+      stepNext.setAttribute('data-spatial-slider-control', 'next'); stepNext.setAttribute('aria-hidden', 'true');
       stepNext.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;overflow:hidden;pointer-events:none';
       slider.appendChild(stepNext);
     }
     osmoInit();
-    var narrow = function () { return window.innerWidth < 992; };
     var copy = qs('.band_copy', hero), title = qs('.band_title', hero), eyebrow = qs('.band_eyebrow', hero);
-    var curve = 0; // set below (the curve experiment)
     var buttons = qsa('.btn', copy || hero), scrollLine = qs('.band_scroll', hero), loader = qs('.band_loader', hero);
     var nav = [qs('.bold-nav-full__bar')].filter(Boolean); // the logo + burger (rdNavFull)
     var hidden = false;
@@ -4287,13 +2746,13 @@
     // after a hand has let go or the pointer has left.
     var autoStep = function () {
       if (reduced || (!stepNext && !(ringApi && stepEvery > 0))) return; // with reduced motion nothing turns by itself, the dial included
-      var zone = ring || qs('[data-' + kind + '-slider-collection]', slider) || slider, over = false;
+      var zone = ring || qs('[data-spatial-slider-collection]', slider) || slider, over = false;
       zone.addEventListener('pointerenter', function () { over = true; });
       zone.addEventListener('pointerleave', function () { over = false; });
       var wait = stepEvery * 1000, due = performance.now() + wait;
       setInterval(function () {
-        var d = slider && slider['_' + kind + 'SliderDraggable'], now = performance.now();
-        var held = over || hidden || document.hidden || scrolled || rollLeft > 0 || (d && (d.isPressed || d.isDragging || d.isThrowing)) || (ringApi && ringApi.busy());
+        var d = slider && slider._spatialSliderDraggable, now = performance.now();
+        var held = over || hidden || document.hidden || scrolled || (d && (d.isPressed || d.isDragging || d.isThrowing)) || (ringApi && ringApi.busy());
         if (held) { due = now + wait; return; }
         if (now < due) return;
         due = now + wait;
@@ -4301,45 +2760,6 @@
       }, 200);
     };
 
-    // ---- the wheel (home-v3, Osmo's radial slider): three turns on top of Osmo's drag, all through the slider's
-    // own proxy and render (turn below), so a hand on the wheel always wins and the layout maths stays Osmo's.
-    //   roll-in  the opening (Rimbo, 2026-11-05: "in the beginning you don't see any of them... the first comes in and
-    //            slides to the left, the second follows, the third, the fourth, and then it's a circle that keeps
-    //            looping; it rolls in from zero, but already on the track of the circle"): every card starts hidden,
-    //            the wheel rolls one full loop from the reveal (Osmo keeps the cards wrapped around the top, half the
-    //            loop either side, so a card leaving on the left comes back on the right: one loop = every card comes
-    //            in from the right exactly once) and each card is shown the moment it comes round past 100 degrees
-    //            on the right, still off screen; a card that already waits off screen on the right goes first, at
-    //            once. The roll's speed falls off as a curve into the drift's over ?roll=S seconds (Rimbo: "we can
-    //            definitely roll in at the start faster"): quick at first, then a long gentle tail, so the wheel never
-    //            stops: the roll becomes the loop. ?rollin=N rolls N degrees instead of one loop (data-band-rollin;
-    //            0 = the fly-in below), ?roll=S / data-band-roll, default 6. No rise and no fade for the stage. A
-    //            hand on the wheel ends the roll where it is and shows the rest.
-    //   fly-in   ?rollin=0 (rejected: V5 2026-11-05 "not working", V3 the same night "weird"): title first, then the
-    //            top card alone slides in straight from the right, the others grow in at their places, then the wheel
-    //            turns. Knobs ?fly= ?fill= ?spread= ?grow= (data-band-fly/-fill/-spread/-grow). In open() (flyAfter).
-    //   drift    at rest the wheel keeps turning, N degrees a second, so the next card drifts into the middle every
-    //            few seconds; it holds during a drag or its throw, during a step or the roll-in, in a hidden tab or
-    //            once the hero has scrolled away, and eases back up to speed after; it does not stop for a pointer
-    //            over the cards (Rimbo: not needed) (?drift=N / data-band-drift, default 3; 0 = off)
-    //   spin     scrolling the hero away turns the wheel N degrees over that first screen, so it rolls out under the
-    //            copy and rolls back on the way up (?spin=N / data-band-spin, default 24; 0 = off)
-    // All three are off under prefers-reduced-motion.
-    var rollIn = wheel ? param('rollin', 'rollin', -1) : 0, drift = wheel ? param('drift', 'drift', 3) : 0, spin = wheel ? param('spin', 'spin', 24) : 0; // rollin < 0 = one full loop
-    if (reduced) rollIn = drift = spin = 0;
-    var rollDur = Math.max(0.1, param('roll', 'roll', 6)); // s, the roll-in's length: its extra speed is gone by then and the drift carries on
-    var flyIn = Math.max(0, param('fly', 'fly', 0.9)), fillStart = Math.max(0, param('fill', 'fill', 0.5)), fillSpread = Math.max(0, param('spread', 'spread', 0.1)), fillGrow = Math.max(0, param('grow', 'grow', 0.8)); // the fly-in's timings (seconds)
-    var wheelHeld = function () { var d = wheel && wheel._radialSliderDraggable; return !d || d.isPressed || d.isDragging || d.isThrowing; };
-    var turn = function (deg) { // turn the wheel by deg from outside a drag: the proxy moves, the Draggable syncs to it, the cards follow
-      var d = wheel && wheel._radialSliderDraggable, proxy = wheel && wheel._radialSliderProxy, render = wheel && wheel._radialSliderRender;
-      if (!d || !proxy || !render) return;
-      gsap.set(proxy, { rotation: (parseFloat(gsap.getProperty(proxy, 'rotation')) || 0) + deg });
-      d.update(); render();
-    };
-    if (wheel) {
-      var wzone = qs('[data-radial-slider-collection]', wheel) || wheel;
-      wzone.addEventListener('pointerdown', function () { if (wheel._radialSliderProxy) gsap.killTweensOf(wheel._radialSliderProxy); }, true); // a hand on the wheel ends the roll-in or a step where it is
-    }
     // ---- home-v4: moving the drum from outside a drag, through the slider's own proxy and Draggable (Osmo's code untouched:
     // its render is the Draggable's onDrag, its step distance is read off its snap)
     var drumStep = function () { // the slider's step in px: the smallest value its snap rounds up to a step
@@ -4350,71 +2770,18 @@
       return snap(hi);
     };
     var turnDrum = function (cards) { // turn the drum by a number of cards: the proxy moves, the Draggable syncs to it, the cards follow
-      var d = slider && kind === 'spatial' && slider._spatialSliderDraggable, proxy = slider && slider._spatialSliderProxy, render = d && d.vars && d.vars.onDrag, step = drumStep();
+      var d = slider && slider._spatialSliderDraggable, proxy = slider && slider._spatialSliderProxy, render = d && d.vars && d.vars.onDrag, step = drumStep();
       if (!d || !proxy || !render || !step || !cards) return;
       gsap.getTweensOf(proxy).forEach(function (t) { t.progress(1); }); // a step under way lands first, so the turn adds to whole cards
       gsap.set(proxy, { x: (parseFloat(gsap.getProperty(proxy, 'x')) || 0) - cards * step });
       d.update(); render();
     };
     var settleDrum = function () { // back at the top of the page: the drum eases onto the nearest card
-      var d = slider && kind === 'spatial' && slider._spatialSliderDraggable, proxy = slider && slider._spatialSliderProxy, render = d && d.vars && d.vars.onDrag, snap = d && d.vars && d.vars.snap;
+      var d = slider && slider._spatialSliderDraggable, proxy = slider && slider._spatialSliderProxy, render = d && d.vars && d.vars.onDrag, snap = d && d.vars && d.vars.snap;
       if (!d || !proxy || !render || typeof snap !== 'function' || d.isPressed || d.isDragging || d.isThrowing) return;
       var x = parseFloat(gsap.getProperty(proxy, 'x')) || 0, to = snap(x);
       if (Math.abs(to - x) < 0.5) return;
       gsap.to(proxy, { x: to, duration: 0.6, ease: 'power2.out', onUpdate: render, onComplete: function () { d.update(); render(); } });
-    };
-    // The wheel's own motion, one ticker: the roll-in (once, from the opening) and the drift. The roll-in is extra
-    // speed on top of the drift that falls off as the square of the time left (quick at first, a long gentle tail)
-    // to nothing over rollDur, sized so the wheel covers roll degrees in that time (drift x rollDur + extra x rollDur
-    // / 3); when it is gone the drift is simply still running, so the roll becomes the loop without a stop. The
-    // cards start hidden and each is shown as it comes round the right side past entryDeg (off screen), so they
-    // arrive one after another; a card that already waits off screen on the right at the start is first in; whatever
-    // is still hidden when the roll ends, or when a hand ends it, fades in where it is.
-    var rollWait = 0, rollLeft = 0, rollExtra = 0, wheelRunning = false, waiting = []; // waiting: the hidden cards
-    var entryDeg = 100; // a card this far round on the right is off screen on every layout, and inside Osmo's wrap
-    var itemRot = function (it) { return parseFloat(gsap.getProperty(it, 'rotation')) || 0; };
-    var hideCards = function () { // called by the opening before the stage shows
-      waiting = qsa('[data-radial-slider-item]', wheel);
-      waiting.forEach(function (it) {
-        var r = itemRot(it);
-        it.__rollRot = (r > 0 && r <= entryDeg && it.getBoundingClientRect().left >= window.innerWidth) ? 9999 : r; // off screen on the right already: it comes in first, so count it as arriving
-      });
-      gsap.set(waiting, { autoAlpha: 0 });
-    };
-    var showArrivals = function () { // the cards that have just come round past entryDeg on the right
-      for (var i = waiting.length - 1; i >= 0; i--) {
-        var it = waiting[i], r = itemRot(it), was = it.__rollRot;
-        it.__rollRot = r;
-        if (r - was > 90) was = 9999; // it wrapped from the far left to the far right this frame
-        if (was > entryDeg && r <= entryDeg && r > 0) { gsap.set(it, { clearProps: 'opacity,visibility' }); waiting.splice(i, 1); }
-      }
-    };
-    var rollDone = function () {
-      rollLeft = 0;
-      if (waiting.length) gsap.to(waiting, { autoAlpha: 1, duration: 0.5, overwrite: true, clearProps: 'opacity,visibility' });
-      waiting = [];
-    };
-    var startDrift = function (roll) { // roll: degrees for the roll-in, or nothing (the drift alone)
-      if (!wheel) return;
-      if (roll && rollDur) { rollWait = 0.15; rollLeft = rollDur; rollExtra = Math.max(0, 3 * (roll - drift * rollDur) / rollDur); }
-      if (wheelRunning || (!drift && !roll)) return;
-      wheelRunning = true;
-      var v = roll ? drift : 0; // degrees a second right now (the drift's share), easing towards drift or 0; the roll-in sets off at full drift speed
-      rdTick(function (t, dt) {
-        var proxy = wheel._radialSliderProxy, s = dt / 1000;
-        if (rollWait > 0) { rollWait -= s; return; }
-        var want = (hidden || document.hidden || wheelHeld() || (proxy && gsap.isTweening(proxy))) ? 0 : drift;
-        v += (want - v) * Math.min(1, s * (want ? 1.5 : 6)); // up to speed in about a second and a half, off within a beat
-        var extra = 0;
-        if (rollLeft > 0) {
-          if (wheelHeld()) rollDone();
-          else { var left = rollLeft / rollDur; extra = rollExtra * left * left; rollLeft -= s; if (rollLeft <= 0) rollDone(); }
-        }
-        if (Math.abs(v) + extra < 0.01) { v = 0; return; }
-        if (wheelHeld()) return;
-        turn(-(v + extra) * s);
-        if (waiting.length) showArrivals();
-      });
     };
 
     // ---- home-extreme, the dial (Rimbo's roulette from the drum lab; round 3: ringSlots cards, the works on the page
@@ -4669,8 +3036,8 @@
       if (ringApi) ringApi.refresh(); // sets which copies face you
       all.forEach(function (m) { if (m.__wait && m.__canvases) m.__canvases.forEach(function (c) { posterInto(m, c); }); }); // a sleeping clip has no frame until after the reveal
     }
-    setTimeout(dedupeClips, 0); // after initMarquees (rdGlobal, right after this) has cloned the rows
-    if (!band) { var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { tune(); dedupeClips(); }, 450); }); } // the Osmo sliders re-clone on a width change (200 ms debounce); the clones become canvases again after
+    setTimeout(dedupeClips, 0); // once this run is done: the slider or the dial has made its copies by then
+    var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { tune(); dedupeClips(); }, 450); }); // the Osmo slider re-clones on a width change (200 ms debounce); the clones become canvases again after
 
     // ---- a hidden tab costs nothing: every clip pauses the moment the page is hidden (a background tab,
     // a minimised window) and the on-screen ones resume when it is shown again. Animation frames already
@@ -4686,133 +3053,12 @@
     hero.addEventListener('mouseover', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p) { var l = qs('.band_panel-label', p); if (l) l.classList.add('is-on'); } });
     hero.addEventListener('mouseout', function (e) { var p = e.target.closest && e.target.closest('.band_panel'); if (p && !p.contains(e.relatedTarget)) { var l = qs('.band_panel-label', p); if (l) l.classList.remove('is-on'); } });
 
-    // ---- the band tilts with the pointer: the Designer's transform is the resting pose; the script finds
-    // its two angles in the stylesheet and adds a few degrees (±5° around x, ±3.5° around z). Fine pointers, wide screens.
-    if (band && !reduced && window.matchMedia('(pointer: fine)').matches) {
-      var base = null, tx = 0, tz = 0, gx = 0, gz = 0, raf = null;
-      var rest = function () {
-        var rules = [].slice.call(document.styleSheets).reduce(function (acc, sh) { try { return acc.concat([].slice.call(sh.cssRules || [])); } catch (e) { return acc; } }, []);
-        var found = null;
-        rules.forEach(function (r) {
-          if (!r.selectorText || !/\.band_band(?![\w-])/.test(r.selectorText) || !r.style || !r.style.transform) return;
-          if (r.parentRule && r.parentRule.conditionText && !window.matchMedia(r.parentRule.conditionText).matches) return;
-          found = r.style.transform;
-        });
-        return found && /rotateX\(([-\d.]+)deg\)/.test(found) ? { str: found, x: +RegExp.$1, z: /rotateZ\(([-\d.]+)deg\)/.test(found) ? +RegExp.$1 : 0 } : null;
-      };
-      var settle = function () {
-        tx += (gx - tx) * 0.05; tz += (gz - tz) * 0.05;
-        if (base) band.style.transform = base.str.replace(/rotateX\([-\d.]+deg\)/, 'rotateX(' + (base.x + tx).toFixed(3) + 'deg)').replace(/rotateZ\([-\d.]+deg\)/, 'rotateZ(' + (base.z + tz).toFixed(3) + 'deg)');
-        raf = (Math.abs(gx - tx) > 0.002 || Math.abs(gz - tz) > 0.002) ? requestAnimationFrame(settle) : null;
-      };
-      hero.addEventListener('mousemove', function (e) {
-        if (narrow()) return;
-        if (!base) base = rest();
-        var r = hero.getBoundingClientRect();
-        var nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-        gx = -ny * 10; gz = nx * 7;
-        if (!raf) raf = requestAnimationFrame(settle);
-      });
-      hero.addEventListener('mouseleave', function () { gx = 0; gz = 0; if (!raf) raf = requestAnimationFrame(settle); });
-      rdOn(window, 'resize', function () { base = null; band.style.transform = ''; });
-    }
 
-    // ---- drag the band: a grab hand, the rows follow the pointer along the band, a flick keeps going
-    // and dies out; while held the rows' own motion eases to a stop and picks up after.
-    if (stage) {
-      var dragRows = null, axis = null, lastX = 0, lastY = 0, lastT = 0, vel = 0, inertia = null, dragging = false;
-      var rowsOf = function () {
-        return qsa('.band_row:not(.is-names)', hero).map(function (r) { // the names strip keeps its own pace
-          var list = qs('[data-marquee-collection-target]', r);
-          var tween = (window.gsap && list) ? gsap.getTweensOf(list).filter(function (t) { return t.duration() > 0; })[0] : null;
-          if (tween && r.__base == null) r.__base = tween.timeScale() || 1;
-          return { el: r, tween: tween, width: list ? list.offsetWidth : 0 };
-        });
-      };
-      var rowAxis = function (px, py) {
-        var list = qs('.band_row:not(.is-names) .band_row-list', hero);
-        var ps = list ? list.children : [], best = -1, bd = Infinity;
-        for (var i = 0; i < ps.length - 1; i++) {
-          var c = ps[i].getBoundingClientRect(), d = Math.hypot(c.left + c.width / 2 - px, c.top + c.height / 2 - py);
-          if (d < bd) { bd = d; best = i; }
-        }
-        if (best < 0) return null;
-        var a = ps[best].getBoundingClientRect(), b = ps[best + 1].getBoundingClientRect();
-        var vx = (b.left + b.width / 2) - (a.left + a.width / 2), vy = (b.top + b.height / 2) - (a.top + a.height / 2);
-        var len = Math.hypot(vx, vy), bandPx = ps[best + 1].offsetLeft - ps[best].offsetLeft;
-        return len ? { x: vx / len, y: vy / len, scale: bandPx / len } : null;
-      };
-      var shift = function (px) {
-        dragRows.forEach(function (r) {
-          if (!r.tween || !r.width) return;
-          var p = r.tween.progress() - px / r.width;
-          r.tween.progress(p - Math.floor(p));
-        });
-      };
-      var hold = function (on) { // no lift under a moving hand (the curve writes its own transforms)
-        if (!curve) qsa('.band_panel', hero).forEach(function (p) { p.style.transform = on ? 'none' : ''; });
-        hero.classList.toggle('is-dragging', on);
-      };
-      var stop = function () {
-        if (!dragging) return;
-        dragging = false; hold(false);
-        var v = Math.max(-3, Math.min(3, vel)), prev = performance.now();
-        var step = function (now) {
-          var dt = Math.min(50, now - prev); prev = now;
-          shift(v * dt); v *= Math.pow(0.95, dt / 16.7);
-          inertia = Math.abs(v) > 0.005 ? requestAnimationFrame(step) : null;
-        };
-        if (inertia) cancelAnimationFrame(inertia);
-        inertia = requestAnimationFrame(step);
-        dragRows.forEach(function (r) { if (r.tween) gsap.to(r.tween, { timeScale: r.el.__base, duration: 1.6, ease: 'power2.out', overwrite: true }); });
-      };
-      stage.addEventListener('pointerdown', function (e) {
-        if (e.button !== 0) return;
-        dragRows = rowsOf(); axis = rowAxis(e.clientX, e.clientY);
-        if (!axis || !dragRows.some(function (r) { return r.tween; })) return;
-        dragging = true; hold(true);
-        try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-        lastX = e.clientX; lastY = e.clientY; lastT = e.timeStamp; vel = 0;
-        if (inertia) { cancelAnimationFrame(inertia); inertia = null; }
-        dragRows.forEach(function (r) { if (r.tween) gsap.to(r.tween, { timeScale: 0, duration: 0.4, ease: 'power2.out', overwrite: true }); });
-        e.preventDefault();
-      });
-      stage.addEventListener('pointermove', function (e) {
-        if (!dragging) return;
-        var dx = e.clientX - lastX, dy = e.clientY - lastY, dt = e.timeStamp - lastT;
-        var along = (dx * axis.x + dy * axis.y) * axis.scale;
-        shift(along);
-        if (dt > 0) vel = 0.7 * (along / dt) + 0.3 * vel;
-        lastX = e.clientX; lastY = e.clientY; lastT = e.timeStamp;
-      });
-      stage.addEventListener('pointerup', stop);
-      stage.addEventListener('pointercancel', stop);
-      stage.addEventListener('lostpointercapture', stop);
-    }
-
-    // ---- where the band opens: the first panel a third in from the left, the second beside it.
-    // The marquee is a looping tween on the row's list; its progress is scanned for that spot.
-    var startAt = function () {
-      var list = qs('.band_row:not(.is-names) [data-marquee-collection-target]', hero);
-      var tween = (window.gsap && list) ? gsap.getTweensOf(list).filter(function (t) { return t.duration() > 0; })[0] : null;
-      if (!tween) return false;
-      var first = qs('.band_panel', list), want = first && first.getAttribute('data-band-name');
-      if (!want) return true;
-      var tx = window.innerWidth * 0.38, ty = window.innerHeight * 0.55, best = null;
-      var panels = qsa('.band_panel', list.parentNode).filter(function (p) { return p.getAttribute('data-band-name') === want; });
-      for (var p = 0; p < 1; p += 0.02) {
-        tween.progress(p);
-        panels.forEach(function (el) { var r = el.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - tx, r.top + r.height / 2 - ty); if (!best || d < best.d) best = { d: d, p: p }; });
-      }
-      tween.progress(best ? best.p : 0.5);
-      return true;
-    };
 
     // ---- the old home's move: the section scrolls away with the page (the Designer keeps it in flow, not fixed),
     // and the moment the visitor scrolls the copy fades and blurs away in place, the scroll prompt even sooner.
-    // A page that still pairs a fixed hero with a [data-band-spacer] gets the same, measured on the spacer.
     // Off-screen, the hero hides and its clips pause until the visitor comes back.
-    var spacer = qs('[data-band-spacer]'), scrollRef = spacer || hero;
+    var scrollRef = hero;
     // ---- home-v4, the scroll pieces that must exist before anyone scrolls. Not in fadeBehind, which waits for the
     // opening: a trigger made mid-scroll snaps the drum to the current progress, the "straight, then clips to 3D"
     // Rimbo saw. The 3D exit: as the hero leaves, the whole drum tips over about its centre (no recede, it keeps its
@@ -4824,7 +3070,7 @@
         onUpdate: function (st) { scrolled = st.progress > 0.02; ringApi.scroll(st.progress); }
       });
     }
-    if (window.ScrollTrigger && !reduced && slider && kind === 'spatial') {
+    if (window.ScrollTrigger && !reduced && slider) {
       if (exitTilt) {
         gsap.set(slider, { rotationX: 0, transformPerspective: exitDepth, transformOrigin: '50% 50%', force3D: true });
         gsap.to(slider, { rotationX: exitTilt, transformPerspective: exitDepth, transformOrigin: '50% 50%', force3D: true, ease: 'none', scrollTrigger: { trigger: scrollRef, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } });
@@ -4870,10 +3116,6 @@
     var fadeBehind = function () {
       if (!window.ScrollTrigger) return;
       var quick = function () { return '+=' + Math.round(window.innerHeight * fadeFrac); }; // gone within the first fifth of a screen (fadeFrac)
-      if (wheel && spin) { // the wheel turns with the scroll: spin degrees over the first screen, back again on the way up
-        var spun = 0;
-        ScrollTrigger.create({ trigger: scrollRef, start: 'top top', end: 'bottom top', onUpdate: function (st) { var want = -spin * st.progress; if (!wheelHeld()) turn(want - spun); spun = want; } });
-      }
       if (copy && !ring) {
         if (landing) {
           // home-v4-landing (Rimbo): scrolling down the copy blurs out with the scroll as on home-v4 (a short catch-up tween
@@ -4888,7 +3130,7 @@
         } else gsap.to(copy, { opacity: 0, filter: 'blur(10px)', ease: 'power1.out', scrollTrigger: { trigger: scrollRef, start: 'top top', end: quick, scrub: true, invalidateOnRefresh: true } });
         // pinned while it blurs (Rimbo, 4 Nov): the copy rides the scroll back exactly as the hero moves up, so it
         // stays put on screen and the band slides away underneath it. Only for the in-flow hero; a fixed one is pinned already.
-        if (!spacer && !ring) gsap.to(copy, { y: function () { return hero.offsetHeight; }, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } }); // (a pinned hero keeps it in place by itself)
+        gsap.to(copy, { y: function () { return hero.offsetHeight; }, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true } }); // (a pinned hero keeps it in place by itself)
       }
       // the scroll line is still fading in (its CSS entrance runs 1.6-2.8 s after the opening), so its
       // scrub waits for that to end, then takes over without the transition fighting every scroll step
@@ -4903,53 +3145,6 @@
       });
     };
 
-    // ---- the curve (experiment): with ?curve=N (or data-band-curve="N" on the section) the panels
-    // leave the straight line by N degrees per panel of distance from the band's centre, each with its own
-    // perspective(), so the band stays one flat layer. ?flat=F keeps the middle F panels either side of the
-    // centre straight, so only the ends bend. ?bend= picks the shape (or data-band-bend):
-    //   cyl   (default) the ends turn and go back, like a band over a drum
-    //   flare the ends turn and come forward, towards the camera (capped well short of it)
-    //   s     one end goes back and the other comes forward: an S in depth
-    //   plane the band bends within its own plane, like an S drawn on the table
-    // A negative N flips the direction of whichever shape.
-    curve = parseFloat((/[?&]curve=(-?[\d.]+)/.exec(query) || [])[1]);
-    if (isNaN(curve)) curve = parseFloat(hero.getAttribute('data-band-curve')) || 0;
-    var flat = parseFloat((/[?&]flat=([\d.]+)/.exec(query) || [])[1]);
-    if (isNaN(flat)) flat = parseFloat(hero.getAttribute('data-band-flat')) || 0;
-    var bendMode = (/[?&]bend=(\w+)/.exec(query) || [])[1] || hero.getAttribute('data-band-bend') || 'cyl';
-    // ?p3d=1 (or data-band-3d): the band keeps its children in 3D (transform-style: preserve-3d on the band in
-    // the Designer), so the panels really leave the band's plane under the stage's own perspective; the
-    // per-panel perspective() is then left out
-    var p3d = /[?&]p3d=1/.test(query) || hero.hasAttribute('data-band-3d');
-    if (!band) curve = 0; // the curve bends the single band's panels: a drum or a dial has none
-    if (p3d && curve) band.style.transformStyle = 'preserve-3d';
-    if (curve && !reduced) {
-      var crow = qs('.band_row:not(.is-names)', hero), cscroll = crow && qs('[data-marquee-scroll-target]', crow);
-      var persp = 1400, sign = curve < 0 ? -1 : 1, step = Math.abs(curve), zCap = persp * 0.35;
-      var bend = function () {
-        if (cscroll && !hidden && !narrow()) {
-          var center = band.offsetWidth / 2, sx = parseFloat(gsap.getProperty(cscroll, 'x')) || 0;
-          qsa('[data-marquee-collection-target]', crow).forEach(function (list) {
-            var lx = list.offsetLeft + (parseFloat(gsap.getProperty(list, 'xPercent')) || 0) / 100 * list.offsetWidth + sx;
-            qsa('.band_panel', list).forEach(function (pnl) {
-              var pitch = pnl.offsetWidth * 1.0625;
-              var d = (lx + pnl.offsetLeft + pnl.offsetWidth / 2 - center) / pitch, dir = d < 0 ? -1 : 1;
-              var u = dir * Math.max(0, Math.abs(d) - flat);
-              var theta = Math.max(-70, Math.min(70, u * step)), rad = theta * Math.PI / 180;
-              var R = pitch / Math.sin(step * Math.PI / 180), arc = R * (1 - Math.cos(rad)), tf;
-              if (bendMode === 'flare') tf = 'translateZ(' + Math.min(arc, zCap).toFixed(1) + 'px) rotateY(' + (sign * theta).toFixed(2) + 'deg)';
-              else if (bendMode === 's') tf = 'translateZ(' + (dir * sign * Math.min(arc, zCap)).toFixed(1) + 'px) rotateY(' + (-theta).toFixed(2) + 'deg)';
-              else if (bendMode === 'plane') tf = 'translateY(' + (-dir * sign * arc).toFixed(1) + 'px) rotateZ(' + (-sign * theta * 0.5).toFixed(2) + 'deg)';
-              else tf = 'translateZ(' + (-arc).toFixed(1) + 'px) rotateY(' + (-sign * theta).toFixed(2) + 'deg)';
-              pnl.style.transition = 'box-shadow .6s';
-              pnl.style.transform = (p3d ? '' : 'perspective(' + persp + 'px) ') + tf;
-            });
-          });
-        }
-        requestAnimationFrame(bend);
-      };
-      requestAnimationFrame(bend);
-    }
 
     // ---- the opening, in order: the band rises, the title letters come up like the old hero,
     // the eyebrow and the buttons follow, the scroll line, and last the logo and the burger.
@@ -4965,32 +3160,15 @@
       // home-v4 (Rimbo): the copy first, then the cards. No rise and no fade for the stage (Rimbo: not needed);
       // once the title is nearly in, each whole card (frame, shadow and clip as one) grows from one pixel at its
       // centre to full size, the middle card first and the rest following outward.
-      // The wheel (home-v3) does not wait: it rolls in with the reveal (startDrift above, from an empty wheel), unless
-      // ?rollin=0, when it opens title-first like V4: the top card alone slides in from the right, then the others
-      // grow in at their places (the flyAfter block below).
-      var cardsAfter = ((!!slider && kind === 'spatial') || !!ringApi) && !landing && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
-      var flyAfter = !!wheel && !rollIn && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
-      // home-v5 (Rimbo): the same order for the glass carousel — the title first, then the canvases expand from the
-      // middle. That expand is rdGlassCarousel's intro; it waits for the "band:stage-in" event fired with the stage reveal.
-      // The glass wheel (data-glass-carousel-arc) opens like V3 instead: the stage with the reveal, rolling in (Rimbo, 2026-11-05: the title-first fly-in was sent back).
-      var glassAfter = !!qs('[data-glass-carousel]:not([data-glass-carousel-arc])', hero) && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
-      if (rollIn && wheel && wheel._radialSliderProxy) { // the roll-in: every card hidden, the wheel rolling one loop (or rollIn degrees) from the reveal
-        if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // no rise and no fade: the cards arrive along the circle, nothing else moves
-        var rollStep = Math.abs(parseFloat(getComputedStyle(wheel).getPropertyValue('--slider-rotate'))) || 18;
-        var rollDeg = rollIn > 0 ? rollIn : qsa('[data-radial-slider-item]', wheel).length * rollStep; // one loop: every card comes in once and the wheel ends where it began
-        hideCards(); turn(rollDeg); startDrift(rollDeg);
-      }
-      var stageNow = !(cardsAfter || glassAfter || flyAfter);
-      if (stageNow && stage && !reduced && qs('[data-glass-carousel-arc]', hero)) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the glass wheel: no rise and no fade, its panels arrive one by one (V3)
+      var cardsAfter = (!!slider || !!ringApi) && !landing && !reduced && !!window.gsap && typeof SplitText !== 'undefined';
+      var stageNow = !cardsAfter;
       if (loader && landing) loader.style.transition = 'opacity .5s ease-out'; // the landing starts under the loader: a quicker fade, so the drum is seen setting off
       [stageNow ? stage : null, landing ? null : copy, loader].forEach(function (el) { if (el) el.classList.add('is-ready'); }); // the landing shows the copy only when the title comes in (its halo would veil the drum passing behind it)
-      if (stageNow && stage) window.dispatchEvent(new CustomEvent('band:stage-in')); // a glass carousel's intro waits for this
       if (loader) setTimeout(function () { loader.remove(); }, 1200);
       var done = function () {
         if (myScope && myScope.left) return; // a link was followed mid-opening: the clock, the drift and the scroll fades are not for a page on its way out
         if (scrollLine) scrollLine.classList.add('is-ready');
-        window.dispatchEvent(new CustomEvent('band:stage-in')); // the stage is in by now whichever way it opened (a glass carousel waits for this)
-        autoStep(); startDrift();
+        autoStep();
         nav.forEach(function (el) { gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out', clearProps: 'opacity' }); });
         // the reveal transitions have run; hand the elements to the scroll fade
         setTimeout(function () { if (copy) copy.style.transition = 'none'; fadeBehind(); }, 1900);
@@ -5031,37 +3209,8 @@
         tl.call(function () { if (stage) stage.classList.add('is-ready'); }, null, 0.98)
           .to(panels, { scale: 1, duration: 1.1, ease: 'expo.out', stagger: 0.1, clearProps: 'transform' }, 1);
       }
-      if (flyAfter) { // the wheel's fly-in (?rollin=0): the stage snaps in once the title is nearly in (no rise, no fade), the top
-        // card alone slides in from beyond the right edge straight to its place (the way the wheel turns), then every other
-        // card grows from one pixel at its place on the circle, the nearest pair first and the rest ring by ring outward.
-        // The cards are grown inside Osmo's items (each .band_panel about its own centre), so the items keep Osmo's rotation
-        // and a hand on the wheel still works during the opening. The timeline ends with the last ring on screen, so done()
-        // (the drift, the step clock) only runs once every card is in: from then on the wheel only ever turns.
-        // (Rimbo sent this opening back on V5 the same night; on V3 it waits behind the knob for his verdict on this wheel.)
-        var rotateStep = Math.abs(parseFloat(getComputedStyle(wheel).getPropertyValue('--slider-rotate'))) || 18;
-        var onScreen = Math.ceil(108 / rotateStep); // rings of cards either side that are on screen at all; the rest grow with the last of these
-        var top = null, others = [], rings = [];
-        qsa('[data-radial-slider-item]', wheel).forEach(function (item) {
-          var panel = qs('.band_panel', item) || item, ring = Math.round(Math.abs(parseFloat(gsap.getProperty(item, 'rotation')) || 0) / rotateStep);
-          if (!top && ring === 0) top = panel; else { others.push(panel); rings.push(Math.min(ring, onScreen)); }
-        });
-        if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // the Designer's rise + fade are off: the cards are the entrance
-        if (others.length) gsap.set(others, { scale: 0.002, transformOrigin: '50% 50%' }); // one pixel, where each card's centre is
-        if (top) gsap.set(top, { x: window.innerWidth - top.getBoundingClientRect().left + 40 }); // its left edge just beyond the right edge of the screen
-        tl.call(function () { if (stage) stage.classList.add('is-ready'); }, null, 0.98);
-        if (top) tl.to(top, { x: 0, duration: flyIn, ease: 'expo.out', clearProps: 'transform' }, 1);
-        if (others.length) tl.to(others, { scale: 1, duration: fillGrow, ease: 'expo.out', clearProps: 'transform', stagger: function (i) { return Math.max(0, rings[i] - 1) * fillSpread; } }, 1 + fillStart);
-      }
-      if (glassAfter) {
-        if (stage) { stage.style.transition = 'none'; gsap.set(stage, { y: 0 }); } // no rise and no fade: the canvases expanding from the middle are the entrance
-        tl.call(function () { if (stage) stage.classList.add('is-ready'); window.dispatchEvent(new CustomEvent('band:stage-in')); }, null, 0.98);
-      }
     };
-    var ready = function () {
-      if (!band) return open(); // startAt looks for the marquee rows; a hero without them (the Osmo sliders, the dial) would wait 90 frames for nothing
-      var tries = 0;
-      (function go() { if (!startAt() && tries++ < 90) return requestAnimationFrame(go); open(); })();
-    };
+    var ready = open;
     if (!loader) { ready(); return; }
     var num = qs('.band_loader-n', loader), bar = qs('.band_loader-fill', loader);
     var t0 = performance.now(), shown = 0;
@@ -7827,7 +5976,7 @@
     run('faq', rdFaq);
 
     if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
-    else if (path === '/' || path === '/home-copy') run('home', rdHome); // Home Copy is the redesign test page, a copy of the home
+    else if (path === '/') run('home', rdHome);
     else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);
     else if (path === '/work') run('work', rdWork);
     else if (path.indexOf('/work/') === 0) run('case study', rdWorkItem);
@@ -7843,7 +5992,6 @@
   // The ones that need the whole page in place first
   function initLateFunctions() {
     var path = pagePath();
-    if (qs('[data-glass-carousel]')) run('glass carousel', rdGlassCarousel);
     if (path === '/audit') run('letter reveal', rdLetterReveal, { duration: 2, delay: 0.4 });
     if (path === '/my-story') run('letter reveal', rdLetterReveal, { duration: 1.4, delay: 0.3 });
   }
