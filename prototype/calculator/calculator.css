@@ -39,9 +39,11 @@
 .calc_ball.is-top { position: absolute; inset: 0 0 auto 0; height: 420px; }
 
 .calc { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
-/* On the site (data-calc-align="left" on the section): the section's own side padding in the Designer sets the edges, the
-   same 5% as the nav, so the calculator starts in line with the logo. Same width as before, the ball keeps the space on the right */
-[data-calc-align="left"] .calc { max-width: 1032px; margin-left: 0; padding-left: 0; padding-right: 0; }
+/* On the site, data-calc-align on the section: the section's own side padding in the Designer (5%) sets the edges, so the
+   calculator adds none of its own (same width as before, the ball keeps the space on the right).
+   "center" = centred on every screen (/proposal since 2026-11-10), "left" = starts on that padding, in line with a nav logo */
+[data-calc-align] .calc { max-width: 1032px; padding-left: 0; padding-right: 0; }
+[data-calc-align="left"] .calc { margin-left: 0; }
 /* What the page puts under the calculator (data-calc-end, made in the Designer: the logo back to the site): centred under
    the boxes, on a phone under everything. Its look (size, quietness, the space above it) is the Designer's */
 [data-calc] .calc > [data-calc-end] { display: table; margin-left: auto; margin-right: auto; } /* a table hugs its content and keeps a set width */
