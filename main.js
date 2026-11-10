@@ -6866,10 +6866,11 @@
     rdOn(window, 'resize', function () { if (!rulerOn) return; clearTimeout(rulerTimer); rulerTimer = setTimeout(function () { sizeLabel(true); }, 120); });
 
     // ---- hover (mouse only): the HTML types back in (not on the email and Based in, they swap) + an orange outline ----
-    // one hover state for the whole cell, and only once the footer has stopped moving: the cells slide until p is 1, and a hover
-    // that started earlier flipped on and off under a resting pointer (Rimbo: it shifts). A pointer already resting on a cell gets
-    // it the moment the footer lands. The HTML is typed by the build only, not on hover
-    var done = false, over = null;
+    // one hover state for the whole cell. Each cell takes it as soon as it is built, not when the whole footer has landed
+    // (Rimbo: someone who scrolls 60% in would never see a hover). It goes again a little below that point, so a small scroll
+    // back and forth can't flicker it. A pointer already resting on a cell gets it the moment the cell is done.
+    // The HTML is typed by the build only, not on hover
+    var over = null;
     if (canHover) {
       qsa('.rdf-cell', foot).forEach(function (cell) {
         var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'rdf-draw'); svg.setAttribute('aria-hidden', 'true');
@@ -6884,7 +6885,7 @@
           cell.classList.add('is-drawn');
         };
         cell.rdfOff = function () { cell.classList.remove('is-drawn'); };
-        cell.addEventListener('mouseenter', function () { over = cell; if (done) cell.rdfOn(); });
+        cell.addEventListener('mouseenter', function () { over = cell; if (cell.rdfReady) cell.rdfOn(); });
         cell.addEventListener('mouseleave', function () { over = null; cell.rdfOff(); });
       });
     }
@@ -6924,9 +6925,14 @@
           b.caret.style.left = (typed.a.x + typed.a.w * typed.k) + 'px';
           b.caret.style.top = typed.a.y + 'px'; b.caret.style.height = typed.a.h + 'px';
         } else b.caret.style.opacity = 0;
+        // built: its last line has written in (the logo cell has none of its own: once the letters are filled in)
+        var ready = b.kids.length ? 0.5 + o + (b.kids.length - 1) * 0.03 + 0.14 : 0.8;
+        var isReady = p > (b.el.rdfReady ? ready - 0.05 : ready);
+        if (isReady !== !!b.el.rdfReady) {
+          b.el.rdfReady = isReady;
+          if (over === b.el) b.el[isReady ? 'rdfOn' : 'rdfOff']();
+        }
       });
-      var landed = p > (done ? 0.97 : 0.995); // it stays on through a tiny scroll
-      if (landed !== done) { done = landed; if (over) over[done ? 'rdfOn' : 'rdfOff'](); }
     }
 
     // ---- the engine: the footer rises at half the scroll speed, so the page seems to slide off it ----
