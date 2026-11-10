@@ -664,6 +664,9 @@
           var started = startCube(data, function () {
             if (!back) return;
             gsap.set(next, { autoAlpha: 1 });
+            // the home's band hides the logo and the burger for its opening and brings them in last. You land far below
+            // that opening, so they stay, as on the way there (Rimbo: "why do they disappear at all?")
+            qsa('.bold-nav-full__bar').forEach(function (el) { gsap.killTweensOf(el); gsap.set(el, { clearProps: 'opacity' }); });
             window.scrollTo(0, y); // the page you came from, back at your spot
             if (hasScrollTrigger) ScrollTrigger.update();
             pass = qs('.pass', next);
@@ -706,7 +709,22 @@
 
           var stage = tearEl('tear_stage', parent);
 
+          // The site's grain lies over each page as a fixed layer. Under the flat dark it dropped out and came back with
+          // the next page, so the dark changed tone twice (Rimbo: "some background color alteration"). One copy lies over
+          // the whole tear instead, and the pages' own layers wait until it is done
+          var grains = qsa('.grain', current).concat(qsa('.grain', next)), grain = null;
+          if (grains.length) {
+            grain = grains[0].cloneNode(false);
+            grain.removeAttribute('id');
+            grain.style.zIndex = 999;
+            grain.style.pointerEvents = 'none';
+            parent.appendChild(grain);
+            grains.forEach(function (el) { el.style.visibility = 'hidden'; });
+          }
+
           function done() {
+            if (grain) grain.remove();
+            grains.forEach(function (el) { el.style.visibility = ''; });
             stage.remove();
             under.remove();
             if (over) over.remove();
