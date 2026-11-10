@@ -2233,9 +2233,10 @@
 
     // ---- pictures: each file is fetched once, ahead of its question ----
     var loaded = {};
+    var images = {};
     function fetchImage(file) {
       if (!loaded[file]) {
-        var image = new Image();
+        var image = images[file] = new Image();
         loaded[file] = new Promise(function (resolve) {
           image.onload = image.onerror = function () { resolve(); };
         });
@@ -2257,8 +2258,23 @@
         el.removeAttribute('srcset'); // Webflow's own responsive list would win over the new src
         el.removeAttribute('sizes');
         el.src = CDN + file;
+        if (el === endImageEl) fitEndFrame(images[file]);
         gsap.to(el, { opacity: 1, duration: reduce ? 0 : 0.25, ease: 'power1.out' });
       });
+    }
+    // The three ending GIFs have three shapes (wide, nearly square, square): the frame takes the shape of the one shown,
+    // as tall as the Designer allows the picture to be (its max-height) and never wider than the frame's own width there
+    function fitEndFrame(image) {
+      var frame = endImageEl.parentElement;
+      if (!frame || !image || !image.naturalWidth) return;
+      var ratio = (image.naturalWidth / image.naturalHeight).toFixed(4);
+      frame.style.width = '';
+      var widest = getComputedStyle(frame).width;
+      var tallest = getComputedStyle(endImageEl).maxHeight;
+      if (!parseFloat(tallest)) return;
+      frame.style.aspectRatio = ratio;
+      frame.style.maxWidth = '100%'; // the widths below are pixels: a phone turned on its side must still fit
+      frame.style.width = 'min(' + widest + ', calc(' + tallest + ' * ' + ratio + '))';
     }
 
     // ---- moving a screen's parts in and out ----
