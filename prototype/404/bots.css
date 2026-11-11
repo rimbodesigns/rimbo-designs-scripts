@@ -75,3 +75,14 @@ body { background: var(--color--black); }
 .lost_row { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: .75rem; }
 
 .lost :focus-visible { outline: 2px solid var(--lost-accent); outline-offset: 3px; }
+
+/* the arcade screen (screen.js). The cabinet: the page's container becomes the frame, the section the tube inside it. */
+[data-barba="container"]:has(> .lost[data-fx-frame]) { height: 100svh; min-height: 30rem; box-sizing: border-box; padding: clamp(14px, 2.6vmin, 34px); background: linear-gradient(#262524, #171616 60%, #1c1b1a); }
+[data-barba="container"]:has(> .lost[data-fx-frame]) > .lost { height: 100%; min-height: 0; border-radius: clamp(16px, 3.2vmin, 44px); box-shadow: 0 0 0 3px #0b0b0b, 0 0 0 4px #33312f, 0 0 70px rgba(228, 68, 28, .07); }
+/* a curved screen has no corners: what sits in them moves in. The script measures how far (--fx-safe, --bots-safe-x/y). */
+.lost[data-fx] .lost_hud { left: calc(2rem + var(--fx-safe, 0px)); right: calc(2rem + var(--fx-safe, 0px)); bottom: calc(1.5rem + var(--fx-safe, 0px) * .6); }
+.lost[data-fx] .lost_logo { left: calc(2rem + var(--fx-safe, 0px)); top: calc(1.5rem + var(--fx-safe, 0px) * .6); }
+@media (max-width: 767px) { .lost[data-fx] .lost_hud { left: calc(1rem + var(--fx-safe, 0px)); right: calc(1rem + var(--fx-safe, 0px)); } .lost[data-fx] .lost_logo { left: calc(1rem + var(--fx-safe, 0px)); } }
+/* on the site: the menu's logo and button, which sit outside the section */
+.bold-nav-full__logo { translate: var(--bots-safe-x, 0px) var(--bots-safe-y, 0px); }
+.bold-nav-full__hamburger { translate: calc(var(--bots-safe-x, 0px) * -1) var(--bots-safe-y, 0px); }

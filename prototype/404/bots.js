@@ -14,6 +14,8 @@
 //   [data-bots-start]     starts a round     [data-bots-quit]  back to the plain 404     [data-bots-sound]  sound on/off
 //   [data-bots-score] [data-bots-best] [data-bots-wave]   numbers       [data-bots-life]  one element per life (gets .is-off)
 //   --lost-mid            set on the section: the middle of the gap between the formation and the fighter, in px
+//   data-bots-out         optional, seconds: how long leaving by a link takes before the page transition starts (0.75)
+// Every moment (hit, hurt, boom, clear, ufo, start, launch, over ...) is also a 'rdbots' event on the section: screen.js listens to it.
 // Keys: arrows or A/D, space to shoot, M sound, Esc to quit. Mouse: the fighter follows it, hold to shoot. Touch: drag, it shoots by itself.
 // Leaving the page by a link: everything fades, the fighter launches off the top, then the site's page transition takes over.
 // ?botsdebug=1 exposes window.rdBotsDebug for tests.
@@ -105,7 +107,7 @@ function rdBots(root) {
   var fireT = 0, bombT = 0, diveT = 0, ufoT = 5, gap = 0, time = 0, clock = 0, shake = 0, intro = 0, warp = 0, boilT = 0;
   var score = 0, wave = 1, why = '';
   var in0 = performance.now();      // when the page opened: the opening sequence runs off this
-  var tilt = 0, lift = 0, fade = 1, leaveT = 0, leaveTo = '', gone = false, leaveTimer = 0;
+  var tilt = 0, lift = 0, fade = 1, leaveT = 0, leaveTo = '', gone = false, leaveTimer = 0, outT = 0.75;
   var raf = 0, last = 0, lastFrame = 0, ticker = 0, born = performance.now(), navEl = null, dead = false;
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -152,7 +154,10 @@ function rdBots(root) {
     clear: function () { [523, 659, 784].forEach(function (f, i) { tone(f, f, 0.1, 'square', 0.3, i * 0.1); }); tone(1047, 1047, 0.25, 'square', 0.3, 0.3); },
     over: function () { tone(392, 392, 0.16, 'square', 0.3); tone(311, 311, 0.16, 'square', 0.3, 0.16); tone(233, 233, 0.4, 'square', 0.3, 0.32); }
   };
-  function sfx(k) { if (AC && !muted) { try { SFX[k](); } catch (e) {} } }
+  function sfx(k) {
+    try { root.dispatchEvent(new CustomEvent('rdbots', { detail: k })); } catch (e) {}     // the moment, for anything that wants to react to it (also with the sound off)
+    if (AC && !muted) { try { SFX[k](); } catch (e) {} }
+  }
   function sound(on) {
     muted = !on; flag('data-bots-muted', muted);
     try { localStorage.setItem(MUTE, muted ? '1' : '0'); } catch (e) {}
@@ -397,8 +402,9 @@ function rdBots(root) {
     ambient(dt);
     if (S === 'leave') {          // on the way out: the rest fades, the fighter goes up faster and faster
       leaveT += dt; fade = Math.max(0, 1 - leaveT / 0.35); tilt *= 0.8;
-      lift += H * (0.4 + 5 * leaveT) * leaveT * dt * 4;
-      if (leaveT > 0.75) depart();
+      var ls = outT > 1 ? 0.625 : 1, lt = leaveT * ls;      // a longer way out (the screen switches off after it): the launch takes its time too
+      lift += H * (0.4 + 5 * lt) * lt * dt * 4 * ls;
+      if (leaveT > outT) depart();
       return;
     }
     if (S !== 'play') return;
@@ -629,8 +635,9 @@ function rdBots(root) {
   }
   function leave(href) {
     leaveTo = href; leaveT = 0; gone = false; shots = []; held = false; keys.left = keys.right = keys.fire = false;
+    outT = +root.getAttribute('data-bots-out') || 0.75;      // seconds until the page transition takes over (screen.js asks for more)
     flag('data-bots-banner', null); setState('leave'); sfx('launch');
-    leaveTimer = setTimeout(depart, 1200);          // a sleeping tab still gets where it was going
+    leaveTimer = setTimeout(depart, outT * 1000 + 450);          // a sleeping tab still gets where it was going
     if (window.barba && barba.prefetch) { try { barba.prefetch(href); } catch (e) {} }     // the next page loads while the fighter launches
     wake();
   }

@@ -8,6 +8,7 @@
 </head>
 <body>
 
+<div data-barba="container">
 <main class="lost" data-bots data-bots-state="idle">
   <canvas class="lost_canvas" data-bots-canvas aria-hidden="true"></canvas>
   <div class="lost_grain" aria-hidden="true"></div>
@@ -57,11 +58,14 @@
     </div>
   </div>
 </main>
+</div>
 
 <script src="bots.js"></script>
+<script src="screen.js"></script>
 <script>
   if (/[?&]theme=light/.test(location.search)) document.querySelector('[data-bots]').setAttribute('data-bots-theme', 'light');
-  rdBots();
+  if (/[?&]screen=off/.test(location.search)) document.querySelector('[data-bots]').setAttribute('data-bots-screen', 'off');
+  rdBotsScreen(); rdBots();
 </script>
 </body>
 </html>

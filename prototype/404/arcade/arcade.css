@@ -1,0 +1,73 @@
+/* The arcade lab: the 404 game on the left, a panel of switches on the right.
+   Top part = what the screen effects need on the page (would move to the 404 with them). Bottom part = the lab panel only. */
+
+/* ---- the screen ---------------------------------------------------------------------------------- */
+.fx_picture { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.fx_glass { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; pointer-events: none; mix-blend-mode: multiply; }
+
+/* the titles join in: a little glow, and the same red and blue edges as the picture */
+.lost[data-fx] :is(.lost_copy, .lost_hud, .lost_wave, .lost_boss, .lost_end, .lost_logo) {
+  text-shadow: calc(var(--fx-tf, 0px) * -1) 0 0 rgba(255, 70, 50, .6), var(--fx-tf, 0px) 0 0 rgba(60, 170, 255, .6), 0 0 var(--fx-tg, 0px) rgba(248, 245, 238, var(--fx-tga, 0)); }
+.lost[data-fx] .btn { text-shadow: none; box-shadow: calc(var(--fx-tf, 0px) * -1) 0 0 rgba(255, 70, 50, .6), var(--fx-tf, 0px) 0 0 rgba(60, 170, 255, .6), 0 0 calc(var(--fx-tg, 0px) * 1.4) rgba(248, 245, 238, calc(var(--fx-tga, 0) * .7)); }
+/* a curved screen has no corners: what sits in them moves in */
+.lost[data-fx] .lost_hud { left: calc(2rem + var(--fx-safe, 0px)); right: calc(2rem + var(--fx-safe, 0px)); bottom: calc(1.5rem + var(--fx-safe, 0px) * .6); }
+.lost[data-fx] .lost_logo { left: calc(2rem + var(--fx-safe, 0px)); top: calc(1.5rem + var(--fx-safe, 0px) * .6); }
+
+/* ---- the lab ------------------------------------------------------------------------------------- */
+:root { --fxp-w: 19rem; color-scheme: light; }
+body { overflow: hidden; }
+.fx_stage { position: fixed; inset: 0 var(--fxp-w) 0 0; background: var(--color--black); }
+.fx_stage .lost { position: absolute; inset: 0; height: auto; min-height: 0; }
+body.is-wide .fx_stage { right: 0; }
+
+/* the cabinet: a frame around the tube */
+.fx_stage[data-bezel] { background: linear-gradient(#262524, #171616 60%, #1c1b1a); box-shadow: inset 0 0 0 1px #2e2d2b; }
+.fx_stage[data-bezel] .lost { inset: clamp(14px, 2.6vmin, 34px); border-radius: clamp(16px, 3.2vmin, 44px); box-shadow: 0 0 0 3px #0b0b0b, 0 0 0 4px #33312f, 0 0 70px rgba(228, 68, 28, .07); }
+
+.fxp { position: fixed; top: 0; right: 0; bottom: 0; width: var(--fxp-w); overflow-y: auto; overscroll-behavior: contain; padding: 1rem 1rem 1.5rem;
+  background: #F8F5EE; color: #131313; border-left: 1px solid #131313; font: 400 .66rem/1.3 "RM MONO", ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; -webkit-font-smoothing: antialiased; }
+body.is-wide .fxp { display: none; }
+.fxp button { font: inherit; letter-spacing: inherit; text-transform: inherit; color: #131313; cursor: pointer; }
+.fxp :focus-visible, .fxp_tab:focus-visible { outline: 2px solid #E4441C; outline-offset: 2px; }
+
+.fxp_head { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .9rem; }
+.fxp_head b { font: 900 1rem/1 IntegralNEW, Arial, sans-serif; letter-spacing: 0; margin-right: auto; }
+.fxp_fps { opacity: .5; font-variant-numeric: tabular-nums; }
+.fxp_link { padding: 0; border: 0; background: none; text-decoration: underline; text-underline-offset: .25em; }
+
+.fxp_set { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.fxp_set button { padding: .7em .2em; border: 1px solid #131313; border-radius: 3px; background: transparent; }
+.fxp_set button[aria-pressed="true"] { background: #131313; color: #F8F5EE; }
+.fxp_hold { width: 100%; margin-top: 4px; padding: .7em; border: 1px dashed rgba(19, 19, 19, .5); border-radius: 3px; background: transparent; touch-action: none; user-select: none; -webkit-user-select: none; }
+.fxp_hold:active { background: rgba(19, 19, 19, .08); }
+
+.fxp_group { margin: 1.3rem 0 .35rem; padding-bottom: .45rem; border-bottom: 1px solid rgba(19, 19, 19, .25); opacity: .55; }
+.fxp_row { display: grid; grid-template-columns: 1.75rem 1fr 5.2rem; align-items: center; gap: .55rem; min-height: 1.75rem; }
+.fxp_row.is-sub .fxp_name { opacity: .55; }
+.fxp_row.is-off .fxp_name { opacity: .45; }
+.fxp_row.is-off input, .fxp_row.is-idle input { opacity: .3; }
+.fxp_sw { position: relative; width: 1.75rem; height: .95rem; padding: 0; border: 1px solid rgba(19, 19, 19, .55); border-radius: 1rem; background: transparent; }
+.fxp_sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: calc(.95rem - 6px); height: calc(.95rem - 6px); border-radius: 50%; background: rgba(19, 19, 19, .55); transition: transform .15s; }
+.fxp_sw[aria-checked="true"] { background: #E4441C; border-color: #E4441C; }
+.fxp_sw[aria-checked="true"]::after { background: #F8F5EE; transform: translateX(.8rem); }
+
+.fxp input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 1.2rem; margin: 0; background: transparent; cursor: pointer; }
+.fxp input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: rgba(19, 19, 19, .3); }
+.fxp input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; margin-top: -4px; border-radius: 50%; background: #131313; border: 0; }
+.fxp input[type="range"]::-moz-range-track { height: 2px; background: rgba(19, 19, 19, .3); }
+.fxp input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: #131313; border: 0; }
+
+.fxp_try { display: flex; flex-wrap: wrap; gap: 4px; margin-top: .5rem; }
+.fxp_try span { width: 100%; opacity: .55; margin-bottom: .1rem; }
+.fxp_try button { padding: .55em .7em; border: 1px solid rgba(19, 19, 19, .55); border-radius: 3px; background: transparent; }
+.fxp_try button:active { background: #131313; color: #F8F5EE; }
+.fxp_foot { margin-top: 1.4rem; }
+.fxp_copy { width: 100%; padding: .85em; border: 1px solid #131313; border-radius: 3px; background: #131313; color: #F8F5EE !important; }
+.fxp_note { margin: .7rem 0 0; opacity: .55; line-height: 1.5; text-transform: none; letter-spacing: .02em; font-size: .7rem; }
+
+.fxp_tab { position: fixed; top: 1rem; right: 1rem; z-index: 20; padding: .6em .9em; border: 1px solid #131313; border-radius: 3px; background: #F8F5EE; color: #131313; font: 400 .66rem/1 "RM MONO", ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+
+@media (max-width: 800px) {
+  .fx_stage { right: 0; }
+  .fxp { z-index: 19; width: min(19rem, 88vw); box-shadow: -20px 0 60px rgba(0, 0, 0, .5); }
+}
