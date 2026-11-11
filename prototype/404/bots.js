@@ -17,6 +17,7 @@
 //   data-bots-out         optional, seconds: how long leaving by a link takes before the page transition starts (0.75)
 // Every moment (hit, hurt, boom, clear, ufo, start, launch, over ...) is also a 'rdbots' event on the section: screen.js listens to it.
 // Keys: arrows or A/D, space to shoot, M sound, Esc to quit. Mouse: the fighter follows it, hold to shoot. Touch: drag, it shoots by itself.
+// Keys win over the mouse: once you steer with keys, the mouse has to move a clear 40 px (or click) before the fighter follows it again.
 // Leaving the page by a link: everything fades, the fighter launches off the top, then the site's page transition takes over.
 // ?botsdebug=1 exposes window.rdBotsDebug for tests.
 function rdBots(root) {
@@ -104,6 +105,7 @@ function rdBots(root) {
   var ship = { x: 0, y: 0, w: 0, h: 0 }, lives = 3, safe = 0;
   var shots = [], bombs = [], bits = [], pops = [], stars = [], ufo = null, boss = null;
   var keys = { left: false, right: false, fire: false }, held = false, targetX = null;
+  var downs = {}, mouseOff = false, mouseX0 = null;      // which physical key holds which control; the mouse stands back while you steer with keys
   var fireT = 0, bombT = 0, diveT = 0, ufoT = 5, gap = 0, time = 0, clock = 0, shake = 0, intro = 0, warp = 0, boilT = 0;
   var score = 0, wave = 1, why = '';
   var in0 = performance.now();      // when the page opened: the opening sequence runs off this
@@ -244,7 +246,7 @@ function rdBots(root) {
     wave = 1; formation(); setSky(far);      // a new game starts at home again
     pose = 0; lives = 3; safe = 0; time = 0; shake = 0; score = 0; gap = 0; why = ''; warp = 0;
     shots = []; bombs = []; bits = []; pops = []; ufo = null; boss = null; targetX = null; held = false;
-    keys.left = keys.right = keys.fire = false; tilt = 0; lift = 0; fade = 1;
+    letGo(); tilt = 0; lift = 0; fade = 1;
     flag('data-bots-banner', null); hud();
   }
 
@@ -588,7 +590,13 @@ function rdBots(root) {
     else start();
   }
 
+  // Nothing may stay held by accident. On a Mac a key let go while Cmd is down (a screenshot, a shortcut) never reports it,
+  // so Cmd, a lost window, a hidden tab and the right-click menu all let everything go.
+  function act(k) { return k === 'ArrowLeft' || k === 'a' || k === 'A' ? 'left' : k === 'ArrowRight' || k === 'd' || k === 'D' ? 'right' : k === ' ' || k === 'Spacebar' || k === 'ArrowUp' ? 'fire' : ''; }
+  function keysUp() { keys.left = keys.right = keys.fire = false; downs = {}; }
+  function letGo() { keysUp(); held = false; }
   on(window, 'keydown', function (ev) {
+    if (ev.key === 'Meta' || ev.key === 'OS') return letGo();
     if (typing(ev.target) || ev.metaKey || ev.ctrlKey || ev.altKey || navOpen()) return;
     var k = ev.key;
     if (k === 'Enter') {                       // a control that is not a real button (a div in Webflow)
@@ -601,30 +609,45 @@ function rdBots(root) {
       if (k === ' ' || k === 'Spacebar') { if (ev.target && ev.target.closest && ev.target.closest('a')) return; ev.preventDefault(); start(); }
       return;
     }
-    if (k === 'ArrowLeft' || k === 'a' || k === 'A') { keys.left = true; ev.preventDefault(); }
-    else if (k === 'ArrowRight' || k === 'd' || k === 'D') { keys.right = true; ev.preventDefault(); }
-    else if (k === ' ' || k === 'Spacebar' || k === 'ArrowUp') { keys.fire = true; ev.preventDefault(); }
-    else if (k === 'Escape') quit();
+    var a = act(k);
+    if (a) {
+      keys[a] = true; downs[ev.code || k] = a; ev.preventDefault();
+      if (a !== 'fire') { mouseOff = true; mouseX0 = null; }      // steering with keys: a nudge of the mouse must not pull the fighter away
+    } else if (k === 'Escape') quit();
   });
   on(window, 'keyup', function (ev) {
-    var k = ev.key;
-    if (k === 'ArrowLeft' || k === 'a' || k === 'A') keys.left = false;
-    else if (k === 'ArrowRight' || k === 'd' || k === 'D') keys.right = false;
-    else if (k === ' ' || k === 'Spacebar' || k === 'ArrowUp') keys.fire = false;
+    if (ev.key === 'Meta' || ev.key === 'OS') return letGo();
+    // by the physical key, not its letter: a key that changed its letter while held (Shift, Alt) still lets go
+    var id = ev.code || ev.key, a = downs[id] || act(ev.key);
+    if (!a) return;
+    delete downs[id];
+    for (var c in downs) if (downs[c] === a) return;      // another key still holds this control
+    keys[a] = false;
   });
-  on(window, 'blur', function () { keys.left = keys.right = keys.fire = false; held = false; });
+  on(window, 'blur', letGo);
+  on(window, 'contextmenu', keysUp);      // keys only: a long press on a phone must not stop a finger that is steering
 
   on(root, 'pointerdown', function (ev) {
     if (ev.target.closest('a, button, ' + CTL)) return;     // links and buttons do their own thing
     if (S === 'idle') { ev.preventDefault(); start(); targetX = pointX(ev); held = ev.pointerType !== 'mouse'; return; }
     if (S !== 'play') return;
-    ev.preventDefault(); held = true; targetX = pointX(ev);
+    ev.preventDefault(); held = true; mouseOff = false; targetX = pointX(ev);
   });
-  on(root, 'pointermove', function (ev) { if (S === 'play' && (ev.pointerType === 'mouse' || held)) targetX = pointX(ev); });
+  on(root, 'pointermove', function (ev) {
+    if (S !== 'play') return;
+    if (ev.pointerType !== 'mouse') { if (held) targetX = pointX(ev); return; }
+    if (held && !ev.buttons) held = false;                // the button was let go outside the window
+    if (mouseOff) {                                        // after the keys, the mouse only takes over again once it really moves
+      if (mouseX0 == null) mouseX0 = ev.clientX;
+      if (Math.abs(ev.clientX - mouseX0) < 40) return;
+      mouseOff = false;
+    }
+    targetX = pointX(ev);
+  });
   on(window, 'pointerup', function () { held = false; });
   on(window, 'pointercancel', function () { held = false; });
   on(root, 'click', function (ev) { var ctl = ev.target.closest(CTL); if (ctl) { ev.preventDefault(); press(ctl); } });
-  on(document, 'visibilitychange', function () { if (document.hidden) { if (raf) cancelAnimationFrame(raf); raf = 0; } else wake(); });
+  on(document, 'visibilitychange', function () { if (document.hidden) { letGo(); if (raf) cancelAnimationFrame(raf); raf = 0; } else wake(); });
   on(window, 'resize', function () { layout(); draw(); });
 
   // ---- leaving by a link: fade, launch, then hand over to the site's page transition -------------
@@ -634,7 +657,7 @@ function rdBots(root) {
     if (window.barba && typeof barba.go === 'function') barba.go(leaveTo); else location.href = leaveTo;
   }
   function leave(href) {
-    leaveTo = href; leaveT = 0; gone = false; shots = []; held = false; keys.left = keys.right = keys.fire = false;
+    leaveTo = href; leaveT = 0; gone = false; shots = []; letGo();
     outT = +root.getAttribute('data-bots-out') || 0.75;      // seconds until the page transition takes over (screen.js asks for more)
     flag('data-bots-banner', null); setState('leave'); sfx('launch');
     leaveTimer = setTimeout(depart, outT * 1000 + 450);          // a sleeping tab still gets where it was going

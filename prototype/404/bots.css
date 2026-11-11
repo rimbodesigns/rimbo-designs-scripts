@@ -81,6 +81,7 @@ body { background: var(--color--black); }
 [data-barba="container"]:has(> .lost[data-fx-frame]) > .lost { height: 100%; min-height: 0; border-radius: clamp(16px, 3.2vmin, 44px); box-shadow: 0 0 0 3px #0b0b0b, 0 0 0 4px #33312f, 0 0 70px rgba(228, 68, 28, .07); }
 /* a curved screen has no corners: what sits in them moves in. The script measures how far (--fx-safe, --bots-safe-x/y). */
 .lost[data-fx] .lost_hud { left: calc(2rem + var(--fx-safe, 0px)); right: calc(2rem + var(--fx-safe, 0px)); bottom: calc(1.5rem + var(--fx-safe, 0px) * .6); }
+.lost[data-fx] .lost_hud-c { translate: 0 calc(var(--fx-safe, 0px) * .6); }     /* the controls line sits in the middle, where the glass does not fall away: it stays low, clear of the fighter */
 .lost[data-fx] .lost_logo { left: calc(2rem + var(--fx-safe, 0px)); top: calc(1.5rem + var(--fx-safe, 0px) * .6); }
 @media (max-width: 767px) { .lost[data-fx] .lost_hud { left: calc(1rem + var(--fx-safe, 0px)); right: calc(1rem + var(--fx-safe, 0px)); } .lost[data-fx] .lost_logo { left: calc(1rem + var(--fx-safe, 0px)); } }
 /* on the site: the menu's logo and button, which sit outside the section */
