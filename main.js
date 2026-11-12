@@ -5235,6 +5235,13 @@
 
     // ---- the boxes: an orange outline, the HTML it types, a caret ----
     var NS = 'http://www.w3.org/2000/svg';
+    // data-code may be written without the brackets and quotes (a class=ft_link href=/apply): easier in the Designer, and
+    // Webflow's API won't save < > or " in an attribute. They are put back here
+    function tagOf(v) {
+      v = (v || '').trim();
+      if (v.charAt(0) === '<') return v;
+      return '<' + v.replace(/([\w-]+)=([^\s"]+)/g, '$1="$2"') + '>';
+    }
     var boxes = qsa('[data-code]', foot).map(function (box) {
       var kids = Array.prototype.slice.call(box.children).filter(function (el) { return !el.hasAttribute('data-own'); });
       kids.forEach(function (k) { k.classList.add('rdf-rev'); });
@@ -5244,7 +5251,7 @@
       rect.setAttribute('pathLength', '1'); rect.style.strokeDasharray = '1 1';
       svg.appendChild(rect); box.appendChild(svg);
       var add = function (cls) { var e = document.createElement('span'); e.className = cls; e.setAttribute('aria-hidden', 'true'); box.appendChild(e); return e; };
-      return { el: box, kids: kids, rect: rect, code: add('rdf-code'), chars: classify(box.getAttribute('data-code')), caret: add('rdf-caret'), at: [] };
+      return { el: box, kids: kids, rect: rect, code: add('rdf-code'), chars: classify(tagOf(box.getAttribute('data-code'))), caret: add('rdf-caret'), at: [] };
     });
 
     // ---- the dashed guide lines on every cell edge, cut where they would run through a cell ----
