@@ -26,6 +26,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdFooter`, `rdLogoSwap` | pages with the Footer_rdf component | the animated footer and the F Brush logo |
 | `rdWall` | pages with the Wall of love | the testimonial slider with the shader balls |
 | `rdFaq` | pages with `[data-faq]` | the accordion + FAQPage structured data |
+| `rdPass`, `rdDfc`, `rdLogoTurn` | pages with the Journey pass (`.pass`), the Digital Feng Shui card (`.dfc`) or its logo | the ticket's lean, foil, clock and route; the card's outline, lean and blue zips; the logo's turn every 4.4 s (were scripts in the Webflow site head until 14 Nov 2026; their CSS stays there) |
 | `rdLocShow`, `rdLocBalls`, `rdLocFaqBtn`, `rdLocBtnAlt` | city pages | the showcase drum, the three balls, small button helpers |
 | `rdPostRefresh`, `rdScrollRuler`, `rdPostCards`, `rdCoverHueDrift` | `/post/…` (English) | the rebuilt post page, Osmo's Scroll Ruler (`docs/osmo/scroll-ruler.md`), the article cards |
 | `rdResources` (+ `rdChipBoil`, `rdLangToggle`, `rdQueuedReveal`, `rdMultiFilter`) | `/resources` | the filter, the chips, the language pill |

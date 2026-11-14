@@ -6152,6 +6152,262 @@
     });
   }
 
+  // =========================================================
+  // DFS LOGO TURN — the Digital Feng Shui logo on the closing cards (.duo_svg, .duo_svg_day, .dfc_svg), as on that site
+  // itself: every 4.4 s the ring (.m-ring) turns +45 and the star (.m-inner) -45, in .6 s. Each logo keeps its own count
+  // (rdA on the svg), so on a new page it starts at 0 again. The logo and the rule that keeps CSS transitions off its
+  // paths (they would fight the turn) live in Webflow. Was a script in the site head until 2026-11-14.
+  // =========================================================
+  var logoTurnEase = null;
+  function rdLogoTurn() {
+    var LOGOS = '.duo_svg, .duo_svg_day, .dfc_svg';
+    if (reducedMotion || !qs(LOGOS)) return;
+    setInterval(function () {
+      if (document.hidden) return;
+      if (!logoTurnEase) logoTurnEase = window.CustomEase ? CustomEase.create('rdDfsTurn', '0.625,0.05,0,1') : 'power2.inOut';
+      qsa(LOGOS).forEach(function (logo) {
+        var ring = qs('.m-ring', logo), inner = qs('.m-inner', logo);
+        if (!ring || !inner) return;
+        logo.rdA = (logo.rdA || 0) + 45;
+        gsap.to(ring, { rotation: logo.rdA, duration: 0.6, ease: logoTurnEase, transformOrigin: '50% 50%', overwrite: 'auto' });
+        gsap.to(inner, { rotation: -logo.rdA, duration: 0.6, ease: logoTurnEase, transformOrigin: '50% 50%', overwrite: 'auto' });
+      });
+    }, 4400);
+  }
+
+  // =========================================================
+  // DFS CARD — the Digital Feng Shui card (component CTA_dfs, classes dfc_*; lab prototype/dfs-card): what a class can't
+  // hold. The outline 8 px in with the ticket's cut corners, redrawn when the card changes size; is-in while the card is on
+  // screen (the logo unfolds on it, in the site head CSS); the same lean as the Journey pass (one pointer across the window,
+  // TILT = degrees, DEPTH = how far the [data-depth] layers shift, eased .07); the Digital Feng Shui site's blue zips on
+  // the grid lines (one every .3-1 s, 56-176 px tall, 140-440 px of travel, 1.4-2.6 s, at most 7). The lean's loop only
+  // runs while a card is on screen and the lean is still easing. Where the pointer was is remembered from page to page, so
+  // a card on the next page leans the right way before the mouse moves again. The look lives in Webflow (dfc_ classes and
+  // the site head CSS). Was a script in the site head until 2026-11-14.
+  // =========================================================
+  var dfcLean = { tx: 0, ty: 0, x: 0, y: 0 };
+  function rdDfc() {
+    var cards = qsa('.dfc:not([data-on])');
+    if (!cards.length) return;
+    var NS = 'http://www.w3.org/2000/svg', TILT = 5, DEPTH = 10, D = 8, C = 14 - D * 0.586;
+    var reduce = reducedMotion, fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var L = dfcLean, items = [], raf = 0;
+
+    function anyOn() { return items.some(function (it) { return it.on && it.c.isConnected; }); }
+    function loop() {
+      raf = 0;
+      if (!anyOn() || document.hidden) return;
+      L.x += (L.tx - L.x) * 0.07;
+      L.y += (L.ty - L.y) * 0.07;
+      items.forEach(function (it) {
+        if (!it.on || !it.c.isConnected) return;
+        it.c.style.transform = 'perspective(1600px) rotateX(' + (-L.y * TILT).toFixed(3) + 'deg) rotateY(' + (L.x * TILT).toFixed(3) + 'deg)';
+        var dx = L.x * DEPTH, dy = L.y * DEPTH;
+        it.layers.forEach(function (l) { l.e.style.transform = 'translate(' + (dx * l.k).toFixed(2) + 'px,' + (dy * l.k).toFixed(2) + 'px)'; });
+      });
+      if (Math.abs(L.tx - L.x) > 0.0004 || Math.abs(L.ty - L.y) > 0.0004) raf = requestAnimationFrame(loop);
+    }
+    var leaning = !reduce && fine;
+    function wake() { if (!raf && leaning && anyOn() && !document.hidden) raf = requestAnimationFrame(loop); }
+
+    cards.forEach(function (c) {
+      c.dataset.on = '1';
+      var svg = document.createElementNS(NS, 'svg'), p = document.createElementNS(NS, 'path');
+      svg.setAttribute('class', 'dfc_frame');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.appendChild(p);
+      c.appendChild(svg);
+      function draw() {
+        var w = c.clientWidth, h = c.clientHeight;
+        svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        p.setAttribute('d', 'M' + (D + C) + ' ' + D + 'H' + (w - D - C) + 'L' + (w - D) + ' ' + (D + C) + 'V' + (h - D - C) + 'L' + (w - D - C) + ' ' + (h - D) + 'H' + (D + C) + 'L' + D + ' ' + (h - D - C) + 'V' + (D + C) + 'Z');
+      }
+      draw();
+      new ResizeObserver(draw).observe(c);
+      var it = {
+        c: c, on: false, zips: 0, grids: qsa('.dfc_gridbg', c),
+        layers: qsa('[data-depth]', c).map(function (e) { return { e: e, k: +e.getAttribute('data-depth') || 0 }; })
+      };
+      new IntersectionObserver(function (es) {
+        var e = es[0], vh = e.rootBounds ? e.rootBounds.height : innerHeight;
+        var f = e.intersectionRect.height / Math.min(e.boundingClientRect.height, vh);
+        if (f >= 0.6) {
+          it.on = true;
+          c.classList.add('is-in');
+          wake();
+        } else if (f < 0.12) {
+          it.on = false;
+          c.classList.remove('is-in');
+          c.style.transform = '';
+          it.layers.forEach(function (l) { l.e.style.transform = ''; });
+        }
+      }, { threshold: [0, 0.12, 0.6, 1] }).observe(c);
+      items.push(it);
+      if (!reduce) setTimeout(function zip() {
+        if (!it.c.isConnected) return;
+        setTimeout(zip, 300 + 700 * Math.random());
+        if (!it.on || document.hidden || it.zips > 6 || !it.grids.length) return;
+        var g = it.grids[Math.floor(Math.random() * it.grids.length)], r = g.getBoundingClientRect();
+        var cols = Math.floor(r.width / 32), s = Math.max(0, -r.top), l = Math.min(r.height, innerHeight - r.top);
+        var h = 56 + 120 * Math.random(), d = 140 + 300 * Math.random();
+        if (cols < 2 || l - s < h + d) return;
+        var z = document.createElement('span');
+        z.className = 'dfc_zip';
+        z.style.left = 32 * (1 + Math.floor(Math.random() * (cols - 1))) + 'px';
+        z.style.top = s + Math.random() * (l - s - h - d) + 'px';
+        z.style.height = h + 'px';
+        g.appendChild(z);
+        it.zips++;
+        gsap.fromTo(z, { y: 0, autoAlpha: 0 }, {
+          y: d, duration: 1.4 + 1.2 * Math.random(), ease: 'power1.inOut', keyframes: { autoAlpha: [0, 1, 1, 0] },
+          onComplete: function () { z.remove(); it.zips--; }
+        });
+      }, 400);
+    });
+
+    if (!leaning) return;
+    rdOn(window, 'pointermove', function (e) {
+      if (e.passFake) return; // the Journey pass's own made-up pointer, meant for its button only
+      L.tx = e.clientX / innerWidth * 2 - 1;
+      L.ty = e.clientY / innerHeight * 2 - 1;
+      wake();
+    }, { passive: true, capture: true });
+    rdOn(document.documentElement, 'pointerleave', function () { L.tx = L.ty = 0; wake(); });
+  }
+
+  // =========================================================
+  // JOURNEY PASS — the ticket (component Journey_pass, classes pass_*; lab prototype/true-guide): what a class can't hold,
+  // for every page that has the card. The ticket leans towards the mouse (TILT = degrees, DEPTH = how far the layers
+  // shift); the foil in the photo lines (pass_holo, --hx --hy --hi) and in the globe stamp follows that lean and is near
+  // nothing when the ticket lies flat (FLAT = at rest, PEAK = most). The route line and its dot run once when the ticket
+  // comes into view (is-in), the globes turn slowly, the clock ([data-pass-clock]) runs on Amsterdam time, and the whole
+  // stub acts as its button, which also feels the mouse from anywhere on the stub. On a phone the lean follows the scroll
+  // instead of a mouse. The loop only runs while a ticket is on screen; while the mouse is still and the lean has settled,
+  // only the globes keep turning, drawn 30 times a second. The look lives in Webflow (pass_ classes; the stub's hover scan
+  // and plus marks in the site head CSS). The tear into /apply is TICKET TEAR, further up. Was a script in the site head
+  // until 2026-11-14.
+  // =========================================================
+  function rdPass() {
+    var passes = qsa('.pass');
+    if (!passes.length || passes[0].dataset.on) return;
+    var TILT = 5, DEPTH = 10, FLAT = 0.08, PEAK = 0.8, NS = 'http://www.w3.org/2000/svg';
+    var reduce = reducedMotion, fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var clocks = qsa('[data-pass-clock]'), a = 0, tx = 0, ty = 0, x = 0, y = 0, raf = 0, lastDraw = 0;
+
+    function tick() {
+      var t = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(new Date());
+      clocks.forEach(function (c) { c.textContent = t; });
+    }
+    setInterval(tick, 20000);
+    tick();
+
+    function limit(v, m) { return Math.max(-m, Math.min(m, v)); }
+    // The globe stamp's lines take a gradient of their own, so the foil can slide through them
+    function foilStamp(svg, i) {
+      if (!svg) return null;
+      var g = document.createElementNS(NS, 'linearGradient'), d = document.createElementNS(NS, 'defs'), u = 'url(#passFoil' + i + ')';
+      g.id = 'passFoil' + i;
+      g.setAttribute('gradientUnits', 'userSpaceOnUse');
+      [['0', '#CC3C18'], ['.3', '#E4566A'], ['.5', '#4B7888'], ['.7', '#E4566A'], ['1', '#CC3C18']].forEach(function (c) {
+        var s = document.createElementNS(NS, 'stop');
+        s.setAttribute('offset', c[0]);
+        s.setAttribute('stop-color', c[1]);
+        g.appendChild(s);
+      });
+      d.appendChild(g);
+      svg.insertBefore(d, svg.firstChild);
+      qsa('[stroke="currentColor"]', svg).forEach(function (e) { e.setAttribute('stroke', u); });
+      qsa('[fill="currentColor"]', svg).forEach(function (e) { e.setAttribute('fill', u); });
+      return g;
+    }
+    function light(it) {
+      var hi = FLAT + (PEAK - FLAT) * Math.pow(Math.min(1, Math.hypot(x, y)), 1.4), st = it.p.style;
+      st.setProperty('--hx', (50 + x * 50).toFixed(2) + '%');
+      st.setProperty('--hy', (50 + y * 50).toFixed(2) + '%');
+      st.setProperty('--hi', hi.toFixed(3));
+      if (it.g) {
+        var s = x * 90, t = y * 60;
+        it.g.setAttribute('x1', (-40 + s).toFixed(1));
+        it.g.setAttribute('y1', t.toFixed(1));
+        it.g.setAttribute('x2', (160 + s).toFixed(1));
+        it.g.setAttribute('y2', (120 + t).toFixed(1));
+      }
+    }
+    function anyOn() { return items.some(function (it) { return it.on; }); }
+    function wake() { if (!raf && !reduce && !document.hidden && passes[0].isConnected && anyOn()) raf = requestAnimationFrame(loop); }
+
+    var items = passes.map(function (p, i) {
+      p.dataset.on = '1';
+      var it = {
+        p: p, on: false, m: qsa('[data-m]', p), rose: qs('.pass_rose', p), earth: qs('.pass_earth', p), stamp: qs('.pass_stamp', p),
+        imgs: qsa('.pass_img,.pass_tex,.pass_holo', p), g: foilStamp(qs('.pass_stamp svg', p), i)
+      };
+      new IntersectionObserver(function (es) {
+        it.on = es[0].isIntersecting;
+        if (!it.on) return;
+        qs('.pass_fill', p).classList.add('is-in');
+        qs('.pass_dot', p).classList.add('is-in');
+        wake();
+      }, { threshold: 0.2 }).observe(p);
+      var stub = qs('.pass_stub', p), btn = stub && qs('.btn', stub);
+      if (btn) {
+        rdOn(stub, 'click', function (e) { if (!btn.contains(e.target)) btn.click(); });
+        // the button's own pull towards the mouse, fed from anywhere on the stub with a made-up pointer near the button
+        if (fine) rdOn(stub, 'pointermove', function (e) {
+          e.stopPropagation();
+          var r = btn.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          var ev = new PointerEvent('pointermove', { clientX: cx + limit((e.clientX - cx) * 0.15, r.width / 3), clientY: cy + limit((e.clientY - cy) * 0.15, r.height / 3) });
+          ev.passFake = true;
+          document.dispatchEvent(ev);
+        });
+      }
+      light(it);
+      return it;
+    });
+
+    if (reduce) return;
+    if (fine) {
+      rdOn(window, 'pointermove', function (e) {
+        if (e.passFake) return;
+        tx = e.clientX / innerWidth * 2 - 1;
+        ty = e.clientY / innerHeight * 2 - 1;
+        wake();
+      }, { passive: true, capture: true });
+      rdOn(document.documentElement, 'pointerleave', function () { tx = ty = 0; wake(); });
+    }
+    rdOn(document, 'visibilitychange', wake);
+
+    function loop(now) {
+      raf = 0;
+      if (!passes[0].isConnected || document.hidden || !anyOn()) return;
+      raf = requestAnimationFrame(loop);
+      if (!fine) {
+        var sc = scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight);
+        tx = Math.sin(sc * 12) * 0.7;
+        ty = 0;
+      }
+      a += 0.0016;
+      x += (tx - x) * 0.07;
+      y += (ty - y) * 0.07;
+      var moving = Math.abs(tx - x) > 0.0004 || Math.abs(ty - y) > 0.0004;
+      if (!moving && now - lastDraw < 33) return;
+      lastDraw = now;
+      items.forEach(function (it) {
+        if (!it.on) return;
+        it.m.forEach(function (e, i) { e.setAttribute('rx', Math.abs(e.getAttribute('ry') * Math.cos(a + (i % 6) * Math.PI / 6)).toFixed(2)); });
+        light(it);
+        if (!fine) return;
+        it.p.style.transform = 'perspective(1600px) rotateX(' + (-y * TILT).toFixed(3) + 'deg) rotateY(' + (x * TILT).toFixed(3) + 'deg)';
+        var dx = (x * DEPTH).toFixed(2), dy = (y * DEPTH).toFixed(2);
+        if (it.rose) it.rose.style.transform = 'translate(' + (-dx) + 'px,' + (-dy) + 'px)';
+        if (it.earth) it.earth.style.transform = 'translate(' + (-dx * 0.6) + 'px,' + (-dy * 0.6) + 'px)';
+        if (it.stamp) it.stamp.style.transform = 'translate(' + (dx * 0.4) + 'px,' + (dy * 0.4) + 'px)';
+        it.imgs.forEach(function (im) { im.style.transform = 'scale(1.05) translate(' + (-dx * 0.5) + 'px,' + (-dy * 0.5) + 'px)'; });
+      });
+    }
+    wake();
+  }
+
   // What runs on which page. Runs on every page, first load or swap
   function initPageFunctions() {
     var path = pagePath();
@@ -6185,6 +6441,9 @@
     later('.loc_steps', 'location balls', rdLocBalls);
     if (qs('.wall_section')) later('.wall_section', 'wall of love', rdWall); else soon('wall of love', rdWall); // a wall outside a .wall_section has nothing to watch for
     soon('faq', rdFaq);
+    soon('journey pass', rdPass);
+    soon('dfs card', rdDfc);
+    soon('dfs logo turn', rdLogoTurn);
 
     if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
     else if (path === '/') run('home', rdHome);
