@@ -1121,7 +1121,8 @@
       if (value === null) root.removeAttribute(name); else root.setAttribute(name, value);
     });
     // the structured data too: a page's own code adds its FAQ or breadcrumb to the head, and those stayed behind, one more per visit
-    var details = 'meta[name="description"], meta[property^="og:"], meta[name^="twitter:"], link[rel="canonical"], link[rel="alternate"], script[type="application/ld+json"]';
+    // meta[name^="rd-"] is a page's own data for this file (the city's name on a city page, see rdLocCity)
+    var details = 'meta[name="description"], meta[name^="rd-"], meta[property^="og:"], meta[name^="twitter:"], link[rel="canonical"], link[rel="alternate"], script[type="application/ld+json"]';
     qsa(details, document.head).forEach(function (el) { el.remove(); });
     qsa(details, doc.head).forEach(function (el) { document.head.appendChild(document.importNode(el, true)); });
 
@@ -6430,6 +6431,182 @@
     wake();
   }
 
+  // =========================================================
+  // LOCATION PAGES, the small parts — what the city template and the overview (/locations) kept in their Webflow page
+  // code until 2026-11-14. The look lives in Webflow: the loc_ and accordion-css classes and the CSS in those pages' own
+  // head and footer code. (The showcase drum, the balls and the button helpers of these pages are further up: rdLocShow,
+  // rdLocBalls, rdLocFaqBtn, rdLocBtnAlt.)
+  // =========================================================
+
+  // City FAQ: the CMS rich text (h2, then h3 + answer pairs, then a closing link line) becomes the accordion, and the page
+  // gets FAQPage structured data. The questions and answers stay in the HTML, so search engines read them; this only
+  // regroups them. Click or Enter/Space opens an item, the others close. (The dark pages' own FAQ is rdFaq.)
+  function rdLocFaq() {
+    var faq = qs('.loc_faq'), rich = faq && qs('.w-richtext', faq);
+    if (!rich || rich.classList.contains('w-dyn-bind-empty')) return;
+    var title = null, items = [], tail = [];
+    Array.prototype.slice.call(rich.children).forEach(function (el) {
+      if (el.tagName === 'H2' && !title) { title = el; return; }
+      if (el.tagName === 'H3') { items.push({ q: el, a: [] }); return; }
+      var cur = items[items.length - 1];
+      if (cur && (cur.a.length === 0 || el.nextElementSibling)) cur.a.push(el); else tail.push(el);
+    });
+    var last = items[items.length - 1]; // the last item keeps only its first paragraph; anything after it is the closing link line
+    if (last && last.a.length > 1) tail = last.a.splice(1).concat(tail);
+    if (!items.length) return;
+
+    var make = function (tag, cls, parent) {
+      var node = document.createElement(tag);
+      node.className = cls;
+      if (parent) parent.appendChild(node);
+      return node;
+    };
+    var head = make('div', 'loc_faq-head');
+    if (title) head.appendChild(title);
+    var acc = make('div', 'accordion-css');
+    acc.setAttribute('data-accordion-css-init', '');
+    var list = make('ul', 'accordion-css__list', acc);
+    var icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M28.5 22.5L18 12L7.5 22.5" stroke="currentColor" stroke-width="3" stroke-miterlimit="10"></path></svg>';
+    var ld = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: [] };
+    items.forEach(function (it) {
+      ld.mainEntity.push({ '@type': 'Question', name: it.q.textContent.trim(), acceptedAnswer: { '@type': 'Answer', text: it.a.map(function (p) { return p.textContent.trim(); }).join(' ') } });
+      var li = make('li', 'accordion-css__item', list);
+      li.setAttribute('data-accordion-status', 'not-active');
+      var top = make('div', 'accordion-css__item-top', li);
+      top.setAttribute('role', 'button');
+      top.setAttribute('tabindex', '0');
+      top.setAttribute('aria-expanded', 'false');
+      it.q.className = 'accordion-css__item-h3';
+      top.appendChild(it.q);
+      make('div', 'accordion-css__item-icon', top).innerHTML = icon;
+      var content = make('div', 'accordion-css__item-bottom-content', make('div', 'accordion-css__item-bottom-inner', make('div', 'accordion-css__item-bottom', li)));
+      it.a.forEach(function (p) { content.appendChild(p); });
+    });
+    if (tail.length) {
+      var t = make('div', 'loc_faq-tail', acc);
+      tail.forEach(function (p) { t.appendChild(p); });
+    }
+    rich.innerHTML = '';
+    rich.style.display = 'none';
+    faq.insertBefore(acc, rich);
+    faq.insertBefore(head, acc);
+    var s = document.createElement('script');
+    s.type = 'application/ld+json';
+    s.textContent = JSON.stringify(ld);
+    rdHead(s);
+
+    function toggle(li) {
+      var open = li.getAttribute('data-accordion-status') === 'active';
+      qsa('.accordion-css__item', list).forEach(function (o) {
+        o.setAttribute('data-accordion-status', 'not-active');
+        o.firstChild.setAttribute('aria-expanded', 'false');
+      });
+      if (!open) {
+        li.setAttribute('data-accordion-status', 'active');
+        li.firstChild.setAttribute('aria-expanded', 'true');
+      }
+    }
+    rdOn(list, 'click', function (e) {
+      var top = e.target.closest('.accordion-css__item-top');
+      if (top && !e.target.closest('a')) toggle(top.parentNode);
+    });
+    rdOn(list, 'keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('accordion-css__item-top')) { e.preventDefault(); toggle(e.target.parentNode); }
+    });
+  }
+
+  // The city's name comes from the CMS as <meta name="rd-city"> in the template's head code (the one line of data that
+  // stays in Webflow; syncHead() carries it along on a page swap). The postcard's postmark carries it: curved text can't
+  // be bound in the Designer, so [data-loc-city] is filled here.
+  function locCity() {
+    var meta = qs('meta[name="rd-city"]', document.head);
+    return meta ? meta.getAttribute('content') || '' : null; // null: not a city page
+  }
+  function rdLocCity() {
+    var city = locCity();
+    if (!city) return;
+    qsa('[data-loc-city]').forEach(function (t) { t.textContent = city.toUpperCase(); });
+  }
+
+  // Breadcrumbs for search results: Home, Locations, this city. Built from the canonical link, so the Dutch page gets its
+  // own addresses.
+  function rdLocCrumbs() {
+    var city = locCity(), c = qs('link[rel="canonical"]');
+    if (city === null || !c) return;
+    var nl = document.documentElement.lang === 'nl', base = 'https://www.rimbodesigns.com' + (nl ? '/nl' : '');
+    var s = document.createElement('script');
+    s.type = 'application/ld+json';
+    s.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: base || 'https://www.rimbodesigns.com' },
+      { '@type': 'ListItem', position: 2, name: nl ? 'Locaties' : 'Locations', item: base + '/locations' },
+      { '@type': 'ListItem', position: 3, name: city, item: c.href }
+    ] });
+    rdHead(s);
+  }
+
+  // Osmo's Accelerating Globe on Scroll ([data-accelerating-globe] with eight [data-accelerating-globe-circle]): the
+  // meridians keep turning, and turn faster while you scroll.
+  function rdGlobe() {
+    qsa('[data-accelerating-globe]').forEach(function (globe) {
+      var circles = qsa('[data-accelerating-globe-circle]', globe);
+      if (circles.length < 8) return;
+      var tl = gsap.timeline({ repeat: -1, defaults: { duration: 1, ease: 'none' } });
+      var widths = [
+        ['50%', '37.5%'], ['37.5%', '25%'], ['25%', '12.5%'], ['calc(12.5% + 1px)', 'calc(0% + 1px)'],
+        ['calc(0% + 1px)', 'calc(12.5% + 1px)'], ['12.5%', '25%'], ['25%', '37.5%'], ['37.5%', '50%']
+      ];
+      circles.slice(0, 8).forEach(function (circle, i) {
+        tl.fromTo(circle, { width: widths[i][0] }, { width: widths[i][1] }, i === 0 ? 0 : '<');
+      });
+      var lastY = window.scrollY, lastT = performance.now(), stopTimeout;
+      rdOn(window, 'scroll', function () {
+        var now = performance.now(), dy = window.scrollY - lastY, dt = now - lastT;
+        lastY = window.scrollY;
+        lastT = now;
+        var velocity = dt > 0 ? (dy / dt) * 1000 : 0; // px/s
+        tl.timeScale(Math.abs(velocity * 0.005) + 1);
+        clearTimeout(stopTimeout);
+        stopTimeout = setTimeout(function () {
+          gsap.to(tl, { timeScale: 1, duration: 0.6, ease: 'power2.out', overwrite: true });
+        }, 100);
+      }, { passive: true });
+    });
+  }
+
+  // The overview's hero card (.loc_hero.is-card on /locations) leans with the mouse: the Journey pass's and the DFS
+  // card's own numbers (TILT 5, DEPTH 10, perspective 1600, eased .07, the pointer across the whole window). data-depth
+  // on the globe and the postcards sets how far each shifts.
+  function rdLocLean() {
+    var card = qs('.loc_hero.is-card');
+    if (!card || reducedMotion || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    var TILT = 5, DEPTH = 10, tx = 0, ty = 0, x = 0, y = 0;
+    var layers = qsa('[data-depth]', card).map(function (e) { return { e: e, k: +e.getAttribute('data-depth') || 0 }; });
+    rdOn(window, 'pointermove', function (e) {
+      tx = e.clientX / innerWidth * 2 - 1;
+      ty = e.clientY / innerHeight * 2 - 1;
+    }, { passive: true });
+    (function loop() {
+      if (!card.isConnected) return;
+      requestAnimationFrame(loop);
+      x += (tx - x) * 0.07;
+      y += (ty - y) * 0.07;
+      card.style.transform = 'perspective(1600px) rotateX(' + (-y * TILT).toFixed(3) + 'deg) rotateY(' + (x * TILT).toFixed(3) + 'deg)';
+      var dx = x * DEPTH, dy = y * DEPTH;
+      layers.forEach(function (l) { l.e.style.transform = 'translate(' + (dx * l.k).toFixed(2) + 'px,' + (dy * l.k).toFixed(2) + 'px)'; });
+    })();
+  }
+
+  // /locations sets its og:url to the address it was opened on (an old snippet from the page's head code)
+  function rdOgUrl() {
+    var tag = qs('meta[property="og:url"]');
+    if (!tag) {
+      tag = document.createElement('meta');
+      tag.setAttribute('property', 'og:url');
+      rdHead(tag);
+    }
+    tag.setAttribute('content', window.location.href);
+  }
+
   // What runs on which page. Runs on every page, first load or swap
   function initPageFunctions() {
     var path = pagePath();
@@ -6478,6 +6655,17 @@
     else if (path.indexOf('/post/') === 0) {
       soon('scroll ruler', rdScrollRuler);
       soon('cover hue drift', rdCoverHueDrift);
+    }
+
+    // the location pages' small parts, last: where their Webflow page code used to run (after everything above on a page
+    // swap, before the queued ones on a first load)
+    run('location faq', rdLocFaq);
+    run('location city', rdLocCity);
+    run('globe', rdGlobe);
+    soon('location breadcrumbs', rdLocCrumbs);
+    if (path === '/locations') {
+      soon('location card lean', rdLocLean);
+      soon('og url', rdOgUrl);
     }
   }
 

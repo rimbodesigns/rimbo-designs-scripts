@@ -28,6 +28,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdFaq` | pages with `[data-faq]` | the accordion + FAQPage structured data |
 | `rdPass`, `rdDfc`, `rdLogoTurn` | pages with the Journey pass (`.pass`), the Digital Feng Shui card (`.dfc`) or its logo | the ticket's lean, foil, clock and route; the card's outline, lean and blue zips; the logo's turn every 4.4 s (were scripts in the Webflow site head until 14 Nov 2026; their CSS stays there) |
 | `rdLocShow`, `rdLocBalls`, `rdLocFaqBtn`, `rdLocBtnAlt` | city pages | the showcase drum, the three balls, small button helpers |
+| `rdLocFaq`, `rdLocCity`, `rdLocCrumbs`, `rdGlobe`, `rdLocLean`, `rdOgUrl` | city pages and `/locations` | the city FAQ accordion + FAQPage data, the postmark's city name, the breadcrumb data, Osmo's Accelerating Globe, the overview card's lean, og:url (were page code in Webflow until 14 Nov 2026; the city's name reaches the script as `<meta name="rd-city">` in the template head) |
 | `rdPostRefresh`, `rdScrollRuler`, `rdPostCards`, `rdCoverHueDrift` | `/post/…` (English) | the rebuilt post page, Osmo's Scroll Ruler (`docs/osmo/scroll-ruler.md`), the article cards |
 | `rdResources` (+ `rdChipBoil`, `rdLangToggle`, `rdQueuedReveal`, `rdMultiFilter`) | `/resources` | the filter, the chips, the language pill |
 | `rdStagingLinks` | webflow.io only | old Service/Work links open the V2 pages |
@@ -36,9 +37,10 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 Removed in v1.7.156 (10 Nov 2026), in the git history up to tag `v1.7.155`: the single band of /home-copy (V2), the radial
 wheel of /home-v3 (`initRadialCardsSlider`) and the glass carousel of /home-v5 (`rdGlassCarousel`, three.js).
 
-Still inline in Webflow: Google Tag Manager (site head), the Lenis CSS (site head),
-the Finsweet attributes, Cal.com on /contact, and the SEO/JSON-LD blocks on the
-Locations and Blog post templates.
+Still inline in Webflow: the Lenis CSS and the one-line `rd-new-nav` class (site head), the BLOG CARDS block
+(site footer), the Finsweet attributes, Cal.com on /contact, the plain JSON-LD data blocks on the Locations and
+Blog post templates, the city template's one-line `is-staging` class and `rd-city` meta, and the page code of pages
+not moved yet.
 
 ## Release flow
 1. Edit `main.js`, commit, push.
