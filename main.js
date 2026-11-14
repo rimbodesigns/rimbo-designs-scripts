@@ -1589,9 +1589,20 @@
     if (ownInstance) {
       instance = new Lenis(LENIS_OPTIONS);
       // Drive Lenis from GSAP's ticker so scrolling and animations share one frame
-      // (GSAP's lag smoothing stays on: after a stall, animations continue instead of jumping)
+      // (GSAP's lag smoothing stays on: after a stall, animations continue instead of jumping).
+      // Two things make the scroll even (measured 2026-11-14 with a perfectly steady wheel: the page's travel per frame
+      // wobbled 4% around its mean, up to 6 px in one frame; now 0.3%, under a fifth of a pixel):
+      // - Lenis gets the time of the FRAME (document.timeline.currentTime, the same number requestAnimationFrame hands
+      //   out), not GSAP's clock. GSAP reads the clock at the moment its code runs, a millisecond earlier or later every
+      //   frame depending on what else was busy, and Lenis moves the page by "speed x time since the last call", so that
+      //   unevenness went straight into the scroll. Frames are shown at even intervals, so the frame's time is the one to use
+      // - it runs first in the tick (the third argument), before GSAP renders: the scroll position is set, ScrollTrigger
+      //   hears it, and everything that follows the scroll is drawn in this same frame instead of the next
       instance.on('scroll', ScrollTrigger.update);
-      rdTick(function (time) { instance.raf(time * 1000); });
+      gsap.ticker.add(function (time) {
+        var frame = document.timeline ? document.timeline.currentTime : null;
+        instance.raf(typeof frame === 'number' ? frame : time * 1000);
+      }, false, true);
     }
     window.lenis = instance;
     if (ownInstance) rdLenisButtons();
@@ -1866,16 +1877,27 @@
     qsa('.rs-chip, .rs-reset, [data-boil]').forEach(function (btn) {
       if (btn.hasAttribute('data-boil-ready')) return;
       var label = qs('span', btn) || btn;
-      var chars = Array.from(label.textContent).map(function (ch) {
-        var c = document.createElement('span');
-        c.className = 'rs-ch';
-        c.style.display = 'inline-block';
-        c.textContent = ch === ' ' ? '\u00a0' : ch;
-        return c;
-      });
-      btn.setAttribute('aria-label', label.textContent.trim());
+      // every letter its own box, and every word a box around its letters: a row of loose letter boxes may wrap between
+      // any two of them, which on a phone gave "ONLINE MARKETIN / G". Words stay whole, the line breaks at the space
+      var text = label.textContent.trim(), chars = [];
+      btn.setAttribute('aria-label', text);
       label.textContent = '';
-      chars.forEach(function (c) { c.setAttribute('aria-hidden', 'true'); label.appendChild(c); });
+      text.split(/\s+/).forEach(function (word, w) {
+        if (w) label.appendChild(document.createTextNode(' '));
+        var box = document.createElement('span');
+        box.className = 'rs-word';
+        box.style.cssText = 'display:inline-block;white-space:nowrap';
+        box.setAttribute('aria-hidden', 'true');
+        Array.from(word).forEach(function (ch) {
+          var c = document.createElement('span');
+          c.className = 'rs-ch';
+          c.style.display = 'inline-block';
+          c.textContent = ch;
+          box.appendChild(c);
+          chars.push(c);
+        });
+        label.appendChild(box);
+      });
       btn.setAttribute('data-boil-ready', '');
       var poses = chars.map(function () {
         return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; });
