@@ -4976,25 +4976,23 @@
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var logoSrc = brushLogoSrc();
-    // two grounds. Dark is the default everywhere: the page's own dark (--color--black), so the classic #131313 and whatever a
-    // page sets itself. Beige is an experiment for pages that come from a light section (Rimbo: keep it dark most places, the
-    // light one stays experimental), so it only runs on the Groningen page. data-footer="light" or "dark" on any element of a
-    // page picks one, ?ftheme= tries it out
-    var themeEl = qs('[data-footer]');
-    var theme = (/[?&]ftheme=(light|dark)/.exec(location.search) || [])[1] || (themeEl && themeEl.getAttribute('data-footer')) || (/-groningen\/?$/.test(location.pathname) ? 'light' : 'dark');
-    var light = theme === 'light';
-    var ACCENT = light ? [75, 120, 136] : [228, 68, 28], LOGO_FILL = light ? [19, 19, 19] : [248, 245, 238];
+    // one ground: the site's black (the beige experiment is gone, Rimbo 15 Nov: every footer ends black)
+    var ACCENT = [228, 68, 28], LOGO_FILL = [248, 245, 238];
     var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
     var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
     var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
     var rgba = function (c, a) { return 'rgba(' + c.join(',') + ',' + clamp(a).toFixed(3) + ')'; };
 
     var ease = 'cubic-bezier(.625, .05, 0, 1)';
-    // only what the Designer can't hold: what the script makes or switches (build, guides, hover states, the light experiment)
+    // only what the Designer can't hold: what the script makes or switches (build, guides, hover states, the notch)
     var css = [
       '.rdf { --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; -webkit-font-smoothing: antialiased; }',
       '.rdf a { text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles stay out
       '.rdf-prev { position: relative; z-index: 2 !important; }',
+      // the page above ends in two cut corners on every page (Rimbo, 15 Nov: the home's notch everywhere). The size is the
+      // Webflow variable Footer notch (32px), a little smaller on phones. A section with a clip-path of its own keeps it
+      '.rdf-prev.rdf-notch { clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--rdf-n)), calc(100% - var(--rdf-n)) 100%, var(--rdf-n) 100%, 0 calc(100% - var(--rdf-n))); --rdf-n: var(--footer-notch, 32px); }',
+      '@media (max-width: 767px) { .rdf-prev.rdf-notch { --rdf-n: calc(var(--footer-notch, 32px) * .875); } }',
       // a notched section above (a clip-path on it, e.g. is-notched): the footer starts 6rem higher, under the page, so its cut
       // corners show the footer coming up, in the page's shade; the edge line goes, it would close the corners
       '.rdf.is-under { margin-top: -6rem; height: calc(100svh + 6rem); }',
@@ -5035,13 +5033,7 @@
       '.rdf-draw path { fill: none; stroke: var(--rdf-brand); stroke-width: 1; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .45s cubic-bezier(.4, 0, .6, 1); }',
       '.rdf-cell.is-drawn .rdf-draw path { stroke-dashoffset: 0; transition: stroke-dashoffset .8s cubic-bezier(.45, 0, .25, 1); }',
       '@media (max-width: 767px) { .rdf-code { left: 1rem; top: 1.1rem; font-size: .58rem; } }',
-      '@media (prefers-reduced-motion: reduce) { .rdf-code .cur { animation: none; } }',
-      // the light ground: an experiment on one page, so it stays out of the Designer until it is decided
-      '.rdf.is-light { --rdf-fg: #131313; --rdf-grey: #5e574b; --rdf-brand: #4b7888; --rdf-hair: rgba(19, 19, 19, .14); --rdf-dash: rgba(19, 19, 19, .26); --rdf-lift: rgba(255, 255, 255, .45); --rdf-key: #5e574b; --rdf-str: #3c6473; background-color: var(--color--rimbobage, #f8f5ee); color: #131313; }',
-      '.rdf.is-light .rdf-shade { background-color: var(--color--rimbobage, #f8f5ee); }',
-      '.rdf.is-light .rdf-drop { border-top-color: rgba(118, 84, 36, .16); background-image: linear-gradient(to bottom, rgba(118, 84, 36, .34), rgba(118, 84, 36, .21) 16%, rgba(118, 84, 36, .122) 36%, rgba(118, 84, 36, .054) 58%, rgba(118, 84, 36, .017) 80%, rgba(118, 84, 36, 0)); }',
-      '.rdf.is-light .rdf-cell, .rdf.is-light .rdf-cell:hover, .rdf.is-light .rdf-soc:hover { color: #131313; }',
-      '.rdf.is-light .rdf-width, .rdf.is-light .rdf-label, .rdf.is-light .rdf-base, .rdf.is-light .rdf-arrow, .rdf.is-light .rdf-soc, .rdf.is-light .rdf-lang-link, .rdf.is-light .rdf-lang-sep { color: #5e574b; }'
+      '@media (prefers-reduced-motion: reduce) { .rdf-code .cur { animation: none; } }'
     ].join('\n');
     var style = document.createElement('style');
     style.textContent = css;
@@ -5055,7 +5047,6 @@
       return lang === 'nl' ? '/nl' + (bare === '/' ? '' : bare) : bare;
     }
     foot.setAttribute('data-rdf-on', '');
-    if (light) foot.classList.add('is-light');
     // what depends on the page you're on: the language, the year
     if (nl) qsa('.rdf-cell[href^="/"]', foot).forEach(function (a) { var h = a.getAttribute('href'); a.setAttribute('href', prefix + (h === '/' ? '' : h)); });
     qsa('.rdf-lang-link', foot).forEach(function (a) {
@@ -5072,7 +5063,10 @@
     var prev = top;
     while (prev && prev.lastElementChild && getComputedStyle(prev).backgroundColor === 'rgba(0, 0, 0, 0)') prev = prev.lastElementChild;
     if (prev && prev.offsetWidth < foot.offsetWidth * .9) prev = top; // a small element at the end of the page (a language pill) is not a section
-    if (prev) prev.classList.add('rdf-prev');
+    if (prev) {
+      prev.classList.add('rdf-prev');
+      if (getComputedStyle(prev).clipPath === 'none') prev.classList.add('rdf-notch');
+    }
     if (prev && getComputedStyle(prev).clipPath !== 'none') foot.classList.add('is-under'); // see .rdf.is-under
     // the same grain as the page: where it sits behind the page (city pages) the footer would cover it and look flat next to it
     var pageGrain = qs('.grain');
