@@ -6607,6 +6607,472 @@
     tag.setAttribute('content', window.location.href);
   }
 
+  // =========================================================
+  // APPLY — /apply, the application form ([data-apply-form]): what moves. The look lives in the Designer (apf_ classes);
+  // this only switches classes and moves things. Was the page's own footer and head code in Webflow until 2026-11-14.
+  // - steps open one by one (is-later off), the open one gets is-current, a finished one its Done mark (is-on),
+  //   the progress line bottom left fills a sixth per step
+  // - the picks (Website, Branding, Marketing) open their follow-ups; every answer goes into a hidden field for the email.
+  //   A hidden field with data-required (Found by, step 02) must have a pick before its step counts as done; a pick with
+  //   data-alone (Not sure yet, Not much yet) clears the others in its group
+  // - budget: dashes lit up to the handle, the amount counts smoothly, a bubble while dragging
+  // - date: Start or Deadline, a two-month calendar that opens below
+  // - sending: an incomplete form never reaches Webflow (every step opens, the missing field gets focus); a complete
+  //   one swooshes away while Webflow sends, then the thank-you plays: the paper plane (below), then the form's own
+  //   success message fades up. On an error it all comes back
+  // (The ticket's tear into this page and its X are TICKET TEAR, further up.)
+  // =========================================================
+  function rdApply() {
+    var form = qs('[data-apply-form]');
+    if (!form || form.dataset.applyReady) return;
+    form.dataset.applyReady = '1';
+    var reduce = reducedMotion, G = gsap;
+    var block = form.parentElement;
+    var head = document.querySelector('.apf_head');
+    var steps = [].slice.call(form.querySelectorAll('[data-step]'));
+    var sendRow = form.querySelector('[data-send-row]');
+    var sendBtn = form.querySelector('[data-send]');
+    var fill = document.querySelector('[data-progress-fill]');
+    var count = document.querySelector('[data-progress-count]');
+    function on(el, cls, yes) { if (el) el.classList.toggle(cls, !!yes); }
+    function shown(el) { return el && !el.classList.contains('is-later'); }
+
+    function show(el) {
+      if (!el || shown(el)) return;
+      el.classList.remove('is-later');
+      if (reduce || !G) return;
+      G.fromTo(el, { height: 0, opacity: 0, y: 12, overflow: 'hidden' }, { height: 'auto', opacity: 1, y: 0, duration: .65, ease: 'power2.out', clearProps: 'height,overflow,transform,opacity' });
+    }
+    function isOpen(el) { return getComputedStyle(el).display !== 'none'; }
+    function slideOpen(el, display) {
+      if (isOpen(el)) return;
+      el.style.display = display;
+      if (reduce || !G) return;
+      G.fromTo(el, { height: 0, opacity: 0, overflow: 'hidden' }, { height: 'auto', opacity: 1, duration: .5, ease: 'power3.out', clearProps: 'height,overflow,opacity' });
+    }
+    function slideShut(el, then) {
+      if (!isOpen(el)) return;
+      function end() { el.style.display = ''; if (G) G.set(el, { clearProps: 'height,opacity,overflow' }); if (then) then(); }
+      if (reduce || !G) { end(); return; }
+      G.to(el, { height: 0, opacity: 0, overflow: 'hidden', duration: .35, ease: 'power2.inOut', onComplete: end });
+    }
+
+    function needed(step) { return [].slice.call(step.querySelectorAll('[required], [data-needs-field], [data-required]')); }
+    function filled(f) { return f.value.trim() !== '' && (f.type === 'hidden' || f.checkValidity()); }
+    function valid(step) { return needed(step).every(filled); }
+    function update() {
+      var done = 0;
+      steps.forEach(function (s) {
+        var ok = shown(s) && valid(s);
+        on(s.querySelector('.apf_num'), 'is-on', ok);
+        on(s.querySelector('.apf_check'), 'is-on', ok);
+        if (ok) done++;
+      });
+      var last = steps.filter(shown).pop();
+      steps.forEach(function (s) { on(s, 'is-current', s === last); });
+      if (fill) fill.style.height = (done / steps.length * 100) + '%';
+      if (count) count.textContent = done + '/' + steps.length;
+      on(sendBtn, 'is-secondary', !steps.every(valid));
+    }
+    function open(step) {
+      show(step);
+      if (step === steps[steps.length - 1]) setTimeout(function () { show(sendRow); }, reduce ? 0 : 260);
+    }
+    // The next step opens by itself: once a step is complete and the hand pauses, or leaves the field. A step that needs
+    // nothing (budget and timing) opens together with the one after it
+    var PAUSE = 900, pauseTimer;
+    function openAfter(step) {
+      if (!valid(step)) return;
+      var i = steps.indexOf(step), next = steps[i + 1];
+      if (!next || shown(next)) return;
+      open(next);
+      if (!needed(next).length && steps[i + 2]) setTimeout(function () { open(steps[i + 2]); update(); }, reduce ? 0 : 180);
+      update();
+    }
+    form.addEventListener('input', function (e) {
+      update();
+      var s = e.target.closest('[data-step]');
+      clearTimeout(pauseTimer);
+      if (s) pauseTimer = setTimeout(function () { openAfter(s); }, PAUSE);
+    });
+    form.addEventListener('change', update);
+    form.addEventListener('focusout', function (e) { var s = e.target.closest('[data-step]'); if (s) openAfter(s); });
+    // The picks, chips and calendar are role=button blocks: Enter and Space press them
+    form.addEventListener('keydown', function (e) {
+      var b = e.target.closest('[role="button"]');
+      if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click(); }
+    });
+
+    // What you need
+    function pressed(b) { return b.getAttribute('aria-pressed') === 'true'; }
+    function press(b, yes) { b.setAttribute('aria-pressed', yes ? 'true' : 'false'); on(b, 'is-on', yes); on(b.querySelector('.apf_pick_box'), 'is-on', yes); }
+    function tell(el) { el.dispatchEvent(new Event('input', { bubbles: true })); }
+    var needsBox = form.querySelector('[data-needs]');
+    if (needsBox) {
+      var needsField = form.querySelector('[data-needs-field]');
+      var needs = [].slice.call(needsBox.querySelectorAll('[data-need]'));
+      needsBox.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-need]');
+        if (!b) return;
+        var yes = !pressed(b);
+        if (yes) needs.forEach(function (x) { if (x !== b && (b.hasAttribute('data-alone') || x.hasAttribute('data-alone'))) press(x, false); });
+        press(b, yes);
+        var chosen = needs.filter(pressed).map(function (x) { return x.dataset.need; });
+        needsField.value = chosen.join(', ');
+        form.querySelectorAll('[data-more]').forEach(function (more) {
+          if (chosen.indexOf(more.dataset.more) >= 0) slideOpen(more, 'flex');
+          else slideShut(more, function () {
+            more.querySelectorAll('[data-val]').forEach(function (x) { press(x, false); });
+            more.querySelectorAll('[data-pick-field]').forEach(function (f) { f.value = ''; });
+          });
+        });
+        tell(b);
+      });
+    }
+    form.querySelectorAll('[data-one], [data-many]').forEach(function (group) {
+      var single = group.hasAttribute('data-one');
+      var field = group.parentNode.querySelector('[data-pick-field]');
+      group.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-val]');
+        if (!b) return;
+        var yes = !pressed(b);
+        if (single) group.querySelectorAll('[data-val]').forEach(function (x) { press(x, false); });
+        else if (yes) group.querySelectorAll('[data-val]').forEach(function (x) { if (x !== b && (b.hasAttribute('data-alone') || x.hasAttribute('data-alone'))) press(x, false); });
+        press(b, yes);
+        if (field) field.value = [].slice.call(group.querySelectorAll('[aria-pressed="true"]')).map(function (x) { return x.dataset.val; }).join(', ');
+        tell(b);
+      });
+    });
+
+    // Budget
+    var bw = form.querySelector('[data-budget]');
+    if (bw) {
+      var range = bw.querySelector('[data-budget-range]'), amount = bw.querySelector('[data-budget-amount]');
+      var bubble = bw.querySelector('[data-budget-bubble]'), bfield = bw.querySelector('[data-budget-field]');
+      var bfill = bw.querySelector('[data-budget-fill]'), thumb = bw.querySelector('[data-budget-thumb]');
+      var ticks = [].slice.call(bw.querySelectorAll('.apf_tick'));
+      var min = +range.min, max = +range.max;
+      function pct(v) { return (v - min) / (max - min) * 100; }
+      ticks.forEach(function (t, i) {
+        var first = i === 0, last = i === ticks.length - 1;
+        t.style.left = pct(+t.dataset.v) + '%';
+        t.style.transform = first ? 'none' : last ? 'translateX(-100%)' : 'translateX(-50%)';
+        t.style.alignItems = first ? 'flex-start' : last ? 'flex-end' : 'center';
+      });
+      function eur(n) { return '€' + Number(n).toLocaleString('en-GB'); }
+      function label(v) { return eur(v) + (v >= max ? '+' : ''); }
+      var shownV = { v: +range.value };
+      function draw() { var v = +range.value, top = v >= max && Math.abs(shownV.v - v) < 1; amount.textContent = eur(Math.round(shownV.v / 50) * 50) + (top ? '+' : ''); }
+      function paint() {
+        var v = +range.value, p = pct(v) + '%';
+        bfill.style.width = p; thumb.style.left = p; bubble.style.left = p;
+        bubble.textContent = label(v); bfield.value = label(v);
+      }
+      // The amount glides to where the handle is and lands without a bump
+      function glide() {
+        if (reduce || !G) { shownV.v = +range.value; draw(); return; }
+        G.to(shownV, { v: +range.value, duration: .55, ease: 'expo.out', overwrite: true, onUpdate: draw, onComplete: draw });
+      }
+      range.addEventListener('input', function () { paint(); glide(); });
+      function drag(yes) { on(thumb, 'is-drag', yes); on(bubble, 'is-drag', yes); }
+      range.addEventListener('pointerdown', function () { drag(true); });
+      rdOn(window, 'pointerup', function () { drag(false); });
+      rdOn(window, 'pointercancel', function () { drag(false); });
+      paint(); draw();
+    }
+
+    // Date
+    var dw = form.querySelector('[data-date]');
+    if (dw) {
+      var trig = dw.querySelector('[data-date-trigger]'), panel = dw.querySelector('[data-date-panel]');
+      var valEl = dw.querySelector('[data-date-value]'), dfield = dw.querySelector('[data-date-field]');
+      var monthsEl = dw.querySelector('[data-cal-months]'), prev = dw.querySelector('[data-cal-prev]'), next = dw.querySelector('[data-cal-next]');
+      var clr = dw.querySelector('[data-date-clear]');
+      var chips = [].slice.call(dw.querySelectorAll('[data-quick]')), modes = [].slice.call(dw.querySelectorAll('[data-mode]'));
+      var today = new Date(); today.setHours(0, 0, 0, 0);
+      var view = new Date(today.getFullYear(), today.getMonth(), 1), mode = 'Start', picked = null, txt = '';
+      function long(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
+      function write() {
+        valEl.textContent = txt || 'Pick a date';
+        on(valEl, 'is-set', !!txt);
+        clr.style.display = txt ? 'flex' : '';
+        dfield.value = txt ? mode + ': ' + txt : '';
+        chips.forEach(function (c) { on(c, 'is-on', c.dataset.quick === txt); });
+        update();
+      }
+      function month(first, second) {
+        var box = document.createElement('div'); box.className = 'apf_month' + (second ? ' is-second' : '');
+        var name = document.createElement('p'); name.className = 'apf_month_label';
+        name.textContent = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); box.appendChild(name);
+        var week = document.createElement('div'); week.className = 'apf_cal_week'; week.setAttribute('aria-hidden', 'true');
+        'MTWTFSS'.split('').forEach(function (l) { var s = document.createElement('span'); s.className = 'apf_wd'; s.textContent = l; week.appendChild(s); });
+        box.appendChild(week);
+        var grid = document.createElement('div'); grid.className = 'apf_cal_grid';
+        var lead = (first.getDay() + 6) % 7; // Monday first
+        for (var i = 0; i < lead; i++) grid.appendChild(document.createElement('span'));
+        var days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+        for (var d = 1; d <= days; d++) {
+          var date = new Date(first.getFullYear(), first.getMonth(), d), b = document.createElement('div');
+          b.className = 'apf_day'; b.textContent = d; b.setAttribute('role', 'button'); b.setAttribute('aria-label', long(date)); b.dataset.time = +date;
+          if (date < today) { b.classList.add('is-off'); b.setAttribute('aria-disabled', 'true'); } else b.tabIndex = 0;
+          if (+date === +today) b.classList.add('is-today');
+          if (picked && +date === +picked) b.classList.add('is-on');
+          grid.appendChild(b);
+        }
+        box.appendChild(grid);
+        return box;
+      }
+      function render() {
+        on(prev, 'is-off', view.getFullYear() === today.getFullYear() && view.getMonth() === today.getMonth());
+        monthsEl.innerHTML = '';
+        monthsEl.appendChild(month(view));
+        monthsEl.appendChild(month(new Date(view.getFullYear(), view.getMonth() + 1, 1), true));
+      }
+      function calOpen() { return panel.style.display === 'block'; }
+      // Opening: the panel unfolds to full width, then the days settle in, row by row
+      function openCal() {
+        if (calOpen()) return;
+        if (picked) view = new Date(picked.getFullYear(), picked.getMonth(), 1);
+        render();
+        panel.style.display = 'block';
+        on(trig, 'is-open', true); trig.setAttribute('aria-expanded', 'true');
+        if (reduce || !G) return;
+        G.fromTo(panel, { height: 0, opacity: 0 }, { height: 'auto', opacity: 1, duration: .55, ease: 'power3.out', clearProps: 'height' });
+        G.fromTo(panel.querySelectorAll('.apf_cal_top, .apf_month_label, .apf_cal_week, .apf_day'), { opacity: 0, y: 6 },
+          { opacity: 1, y: 0, duration: .45, ease: 'power2.out', stagger: { each: .006 }, delay: .12, clearProps: 'opacity,transform' });
+      }
+      function closeCal() {
+        if (!calOpen()) return;
+        on(trig, 'is-open', false); trig.setAttribute('aria-expanded', 'false');
+        if (reduce || !G) { panel.style.display = ''; return; }
+        G.to(panel, { height: 0, opacity: 0, duration: .35, ease: 'power2.inOut', onComplete: function () { panel.style.display = ''; G.set(panel, { clearProps: 'height,opacity' }); } });
+      }
+      trig.addEventListener('click', function () { if (calOpen()) closeCal(); else openCal(); });
+      prev.addEventListener('click', function () { if (prev.classList.contains('is-off')) return; view = new Date(view.getFullYear(), view.getMonth() - 1, 1); render(); });
+      next.addEventListener('click', function () { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); render(); });
+      monthsEl.addEventListener('click', function (e) {
+        var b = e.target.closest('.apf_day');
+        if (!b || b.classList.contains('is-off')) return;
+        picked = new Date(+b.dataset.time); txt = long(picked);
+        render(); write();
+        setTimeout(closeCal, reduce ? 0 : 220); // let the pick be seen
+      });
+      chips.forEach(function (c) { c.addEventListener('click', function () { picked = null; txt = c.dataset.quick; render(); write(); setTimeout(closeCal, reduce ? 0 : 220); }); });
+      modes.forEach(function (m) { m.addEventListener('click', function () { mode = m.dataset.mode; modes.forEach(function (x) { on(x, 'is-on', x === m); }); write(); }); });
+      clr.addEventListener('click', function () { picked = null; txt = ''; write(); closeCal(); });
+      rdOn(document, 'pointerdown', function (e) { if (!dw.contains(e.target)) closeCal(); });
+      rdOn(document, 'keydown', function (e) { if (e.key === 'Escape') closeCal(); });
+    }
+
+    // Sending. This listener runs before Webflow's own (Webflow listens on the document)
+    var done = block.querySelector('.w-form-done'), fail = block.querySelector('.w-form-fail');
+    var gone = [], swooshEnd = 0;
+    form.addEventListener('submit', function (e) {
+      var missing = steps.filter(function (s) { return !valid(s); })[0];
+      if (missing) {
+        e.preventDefault(); e.stopPropagation();
+        steps.forEach(open);
+        update();
+        var f = needed(missing).filter(function (x) { return !filled(x); })[0];
+        window.scrollTo({ top: missing.getBoundingClientRect().top + window.scrollY - 120, behavior: reduce ? 'auto' : 'smooth' });
+        if (f && f.type !== 'hidden') f.focus({ preventScroll: true });
+        return;
+      }
+      if (fill) fill.style.height = '100%';
+      if (count) count.textContent = steps.length + '/' + steps.length;
+      gone = [head].concat(steps, [sendRow]).filter(Boolean);
+      if (reduce || !G) return;
+      swooshEnd = Date.now() + 700 + 70 * gone.length;
+      G.to(gone, { y: -64, opacity: 0, filter: 'blur(6px)', duration: .7, ease: 'power3.in', stagger: .07 });
+    });
+    // The thank-you: the paper plane (Rimbo's pick, 2026-11-10; lab prototype/apply/thanks.js). The drawing is the
+    // apf_fx element in the success message (an SVG: a sheet, two folds, the plane, the whoosh, the trail). A sheet pops in
+    // where the title will be, folds into the plane, which loops once and flies off the top right on a dotted trail that
+    // wipes itself; then the words fade up. Stop-motion: moves are set 12 times a second, the lines boil 9 times a
+    // second (the noise seed changes), like button 06
+    function words() { return done.querySelectorAll('.apf_done_in > *'); }
+    function fadeWords() { G.fromTo(words(), { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: 'power3.out', stagger: .09 }); }
+    function plane() {
+      var fx = done.querySelector('[data-fx-plane]'), title = done.querySelector('.apf_title'), svg = fx && fx.querySelector('svg');
+      if (!svg || !title) { fadeWords(); return; }
+      var pl = svg.querySelector('[data-plane]'), trail = svg.querySelector('[data-trail]'), mask = svg.querySelector('[data-trail-mask]');
+      var maskBox = svg.querySelector('mask'), noise = svg.querySelector('[data-boil-noise]'), puff = svg.querySelector('[data-puff]'), frames = {};
+      [].forEach.call(svg.querySelectorAll('[data-frame]'), function (f) { frames[f.getAttribute('data-frame')] = f; });
+      G.set(words(), { opacity: 0 });
+      fx.style.display = 'block';
+      var box = svg.getBoundingClientRect(), w = box.width, h = box.height, r = title.getBoundingClientRect();
+      var cx = r.left - box.left + r.width / 2, cy = r.top - box.top + r.height / 2;
+      var U = Math.min(w * .5, 460), S = Math.max(1, Math.min(1.6, w / 800));
+      svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      maskBox.setAttribute('x', 0); maskBox.setAttribute('y', 0); maskBox.setAttribute('width', w); maskBox.setAttribute('height', h);
+      function P(x, y) { return (cx + x * U).toFixed(1) + ' ' + (cy + y * U).toFixed(1); }
+      // Forward with a little dip, up and back over the top, down through and forward again, then off the top right
+      var d = 'M' + P(0, 0) + ' C' + P(.25, .14) + ' ' + P(.55, .14) + ' ' + P(.68, -.08) + ' C' + P(.78, -.38) + ' ' + P(.38, -.5) + ' ' + P(.36, -.24) +
+        ' C' + P(.34, -.02) + ' ' + P(.62, .06) + ' ' + P(.8, -.14) + ' C' + P(.95, -.32) + ' ' + P(1.05, -.62) + ' ' + (w + 140) + ' -140';
+      trail.setAttribute('d', d); mask.setAttribute('d', d);
+      var L = trail.getTotalLength();
+      function at(p) {
+        var l = Math.max(0, Math.min(L, p * L)), a = trail.getPointAtLength(Math.max(0, l - 2)), b = trail.getPointAtLength(Math.min(L, l + 2)), c = trail.getPointAtLength(l);
+        return { x: c.x, y: c.y, r: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI };
+      }
+      var H = at(0).r, hx = Math.cos(H * Math.PI / 180), hy = Math.sin(H * Math.PI / 180);
+      pl.setAttribute('stroke-width', (1.5 / S).toFixed(3)); // the lines stay 1.5px at any size
+      puff.setAttribute('stroke-width', (1.5 / S).toFixed(3));
+      puff.setAttribute('transform', 'translate(' + cx + ' ' + cy + ') rotate(' + H + ') scale(' + S + ')');
+      function frame(name) { for (var k in frames) frames[k].setAttribute('display', k === name ? 'inline' : 'none'); }
+      function put(x, y, rot, s) { pl.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + rot.toFixed(1) + ') scale(' + (s * S).toFixed(3) + ')'); }
+      function trailFrom(a, b) { a = Math.max(0, a) * L; b = Math.max(a, Math.min(1, b) * L); mask.setAttribute('stroke-dasharray', '0 ' + a.toFixed(1) + ' ' + (b - a).toFixed(1) + ' ' + (L + 20).toFixed(1)); }
+      trailFrom(0, 0);
+      var POP = [.45, 1.14, .94, 1], FLY = 1.25, DUR = 1.75, TAIL = .3, wordsIn = false, seed = 0, start = null, last = -1;
+      function ease(x) { return x * .55 + x * x * .45; } // thrown: off at once, a little faster as it goes
+      function step(t) {
+        puff.setAttribute('display', t >= FLY && t < FLY + .25 ? 'inline' : 'none');
+        if (t < .5) { frame('sheet'); put(cx, cy, 0, t < .34 ? POP[Math.min(3, Math.floor(t * 12))] : 1); } // pops in, sits a beat
+        else if (t < .67) { frame('fold1'); put(cx, cy, 0, t < .58 ? 1.06 : 1); }                          // every fold lands with a bounce
+        else if (t < .84) { frame('fold2'); put(cx, cy, 0, t < .75 ? 1.06 : 1); }
+        else if (t < .92) { frame('fold2'); put(cx, cy, (H + 90) * .5, 1); }                                // turns to where it'll fly
+        else if (t < FLY) {                                                                                  // nose up, pulls back, and...
+          frame('plane');
+          if (t < 1) put(cx, cy, H, 1); else if (t < 1.08) put(cx, cy, H - 12, 1); else put(cx - hx * 9, cy - hy * 9, H - 5, 1);
+        } else if (t < FLY + DUR) {                                                                          // ...goes
+          var p = ease((t - FLY) / DUR), a = at(p);
+          frame('plane'); put(a.x, a.y, a.r, 1); trailFrom(p - TAIL, p);
+          if (p > .72 && !wordsIn) { wordsIn = true; fadeWords(); }
+        } else {                                                                                             // gone: the trail's tail catches up
+          frame(null);
+          if (!wordsIn) { wordsIn = true; fadeWords(); }
+          var k = (t - FLY - DUR) / .35;
+          if (k >= 1) { trailFrom(0, 0); fx.style.display = ''; return false; }
+          trailFrom(1 - TAIL + TAIL * k, 1);
+        }
+      }
+      requestAnimationFrame(function loop(now) {
+        if (start === null) start = now;
+        var raw = (now - start) / 1000, f = Math.floor(raw * 12), s = 1 + Math.floor(raw * 9) % 3;
+        if (s !== seed) { seed = s; noise.setAttribute('seed', s); }                                       // the boil
+        if (f !== last) { last = f; if (step(f / 12) === false) return; }
+        requestAnimationFrame(loop);
+      });
+    }
+
+    // Webflow shows its success message straight away; it waits here until the swoosh is through, then fades up
+    if (done) new MutationObserver(function () {
+      if (done.style.display !== 'block' || done.dataset.shown) return;
+      done.dataset.shown = '1';
+      if (!reduce && G) G.set(words(), { opacity: 0 }); // never seen before the plane has flown
+      var wait = Math.max(0, swooshEnd - Date.now());
+      if (wait) { done.style.display = 'none'; form.style.display = 'flex'; }
+      setTimeout(function () {
+        form.style.display = 'none';
+        if (head) head.style.display = 'none';
+        done.style.display = 'block';
+        window.scrollTo(0, 0);
+        if (!reduce && G) plane();
+      }, wait + 150);
+    }).observe(done, { attributes: true, attributeFilter: ['style'] });
+    // An error: everything comes back as it was
+    if (fail) new MutationObserver(function () {
+      if (fail.style.display !== 'block') return;
+      if (G) G.to(gone, { y: 0, opacity: 1, filter: 'blur(0px)', duration: .5, ease: 'power2.out', clearProps: 'transform,opacity,filter' });
+      update();
+    }).observe(fail, { attributes: true, attributeFilter: ['style'] });
+
+    update();
+  }
+
+  // The thank-you says their first name, on its own line under "Thank you": the name element (apf_name inside the
+  // success title, shown by its combo is-on) gets the first word of the Name field when the form is sent. Once the title
+  // has faded up, the letters stamp in one by one in stop-motion (12 a second, a little pop and tilt each), boil a
+  // moment like button 06, and settle. A name too wide for the screen at the title's size is left out.
+  function rdApplyName() {
+    var form = document.querySelector('[data-apply-form]'), title = document.querySelector('.w-form-done .apf_title');
+    var nameEl = title && title.querySelector('.apf_name');
+    if (!form || !nameEl) return;
+    var reduce = reducedMotion;
+    var base = [].filter.call(title.childNodes, function (n) { return n.nodeType === 3; }).map(function (n) { return n.textContent; }).join('').trim();
+    var letters = [], started = false;
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function fits(word) {
+      var probe = document.createElement('span');
+      probe.className = 'apf_title';
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;display:inline-block';
+      probe.textContent = word;
+      document.body.appendChild(probe);
+      var ok = probe.offsetWidth <= form.parentElement.clientWidth;
+      probe.remove();
+      return ok;
+    }
+    form.addEventListener('submit', function () {
+      var f = form.querySelector('[name="Name"]'), first = f ? f.value.trim().split(/\s+/)[0] : '';
+      if (first && first === first.toLowerCase()) first = first.charAt(0).toUpperCase() + first.slice(1);
+      if (first && !fits(first)) first = '';
+      var still = reduce; // without the fade-up there's nothing to wait for: the name just stands there
+      nameEl.classList.toggle('is-on', !!first);
+      nameEl.setAttribute('aria-hidden', 'true');
+      title.setAttribute('aria-label', first ? base + ', ' + first : base);
+      nameEl.textContent = '';
+      started = still;
+      letters = first.split('').map(function (ch) {
+        var s = document.createElement('span');
+        s.textContent = ch;
+        s.style.cssText = 'display:inline-block;transform-origin:50% 60%;' + (still ? '' : 'visibility:hidden');
+        nameEl.appendChild(s);
+        return s;
+      });
+    });
+    // The title fades up (rdApply's thank-you); when it's nearly in, the letters stamp in
+    new MutationObserver(function () {
+      if (started || !letters.length || parseFloat(title.style.opacity || '0') < .85) return;
+      started = true;
+      stamp(letters);
+    }).observe(title, { attributes: true, attributeFilter: ['style'] });
+    function stamp(ls) {
+      var poses = ls.map(function () { return [0, 1, 2].map(function () { return [rnd(-1.2, 1.2), rnd(-1.4, 1.4), rnd(-3.5, 3.5)]; }); });
+      var tilt = ls.map(function () { return rnd(5, 10) * (Math.random() < .5 ? -1 : 1); });
+      var t0 = null, last = -1, END = ls.length + 16; // one letter per frame, then about 1.2 s of boil
+      function set(el, x, y, r, s) { el.style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px) rotate(' + r.toFixed(2) + 'deg) scale(' + s + ')'; }
+      requestAnimationFrame(function loop(now) {
+        if (t0 === null) t0 = now;
+        var ms = now - t0, f = Math.floor(ms / 1000 * 12), b = Math.floor(ms / 1000 * 9);
+        if (f !== last) {
+          last = f;
+          if (f >= END) { ls.forEach(function (el) { el.style.transition = 'transform .35s cubic-bezier(.16,1,.3,1)'; el.style.transform = ''; }); return; }
+          ls.forEach(function (el, i) {
+            var age = f - i;
+            if (age < 0) return;
+            el.style.visibility = '';
+            if (age === 0) set(el, 0, -6, tilt[i], 1.3);          // it lands: big, tilted
+            else if (age === 1) set(el, 0, 1, -tilt[i] * .4, .94); // a squash the other way
+            else { var p = poses[i][(b + i) % 3]; set(el, p[0], p[1], p[2], 1); } // then it boils
+          });
+        }
+        requestAnimationFrame(loop);
+      });
+    }
+  }
+
+  // Demo link, staging only: /apply?demo (or ?thanks) plays a send and the thank-you without sending anything.
+  // It fills the form with a sample (name: Rimbo), lets the page's own submit run (the swoosh), stops the event before
+  // Webflow's handler (so nothing is sent), then shows the success message the way Webflow does. Reload to see it again.
+  // Never runs on rimbodesigns.com.
+  function rdApplyDemo() {
+    if (!/[?&](demo|thanks)\b/.test(location.search) || !/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
+    var form = document.querySelector('[data-apply-form]'), done = document.querySelector('.w-form-done');
+    if (!form || !done || !form.requestSubmit) return;
+    form.addEventListener('submit', function (e) { e.preventDefault(); e.stopPropagation(); });
+    setTimeout(function () {
+      form.querySelectorAll('[required]').forEach(function (f) { f.value = f.type === 'email' ? 'sample@example.com' : f.name === 'Name' ? 'Rimbo' : 'Sample'; });
+      var needs = form.querySelector('[data-needs-field]'); if (needs) needs.value = 'Website';
+      form.querySelectorAll('[data-required]').forEach(function (f) { if (!f.value) f.value = 'Sample'; });
+      form.querySelectorAll('[data-step], [data-send-row]').forEach(function (s) { s.classList.remove('is-later'); });
+      form.dispatchEvent(new Event('input', { bubbles: true }));
+      setTimeout(function () {
+        form.requestSubmit();
+        setTimeout(function () { form.style.display = 'none'; done.style.display = 'block'; }, 400);
+      }, 900);
+    }, 800);
+  }
+
   // What runs on which page. Runs on every page, first load or swap
   function initPageFunctions() {
     var path = pagePath();
@@ -6667,6 +7133,11 @@
       soon('location card lean', rdLocLean);
       soon('og url', rdOgUrl);
     }
+
+    // /apply, last for the same reason: the form itself at once (it is the first screen), the thank-you's parts in turn
+    run('apply', rdApply);
+    soon('apply name', rdApplyName);
+    soon('apply demo', rdApplyDemo);
   }
 
   // The ones that need the whole page in place first

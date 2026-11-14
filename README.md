@@ -31,6 +31,7 @@ Site-wide JavaScript for [rimbodesigns.com](https://www.rimbodesigns.com) (Webfl
 | `rdLocFaq`, `rdLocCity`, `rdLocCrumbs`, `rdGlobe`, `rdLocLean`, `rdOgUrl` | city pages and `/locations` | the city FAQ accordion + FAQPage data, the postmark's city name, the breadcrumb data, Osmo's Accelerating Globe, the overview card's lean, og:url (were page code in Webflow until 14 Nov 2026; the city's name reaches the script as `<meta name="rd-city">` in the template head) |
 | `rdPostRefresh`, `rdScrollRuler`, `rdPostCards`, `rdCoverHueDrift` | `/post/…` (English) | the rebuilt post page, Osmo's Scroll Ruler (`docs/osmo/scroll-ruler.md`), the article cards |
 | `rdResources` (+ `rdChipBoil`, `rdLangToggle`, `rdQueuedReveal`, `rdMultiFilter`) | `/resources` | the filter, the chips, the language pill |
+| `rdApply`, `rdApplyName`, `rdApplyDemo` | `/apply` | the application form (steps, picks, budget, calendar, the swoosh and the paper plane thank-you), the first name stamped into the thank-you, the staging-only `?demo` link (were the page's footer and head code in Webflow until 14 Nov 2026) |
 | `rdStagingLinks` | webflow.io only | old Service/Work links open the V2 pages |
 | `rdHome`, `rdService`, `rdWork`, `rdWorkItem`, `rdNewsletter`, `rdQuiz`, `rdLetterReveal` | the old site's pages (`/`, `/service`, `/locations/…`, `/work`, `/work/…`, newsletter, quiz, audit, my-story) | the Slater ports, kept until the redesign replaces those pages |
 
