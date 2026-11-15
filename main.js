@@ -7264,7 +7264,7 @@
     var label = function () { if (dia && sun) dia.textContent = 'Ø ' + Math.round(sun.clientWidth) + ' PX'; };
     label();
     if (!('IntersectionObserver' in window)) return;
-    var obs = [], raf = 0, on = false, ball = null, last = 0, lastT = 0, dead = false, time = 0, inAt = 0, built = false, wordM = null, dirty = true, sweep = -1, diaT = '',
+    var obs = [], raf = 0, on = false, ball = null, last = 0, lastT = 0, dead = false, time = 0, inAt = 0, want = false, built = false, wordM = null, dirty = true, sweep = -1, diaT = '',
         c2 = null, near = null, waitT = 0, P = { x: 0, y: 0, tx: 0, ty: 0, target: 0, push: 0, pull: LOOK.pull, to: LOOK.to, share: -1 }, stir = 0, stirTo = 0, sy = 0, st = 0, tapT = 0, heard = false, hot = null, at = null, td = null;
     var gl = !calm && !!cv && !!sun && !!window.WebGL2RenderingContext;
     if (gl) sheet.classList.add('is-gl');
@@ -7278,7 +7278,7 @@
 
     function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
     // no painter (no WebGL, or the context was lost): the still image and a solid ink word, at once
-    function noGl() { gl = false; ball = null; stop(); hear(false); if (cv) cv.style.display = 'none'; sheet.classList.remove('is-gl'); if (sun) sun.classList.remove('is-live'); label(); }
+    function noGl() { gl = false; ball = null; stop(); hear(false); if (cv) cv.style.display = 'none'; sheet.classList.remove('is-gl'); if (sun) sun.classList.remove('is-live'); label(); if (want) { want = false; go(); } }
     // the page left (page transition, see PAGE SCOPE at the top): stop everything and give the WebGL context back
     function quit() {
       if (dead) return; dead = true; stop(); hear(false); clearTimeout(tapT); clearTimeout(waitT);
@@ -7407,6 +7407,7 @@
         cv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); if (dead) return; near.disconnect(); noGl(); });
       }
       hear(true); wake();
+      if (want) { want = false; go(); } // the build waited for the painter (see ask)
     }
     if (gl) {
       near = new IntersectionObserver(function (es) {
@@ -7423,17 +7424,20 @@
     // so a visitor who scrolls on still gets the colour); is-in = the ruler is on screen: the lines and the parts
     if (calm || !stage) return;
     sheet.classList.add('is-armed');
+    // with the painter, the build never starts before the painter draws (its observer starts lower on the screen than these),
+    // or a visitor who stops just there sees the build play without the ball and then the finished ball pop in
+    function ask() { if (gl && !ball && !dead) { want = true; return; } go(); }
     function go() {
       if (inAt) return; inAt = performance.now(); sheet.classList.add('is-go'); if (!gl) label(); wake();
       if (word) (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(inZone(function () { if (!dead) drawWord(word, gl); }));
     }
     var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { if (!e.isIntersecting) return; io.disconnect(); go(); sheet.classList.add('is-in'); });
+      es.forEach(function (e) { if (!e.isIntersecting) return; io.disconnect(); ask(); sheet.classList.add('is-in'); });
     }, { rootMargin: '0px 0px -8% 0px' });
     io.observe(qs('.im_ruler', sheet) || stage); obs.push(io);
     if (gl && sky) {
       var early = new IntersectionObserver(function (es) {
-        es.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio >= 0.34) { early.disconnect(); go(); } });
+        es.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio >= 0.34) { early.disconnect(); ask(); } });
       }, { threshold: 0.35 });
       early.observe(sky); obs.push(early);
     }
