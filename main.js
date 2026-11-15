@@ -448,6 +448,10 @@
   // The numbers are the lab's. ?cube=1 on staging shows the cube it replaced
   // -----------------------------------------
   var IMPACT = { stagger: 0.035, dur: 1.4, far: [300, 1300], spinZ: 80, spinY: 60, drift: 0.1, burst: 260, hang: 0.1 };
+  // the cut, at the click: every block shrinks a little about its own middle, so lines open between them, spreading
+  // from the click. minHold = how long the cut page stands before it bursts, however fast the next page is
+  var IMPACT_CUT = { scale: 0.955, dur: 0.34, spread: 0.028, minHold: 0.42 };
+  var impactPending = null; // the cut page, between the click and the moment the next page is ready
   var useCube = /[?&]cube=1/.test(location.search);
   var impactStyle = null;
   var pageVisits = 0; // 1 on the page you arrived on, more after every page transition
@@ -513,8 +517,7 @@
         var shadow = host.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = sheets;
         var root = document.createElement('div');
-        // rules that hang on a class of <html> (.rf …) still reach the copies
-        root.className = 'rd-impact__root ' + document.documentElement.className.replace(/\blenis\S*/g, '');
+        root.className = 'rd-impact__root';
         shadow.appendChild(root);
         return { host: host, root: root };
       } catch (err) {
@@ -539,9 +542,11 @@
   // A copy of what a page shows on screen right now, made from the live page. Boxes that run far past the screen are
   // opened and only their visible children copied; the rest is copied whole. Every copied box is placed where it was
   // measured, so the copy doesn't depend on the page's own layout. Videos and canvases become still pictures
-  function snapshot(container, W, H) {
+  function snapshot(container, W, H, hot) {
     var root = document.createElement('div');
-    root.className = 'rd-snap';
+    // the classes <html> has at this moment go on the copy: rules that hang on them (.rf …, the Service hero's
+    // .svh-pre that hides its title until it builds) then reach this copy, and only this one
+    root.className = 'rd-snap ' + document.documentElement.className.replace(/\blenis\S*/g, '');
     root.style.cssText = 'width:' + W + 'px;height:' + H + 'px;background:' + getComputedStyle(document.body).backgroundColor;
     var onScreen = function (r) { return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H && r.right > 0 && r.left < W; };
 
@@ -560,6 +565,37 @@
     }
 
     // videos and canvases in a copy are blank (or start decoding again): freezeInside() turns them into stills of the original
+    // A copy is not under the pointer, so it would fall back to its look without hover: the article card you click
+    // showed its extra lines, and its copy flashed without them (Rimbo). The look is read from the real elements and
+    // written on the copies. hotTop = the clicked link, or the box around it if that is hovered too
+    var hotTop = null;
+    if (hot && hot.nodeType === 1 && hot.matches(':hover')) {
+      hotTop = hot;
+      for (var up = 0; up < 2; up++) if (hotTop.parentElement && hotTop.parentElement !== container && hotTop.parentElement.matches(':hover')) hotTop = hotTop.parentElement;
+    }
+    var LOOK = ['opacity', 'visibility', 'color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'clipPath', 'filter', 'boxShadow', 'outlineColor'];
+    var SHAPE = ['transform', 'translate', 'rotate', 'scale', 'width', 'height', 'maxHeight', 'top', 'left', 'right', 'bottom', 'display', 'zIndex'];
+    function wear(orig, copy, shapeToo) {
+      var cs = getComputedStyle(orig);
+      LOOK.concat(shapeToo ? SHAPE : []).forEach(function (k) { copy.style[k] = cs[k]; });
+    }
+    function hoverLook(el, clone, whole) {
+      if (!hotTop) return;
+      if (hotTop.contains(el)) { // the copied box is the hovered one, or inside it
+        wear(el, clone, false); // its place was measured already
+        if (whole) { var a = el.querySelectorAll('*'), b = clone.querySelectorAll('*'); for (var i = 0; i < a.length && i < b.length; i++) wear(a[i], b[i], true); }
+      } else if (whole && el.contains(hotTop)) { // the hovered box sits somewhere inside this copy: find its twin by position
+        var path = [], n = hotTop;
+        while (n !== el) { path.unshift(Array.prototype.indexOf.call(n.parentNode.children, n)); n = n.parentNode; }
+        var twin = clone;
+        for (var j = 0; j < path.length && twin; j++) twin = twin.children[path[j]];
+        if (!twin) return;
+        wear(hotTop, twin, true);
+        var x = hotTop.querySelectorAll('*'), y = twin.querySelectorAll('*');
+        for (var k = 0; k < x.length && k < y.length; k++) wear(x[k], y[k], true);
+      }
+    }
+
     function walk(el, parent, base) {
       if (el.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(el.tagName)) return;
       var cs = getComputedStyle(el);
@@ -570,6 +606,7 @@
       var open = r.height > H * 1.2 && el.children.length > 0 && cs.transform === 'none' && !/^(VIDEO|CANVAS|IMG|IFRAME|PICTURE|svg)$/i.test(el.tagName);
       var clone = el.cloneNode(!open);
       place(clone, el, r, base, cs);
+      hoverLook(el, clone, !open);
       parent.appendChild(clone);
       if (open) {
         var inner = { x: r.left + el.clientLeft, y: r.top + el.clientTop };
@@ -638,21 +675,22 @@
   // half play, where nobody sees it (Rimbo on the Service page: "does it block the whole animation?"). Whole animations
   // are paused, never a tween inside a timeline: a paused child is left behind when its timeline ends, and that once
   // left the menu bar invisible. Looked at every frame, because page code starts its opening late: after the fonts,
-  // after a script of its own arrives. keep(tl) names the one animation that must run: the blocks
+  // after a script of its own arrives; and looked at before GSAP moves anything in that frame, because making the blocks
+  // takes one long frame and a short delay (the Service hero's 0.15 s) would run out inside it. The blocks' own
+  // animations carry data: 'rd-impact' and run on
   function holdNewPage() {
-    var held = [], mine = null, on = true;
+    var held = [], on = true;
     function sweep() {
       if (!on) return;
       gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
-        if (a === mine || a.scrollTrigger || a.paused() || a.progress() >= 1) return;
+        if (a.data === 'rd-impact' || a.scrollTrigger || a.paused() || a.progress() >= 1) return;
         a.pause();
         held.push(a);
       });
     }
     sweep();
-    gsap.ticker.add(sweep);
+    gsap.ticker.add(sweep, false, true); // true: ahead of GSAP's own update
     return {
-      keep: function (tl) { mine = tl; },
       release: function () {
         on = false;
         gsap.ticker.remove(sweep);
@@ -692,7 +730,9 @@
     return Promise.race([Promise.all(waits), new Promise(function (done) { setTimeout(done, ms); })]);
   }
 
-  function impactBlocks(oldSnap, newSnap, W, H, point) {
+  // The blocks, made from the page you are on. cut = the lines opening from the click; fill(copy) puts the next page on
+  // the faces that turn up; tl = the burst and the landing
+  function impactBlocks(oldSnap, W, H, point) {
     var cols = W < 600 ? 3 : W < 1000 ? 5 : 7, rows = Math.max(2, Math.round(cols * H / W));
     var w = W / cols, h = H / rows, depth = h / 2;
     var layer = impactStage(), stage = layer.host;
@@ -701,69 +741,97 @@
     stage.style.background = CUBE_VOID; layer.root.style.perspective = W + 'px';
     grain.style.backgroundImage = CUBE_GRAIN;
     layer.root.appendChild(grain); layer.root.appendChild(scene);
-    var face = function (box, css, snap, c, r) {
+    var show = function (f, snap, c, r) { var copy = snapCopy(snap); copy.style.left = (-c * w) + 'px'; copy.style.top = (-r * h) + 'px'; f.appendChild(copy); };
+    var face = function (box, css, side) {
       var f = document.createElement('div');
-      f.className = 'rd-impact__face' + (snap ? '' : ' rd-impact__side');
+      f.className = 'rd-impact__face' + (side ? ' rd-impact__side' : '');
       f.style.cssText = css;
-      if (snap) { var copy = snapCopy(snap); copy.style.left = (-c * w) + 'px'; copy.style.top = (-r * h) + 'px'; f.appendChild(copy); }
       box.appendChild(f);
+      return f;
     };
     var blocks = [];
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var piece = document.createElement('div'), box = document.createElement('div');
       piece.className = 'rd-impact__piece'; box.className = 'rd-impact__box';
       piece.style.cssText = 'left:' + c * w + 'px;top:' + r * h + 'px;width:' + w + 'px;height:' + h + 'px';
-      face(box, 'transform:rotateX(0deg) translateZ(' + depth + 'px)', oldSnap, c, r);           // the page you leave
-      face(box, 'transform:rotateX(90deg) translateZ(' + (depth + 0.5) + 'px)', newSnap, c, r);  // where you go
-      face(box, 'transform:rotateX(-90deg) translateZ(' + depth + 'px)');
-      face(box, 'transform:rotateX(180deg) translateZ(' + depth + 'px)');
-      [90, -90].forEach(function (deg) { face(box, 'left:' + (w / 2 - depth) + 'px;width:' + depth * 2 + 'px;transform:rotateY(' + deg + 'deg) translateZ(' + w / 2 + 'px)'); });
+      show(face(box, 'transform:rotateX(0deg) translateZ(' + depth + 'px)'), oldSnap, c, r);              // the page you leave
+      var up = face(box, 'transform:rotateX(90deg) translateZ(' + (depth + 0.5) + 'px)');                 // where you go: filled later
+      face(box, 'transform:rotateX(-90deg) translateZ(' + depth + 'px)', true);
+      face(box, 'transform:rotateX(180deg) translateZ(' + depth + 'px)', true);
+      [90, -90].forEach(function (deg) { face(box, 'left:' + (w / 2 - depth) + 'px;width:' + depth * 2 + 'px;transform:rotateY(' + deg + 'deg) translateZ(' + w / 2 + 'px)', true); });
       piece.appendChild(box); scene.appendChild(piece);
       gsap.set(box, { z: -depth, transformOrigin: '50% 50%', force3D: true });
-      blocks.push({ box: box, r: r, c: c });
+      var vx = (c + 0.5) * w - point.x, vy = (r + 0.5) * h - point.y;
+      blocks.push({ box: box, up: up, r: r, c: c, vx: vx, vy: vy, dist: Math.hypot(vx, vy) || 1 });
     }
 
-    var o = IMPACT, tl = gsap.timeline({ paused: true });
+    var k = IMPACT_CUT, cut = gsap.timeline({ data: 'rd-impact' });
+    blocks.forEach(function (b) { cut.to(b.box, { scale: k.scale, duration: k.dur, ease: 'power2.out' }, b.dist / w * k.spread); });
+
+    var o = IMPACT, tl = gsap.timeline({ paused: true, data: 'rd-impact' });
     var rand = function (a, b) { return a + Math.random() * (b - a); };
     blocks.forEach(function (b) {
-      var cx = (b.c + 0.5) * w, cy = (b.r + 0.5) * h;
-      var vx = cx - point.x, vy = cy - point.y, dist = Math.hypot(vx, vy) || 1;
-      var at = dist / w * o.stagger, d = o.dur;
-      var push = o.burst * (1 - Math.min(dist / Math.hypot(W, H), 1) * 0.6); // the nearest blocks are pushed furthest
-      var dx = rand(-0.5, 0.5) * W * o.drift + vx / dist * push, dy = vy / dist * push;
+      var at = b.dist / w * o.stagger, d = o.dur;
+      var push = o.burst * (1 - Math.min(b.dist / Math.hypot(W, H), 1) * 0.6); // the nearest blocks are pushed furthest
+      var dx = rand(-0.5, 0.5) * W * o.drift + b.vx / b.dist * push, dy = b.vy / b.dist * push;
       tl.to(b.box, { z: -depth - rand(o.far[0], o.far[1]), x: dx, y: dy, rotateZ: rand(-0.5, 0.5) * o.spinZ, rotateY: rand(-0.5, 0.5) * o.spinY, duration: d * 0.45, ease: 'power3.out' }, at);
       tl.to(b.box, { rotateX: -90, duration: d * 0.6, ease: 'power2.inOut' }, at + d * 0.2);
-      tl.to(b.box, { z: -depth, x: 0, y: 0, rotateZ: 0, rotateY: 0, duration: d * 0.55, ease: 'power3.inOut' }, at + d * 0.45 + o.hang);
+      tl.to(b.box, { z: -depth, x: 0, y: 0, rotateZ: 0, rotateY: 0, scale: 1, duration: d * 0.55, ease: 'power3.inOut' }, at + d * 0.45 + o.hang);
     });
-    return { stage: stage, tl: tl };
+    return {
+      stage: stage, cut: cut, tl: tl,
+      fill: function (newSnap) { blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); }
+    };
+  }
+
+  // The click: the page is copied and cut at once, before the next page has even been asked for, so the click answers
+  // straight away (Rimbo: "the screen first gets cut, for a fraction of a second, and then…"). Called from barba.go
+  function impactCut(href, trigger) {
+    if (useCube || reducedMotion || impactPending || !trigger || trigger.nodeType !== 1 || !trigger.isConnected) return;
+    var url = new URL(href, location.href);
+    if (url.hash || (url.pathname === location.pathname && url.search === location.search) || tearRule({ trigger: trigger })) return;
+    var current = qs('[data-barba="container"]');
+    if (!current) return;
+    var W = document.documentElement.clientWidth, H = window.innerHeight;
+    var point = impactPoint({ trigger: trigger }); // before anything moves
+    var oldSnap = snapshot(current, W, H, trigger);
+    PAGE_HTML_CLASSES.forEach(function (name) { if (document.documentElement.classList.contains(name) && oldSnap.firstElementChild) oldSnap.firstElementChild.classList.add(name); });
+    if (rdNavFull.handOver) rdNavFull.handOver(oldSnap); // an open menu is cut up with the page
+    var blocks = impactBlocks(oldSnap, W, H, point);
+    document.body.appendChild(blocks.stage);
+    if (window.lenis) window.lenis.stop();
+    impactPending = { blocks: blocks, W: W, H: H, at: performance.now() };
+    // the next page never came (Barba then loads it the plain way, or the visitor is offline): don't leave the cut standing
+    var mine = impactPending;
+    window.setTimeout(function () {
+      if (impactPending !== mine) return;
+      impactPending = null;
+      mine.blocks.cut.kill(); mine.blocks.stage.remove();
+      if (window.lenis) window.lenis.start();
+    }, 9000);
   }
 
   function runImpactLeave(current, next, data) {
     return new Promise(function (resolve) {
-      var point = impactPoint(data); // before anything moves
+      if (!impactPending) impactCut(data.next.url.href, data.trigger && data.trigger.nodeType === 1 ? data.trigger : document.body); // a move that didn't start with a click on a link
+      var pending = impactPending;
+      impactPending = null;
+      if (!pending) { // no cut could be made: the plain swap
+        return runFadeLeave(current).then(function () { return runFadeEnter(next, data); }).then(resolve);
+      }
+      var blocks = pending.blocks, W = pending.W, H = pending.H;
       window.requestAnimationFrame(function () {
         window.requestAnimationFrame(function () { // Webflow.destroy() needs a frame before it can start again (restartWebflow)
-          var W = document.documentElement.clientWidth, H = window.innerHeight;
-          var oldSnap = snapshot(current, W, H);
-          PAGE_HTML_CLASSES.forEach(function (name) { if (document.documentElement.classList.contains(name) && oldSnap.firstElementChild) oldSnap.firstElementChild.classList.add(name); });
-          if (rdNavFull.handOver) rdNavFull.handOver(oldSnap); // an open menu breaks up with the page
           var scripts = watchScripts();
           var started = startCube(data);
           var scriptsReady = scripts(900);
-          current.remove(); // its copy stands in for it from here
-          var coverLayer = impactStage(), cover = coverLayer.host; // the old page's copy holds the screen while the blocks are made
-          coverLayer.root.appendChild(oldSnap);
-          document.body.appendChild(cover); // same moment as the old page going, so nothing shows in between
+          current.remove(); // its copy on the blocks stands in for it
           if (window.lenis) window.lenis.stop();
           var hold = holdNewPage();
           Promise.all([picturesReady(next, H, 350), scriptsReady]).then(function () {
             return new Promise(function (frame) { window.requestAnimationFrame(frame); }); // what a late script just set up is on the page
           }).then(function () {
-            var newSnap = snapshot(next, W, H);
-            var blocks = impactBlocks(oldSnap, newSnap, W, H, point);
-            hold.keep(blocks.tl);
-            document.body.appendChild(blocks.stage);
-            cover.remove();
+            blocks.fill(snapshot(next, W, H));
             blocks.tl.eventCallback('onComplete', function () {
               gsap.set(next, { clearProps: 'opacity,visibility' });
               blocks.stage.remove();
@@ -772,8 +840,12 @@
               finishCube(started);
               resolve();
             });
-            // two frames standing still first: the blocks get drawn before they move, so that first heavy frame doesn't stutter the flight
-            window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { blocks.tl.play(); }); });
+            // the cut stands for a moment however fast the page came, and two frames pass after the new faces went on:
+            // they are drawn before anything moves, so that heavy frame doesn't stutter the flight
+            var wait = Math.max(0, IMPACT_CUT.minHold * 1000 - (performance.now() - pending.at));
+            window.setTimeout(function () {
+              window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { blocks.cut.kill(); blocks.tl.play(); }); });
+            }, wait);
           });
         });
       });
@@ -1334,6 +1406,7 @@
       }
       navigating = true;
       linkHash = new URL(href, location.href).hash;
+      try { impactCut(href, trigger); } catch (err) { console.error('[rimbo-designs] impact cut:', err); } // a click on a link: the page is cut before the next one is fetched
       return Promise.resolve(go.call(barba, href, trigger, e)).finally(function () { navigating = false; });
     };
 
