@@ -448,11 +448,12 @@
   // The numbers are the lab's. ?cube=1 on staging shows the cube it replaced
   // -----------------------------------------
   var IMPACT = { stagger: 0.035, dur: 1.4, far: [300, 1300], spinZ: 80, spinY: 60, drift: 0.1, burst: 260, hang: 0.1 };
-  // the cut, at the click, is drawn: a line runs along every seam (line = how long one takes, lineSpread = how far the
-  // furthest one starts behind the nearest), then from partAt every block shrinks a little about its own middle (part,
-  // spread per block away from the click) so the lines open up. minHold = how long the cut page stands before it
-  // bursts, however fast the next page is: the whole cut has to fit in it. Seconds (Rimbo: "one second of swoop, cut")
-  var IMPACT_CUT = { scale: 0.955, line: 0.46, lineSpread: 0.24, partAt: 0.62, part: 0.28, spread: 0.018, minHold: 1.02 };
+  // the cut, at the click, is a sword stroke (Rimbo's pick from the cut lab, "Swoosh, cut stays"): along every seam a
+  // fine orange stroke flies past (stroke = seconds one takes, strokeLen = its length as a part of the seam, lineSpread =
+  // how far the furthest seam starts behind the nearest) and leaves a pale hairline. From partAt every block shrinks a
+  // little about its own middle (part, spread per block away from the click), so the hairlines open. minHold = how long
+  // the cut page stands before it bursts, however fast the next page is: the whole cut has to fit in it. Seconds
+  var IMPACT_CUT = { scale: 0.955, stroke: 0.36, strokeLen: 0.42, lineSpread: 0.4, partAt: 0.7, part: 0.28, spread: 0.018, minHold: 1.1 };
   var impactPending = null; // the cut page, between the click and the moment the next page is ready
   var useCube = /[?&]cube=1/.test(location.search);
   var impactStyle = null;
@@ -468,7 +469,11 @@
     '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
     '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
     '.rd-impact__cuts{position:absolute;inset:0}' +
-    '.rd-impact__cut{position:absolute;background:#E4441C;will-change:transform}' +
+    // one seam: a line of its own, laid along the seam from the edge where the stroke comes in
+    '.rd-impact__seam{position:absolute;left:0;top:0;height:0;transform-origin:0 0}' +
+    '.rd-impact__seam div{position:absolute;left:0;top:0;height:1px;will-change:transform}' +
+    '.rd-impact__stroke{background:linear-gradient(90deg,rgba(228,68,28,0),#E4441C 70%)}' + // Deep Orange, docs/brand.md
+    '.rd-impact__scar{width:100%;transform-origin:0 50%;transform:scaleX(0);background:#DACCAE;box-shadow:0 0 0 .5px rgba(19,19,19,.28)}' +
     '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
     // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
     '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
@@ -782,25 +787,31 @@
     }
 
     // The cut. The lines appearing all at once read as the site breaking (Rimbo: "the first fraction of a second feels a
-    // bit like the website is breaking"), so they are drawn: up from the bottom and in from the left and the right in
-    // turn, the ones nearest the click first, and only then do the pieces part. It runs on the browser's own animation
-    // track (element.animate, transform and opacity only), so it stays smooth while the next page is set up behind it
-    // The lines are Deep Orange (docs/brand.md; Rimbo: "the cut can be in the brand color instead of gray")
+    // bit like the website is breaking"), so the page is cut by strokes: up from the bottom and in from the left and the
+    // right in turn, the seams nearest the click first, and only then do the pieces part. A stroke is orange and gone
+    // again ("it doesn't stay red, so it's like a swoosh"); what it leaves is a hairline in the void's colour, 1px, no
+    // glow, no white core, no point (his notes on the lab). It all runs on the browser's own animation track
+    // (element.animate, transform and opacity only), so it stays smooth while the next page is set up behind it.
+    // Stroke and hairline share one set of steps, so the hairline ends exactly under the stroke's tip
     var k = IMPACT_CUT, moves = [], drawn = typeof scene.animate === 'function';
     var cuts = document.createElement('div');
     cuts.className = 'rd-impact__cuts';
-    var seams = [], thick = 2, n;
-    for (n = 1; n < cols; n++) seams.push({ up: true, at: n * w, far: Math.abs(n * w - point.x) / W });
-    for (n = 1; n < rows; n++) seams.push({ up: false, at: n * h, far: Math.abs(n * h - point.y) / H, right: n % 2 === 0 });
+    var seams = [], n;
+    for (n = 1; n < cols; n++) seams.push({ x: Math.round(n * w), y: H, turn: -90, len: H, far: Math.abs(n * w - point.x) / W });
+    for (n = 1; n < rows; n++) seams.push({ x: n % 2 ? 0 : W, y: Math.round(n * h), turn: n % 2 ? 0 : 180, len: W, far: Math.abs(n * h - point.y) / H });
+    var STEPS = 24, tip = []; // where the stroke's tip is at each step, 0 = the seam's start, 1 = its end (power2.inOut)
+    for (n = 0; n <= STEPS; n++) { var t = n / STEPS; tip.push((1 + k.strokeLen) * (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)); }
     if (drawn) seams.forEach(function (m) {
-      var el = document.createElement('div');
-      el.className = 'rd-impact__cut';
-      el.style.cssText = (m.up
-        ? 'left:' + (m.at - thick / 2) + 'px;top:0;width:' + thick + 'px;height:100%;transform-origin:50% 100%'
-        : 'top:' + (m.at - thick / 2) + 'px;left:0;height:' + thick + 'px;width:100%;transform-origin:' + (m.right ? '100%' : '0') + ' 50%');
-      cuts.appendChild(el);
-      var axis = m.up ? 'scaleY' : 'scaleX';
-      moves.push(el.animate([{ transform: axis + '(0)' }, { transform: axis + '(1)' }], { duration: k.line * 1000, delay: m.far * k.lineSpread * 1000, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'both' }));
+      var seam = document.createElement('div'), scar = document.createElement('div'), stroke = document.createElement('div');
+      seam.className = 'rd-impact__seam'; scar.className = 'rd-impact__scar'; stroke.className = 'rd-impact__stroke';
+      seam.style.width = m.len + 'px';
+      seam.style.transform = 'translate(' + m.x + 'px,' + m.y + 'px) rotate(' + m.turn + 'deg)';
+      stroke.style.width = (k.strokeLen * m.len) + 'px';
+      stroke.style.transform = 'translateX(' + (-k.strokeLen * m.len) + 'px)';
+      seam.appendChild(scar); seam.appendChild(stroke); cuts.appendChild(seam);
+      var timing = { duration: k.stroke * 1000, delay: m.far * k.lineSpread * 1000, easing: 'linear', fill: 'both' };
+      moves.push(stroke.animate(tip.map(function (p) { return { transform: 'translateX(' + ((p - k.strokeLen) * m.len).toFixed(1) + 'px)' }; }), timing));
+      moves.push(scar.animate(tip.map(function (p) { return { transform: 'scaleX(' + Math.min(1, p).toFixed(4) + ')' }; }), timing));
     });
     layer.root.appendChild(cuts);
     blocks.forEach(function (b) {
