@@ -448,9 +448,11 @@
   // The numbers are the lab's. ?cube=1 on staging shows the cube it replaced
   // -----------------------------------------
   var IMPACT = { stagger: 0.035, dur: 1.4, far: [300, 1300], spinZ: 80, spinY: 60, drift: 0.1, burst: 260, hang: 0.1 };
-  // the cut, at the click: every block shrinks a little about its own middle, so lines open between them, spreading
-  // from the click. minHold = how long the cut page stands before it bursts, however fast the next page is
-  var IMPACT_CUT = { scale: 0.955, dur: 0.34, spread: 0.028, minHold: 0.42 };
+  // the cut, at the click, is drawn: a line runs along every seam (line = how long one takes, lineSpread = how far the
+  // furthest one starts behind the nearest), then from partAt every block shrinks a little about its own middle (part,
+  // spread per block away from the click) so the lines open up. minHold = how long the cut page stands before it
+  // bursts, however fast the next page is: the whole cut has to fit in it. Seconds (Rimbo: "one second of swoop, cut")
+  var IMPACT_CUT = { scale: 0.955, line: 0.46, lineSpread: 0.24, partAt: 0.62, part: 0.28, spread: 0.018, minHold: 1.02 };
   var impactPending = null; // the cut page, between the click and the moment the next page is ready
   var useCube = /[?&]cube=1/.test(location.search);
   var impactStyle = null;
@@ -465,6 +467,8 @@
     // will-change: each face is drawn once and moved as a picture, not redrawn at every size on its way into the depth
     '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
     '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
+    '.rd-impact__cuts{position:absolute;inset:0}' +
+    '.rd-impact__cut{position:absolute;box-shadow:0 0 0 1px rgba(19,19,19,.18);will-change:transform}' +
     '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
     // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
     '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
@@ -730,8 +734,8 @@
     return Promise.race([Promise.all(waits), new Promise(function (done) { setTimeout(done, ms); })]);
   }
 
-  // The blocks, made from the page you are on. cut = the lines opening from the click; fill(copy) puts the next page on
-  // the faces that turn up; tl = the burst and the landing
+  // The blocks, made from the page you are on. The cut starts by itself; fill(copy) puts the next page on the faces that
+  // turn up; burst() = the burst and the landing (tl)
   function impactBlocks(oldSnap, W, H, point) {
     var cols = W < 600 ? 3 : W < 1000 ? 5 : 7, rows = Math.max(2, Math.round(cols * H / W));
     var w = W / cols, h = H / rows, depth = h / 2;
@@ -762,11 +766,36 @@
       piece.appendChild(box); scene.appendChild(piece);
       gsap.set(box, { z: -depth, transformOrigin: '50% 50%', force3D: true });
       var vx = (c + 0.5) * w - point.x, vy = (r + 0.5) * h - point.y;
-      blocks.push({ box: box, up: up, r: r, c: c, vx: vx, vy: vy, dist: Math.hypot(vx, vy) || 1 });
+      blocks.push({ piece: piece, box: box, up: up, r: r, c: c, vx: vx, vy: vy, dist: Math.hypot(vx, vy) || 1 });
     }
 
-    var k = IMPACT_CUT, cut = gsap.timeline({ data: 'rd-impact' });
-    blocks.forEach(function (b) { cut.to(b.box, { scale: k.scale, duration: k.dur, ease: 'power2.out' }, b.dist / w * k.spread); });
+    // The cut. The lines appearing all at once read as the site breaking (Rimbo: "the first fraction of a second feels a
+    // bit like the website is breaking"), so they are drawn: up from the bottom and in from the left and the right in
+    // turn, the ones nearest the click first, and only then do the pieces part. It runs on the browser's own animation
+    // track (element.animate, transform and opacity only), so it stays smooth while the next page is set up behind it
+    var k = IMPACT_CUT, moves = [], drawn = typeof scene.animate === 'function';
+    var cuts = document.createElement('div');
+    cuts.className = 'rd-impact__cuts';
+    var seams = [], thick = 2, n;
+    for (n = 1; n < cols; n++) seams.push({ up: true, at: n * w, far: Math.abs(n * w - point.x) / W });
+    for (n = 1; n < rows; n++) seams.push({ up: false, at: n * h, far: Math.abs(n * h - point.y) / H, right: n % 2 === 0 });
+    if (drawn) seams.forEach(function (m) {
+      var el = document.createElement('div');
+      el.className = 'rd-impact__cut';
+      el.style.cssText = 'background:' + CUBE_VOID + ';' + (m.up
+        ? 'left:' + (m.at - thick / 2) + 'px;top:0;width:' + thick + 'px;height:100%;transform-origin:50% 100%'
+        : 'top:' + (m.at - thick / 2) + 'px;left:0;height:' + thick + 'px;width:100%;transform-origin:' + (m.right ? '100%' : '0') + ' 50%');
+      cuts.appendChild(el);
+      var axis = m.up ? 'scaleY' : 'scaleX';
+      moves.push(el.animate([{ transform: axis + '(0)' }, { transform: axis + '(1)' }], { duration: k.line * 1000, delay: m.far * k.lineSpread * 1000, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'both' }));
+    });
+    layer.root.appendChild(cuts);
+    blocks.forEach(function (b) {
+      if (!drawn) return gsap.set(b.box, { scale: k.scale }); // no animation track: the page is simply cut
+      moves.push(b.piece.animate([{ transform: 'scale(1)' }, { transform: 'scale(' + k.scale + ')' }], { duration: k.part * 1000, delay: (k.partAt + b.dist / w * k.spread) * 1000, easing: 'cubic-bezier(.33,1,.68,1)', fill: 'both' }));
+    });
+    // the drawn lines make way for the real gaps as these open
+    if (drawn) moves.push(cuts.animate([{ opacity: 1 }, { opacity: 0 }], { duration: k.part * 1000, delay: (k.partAt + k.part * 0.4) * 1000, easing: 'linear', fill: 'both' }));
 
     var o = IMPACT, tl = gsap.timeline({ paused: true, data: 'rd-impact' });
     var rand = function (a, b) { return a + Math.random() * (b - a); };
@@ -779,8 +808,15 @@
       tl.to(b.box, { z: -depth, x: 0, y: 0, rotateZ: 0, rotateY: 0, scale: 1, duration: d * 0.55, ease: 'power3.inOut' }, at + d * 0.45 + o.hang);
     });
     return {
-      stage: stage, cut: cut, tl: tl,
-      fill: function (newSnap) { blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); }
+      stage: stage, tl: tl,
+      fill: function (newSnap) { blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); },
+      // the cut's own animations hand the parted blocks to the timeline, in one frame
+      burst: function () {
+        moves.forEach(function (m) { m.cancel(); });
+        if (drawn) blocks.forEach(function (b) { gsap.set(b.box, { scale: k.scale }); });
+        cuts.remove();
+        tl.play();
+      }
     };
   }
 
@@ -806,7 +842,7 @@
     window.setTimeout(function () {
       if (impactPending !== mine) return;
       impactPending = null;
-      mine.blocks.cut.kill(); mine.blocks.stage.remove();
+      mine.blocks.stage.remove();
       if (window.lenis) window.lenis.start();
     }, 9000);
   }
@@ -844,7 +880,7 @@
             // they are drawn before anything moves, so that heavy frame doesn't stutter the flight
             var wait = Math.max(0, IMPACT_CUT.minHold * 1000 - (performance.now() - pending.at));
             window.setTimeout(function () {
-              window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { blocks.cut.kill(); blocks.tl.play(); }); });
+              window.requestAnimationFrame(function () { window.requestAnimationFrame(blocks.burst); });
             }, wait);
           });
         });
