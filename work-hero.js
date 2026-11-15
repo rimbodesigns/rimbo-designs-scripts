@@ -197,7 +197,7 @@ function initOrbitTiles() {
   var PERIOD = STEP + HOLD;                   // step + rest
   var FIRST_WAIT = HOLD + 1.6;                // the first tile rests longer: it has just eased in
   var FIRST_MOMENT = 1.7;                     // seconds after the opening starts that the first clip's moment starts
-  var BEAT = 0.18;                            // the pause between "the tile has settled" and "its moment starts"
+  var BEAT = -0.35;                          // Rimbo 2026-11-15: the moment starts a little BEFORE the tile has settled (more fluent)
 
   // When has a tile "settled"? Osmo's ease creeps for the last second; the eye reads it as landed once the
   // tile is within about 5% of its width of the centre. The clip's moment starts BEAT seconds after that point.
@@ -223,7 +223,7 @@ function initOrbitTiles() {
     return { v: v, at: +v.dataset.whAt, from: +v.dataset.whFrom || 0, slowFor: sf, slowRate: sr, due: null, card: el.querySelector('.wh_card'), project: +el.querySelector('.wh_card').dataset.whProject };
   });
   var running = false, pausedAt = null, wasPlaying = [];
-  var LEAVE = 0.9;   // seconds the leaving clip plays on into the swap before it freezes (freezing at once read as a stop)
+  var LEAVE = 1.8;   // seconds the leaving clip plays on into the swap before it freezes (Rimbo: pause a little later)
   // One thing moves at a time: only the "live" clip (the tile landing or in front) plays. The others hold a still
   // (their data-wh-from frame), and a waiting clip is only set back to that still while its tile passes behind
   // the front one, out of sight.
@@ -394,17 +394,6 @@ function initOrbitTiles() {
   // shows its still, so nothing pops or jumps; then it eases in, slowly and in one go: the front tile rises into
   // place, the others follow, then the name and the label. The orbit starts with it.
   var head = hero.querySelector('.wh_head'), hint = hero.querySelector('.wh_scroll');
-  // Added for this site: "Scroll" takes you to the next section
-  if (hint) {
-    hint.removeAttribute('aria-hidden'); hint.setAttribute('role', 'button'); hint.tabIndex = 0;
-    hint.setAttribute('aria-label', 'Scroll to the next section');
-    var goNext = function () {
-      var next = hero.nextElementSibling; if (!next) return;
-      if (window.lenis && window.lenis.scrollTo) window.lenis.scrollTo(next, { duration: 1.4 }); else next.scrollIntoView({ behavior: 'smooth' });
-    };
-    hint.addEventListener('click', goNext);
-    hint.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goNext(); } });
-  }
   var cards = clips.map(function (c) { return c.card; });
   if (!reduce) {
     gsap.set(cards, { autoAlpha: 0 });
