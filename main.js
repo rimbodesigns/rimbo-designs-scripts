@@ -617,6 +617,24 @@
       }
     }
 
+    // Pictures in a copy must be there in the very first frame. A copied <img> starts again as a new picture: a lazy one
+    // waits to be looked at, and a browser may draw the block first and the picture a moment later, so a dark card
+    // showed through where its cover belongs (Rimbo: "the cover images flicker black" on the blog section's cards).
+    // So every copy loads at once, is decoded before it is drawn, and uses the very file the original is showing
+    function pinPictures(el, clone) {
+      var a = el.tagName === 'IMG' ? [el] : qsa('img', el), b = clone.tagName === 'IMG' ? [clone] : qsa('img', clone);
+      a.forEach(function (img, i) {
+        var c = b[i];
+        if (!c) return;
+        if (img.currentSrc) {
+          if (c.parentNode && c.parentNode.tagName === 'PICTURE') qsa('source', c.parentNode).forEach(function (so) { so.remove(); });
+          c.removeAttribute('srcset'); c.removeAttribute('sizes');
+          c.src = img.currentSrc;
+        }
+        c.loading = 'eager'; c.decoding = 'sync';
+      });
+    }
+
     function walk(el, parent, base) {
       if (el.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(el.tagName)) return;
       var cs = getComputedStyle(el);
@@ -626,6 +644,7 @@
       if (!onScreen(r)) return;
       var open = r.height > H * 1.2 && el.children.length > 0 && cs.transform === 'none' && !/^(VIDEO|CANVAS|IMG|IFRAME|PICTURE|svg)$/i.test(el.tagName);
       var clone = el.cloneNode(!open);
+      if (!open) pinPictures(el, clone);
       place(clone, el, r, base, cs);
       hoverLook(el, clone, !open);
       parent.appendChild(clone);
@@ -668,7 +687,7 @@
           try { // a picture instead of a canvas: every block would otherwise get a canvas layer of its own
             var pic = document.createElement('img');
             pic.src = still.toDataURL(m.tagName === 'VIDEO' ? 'image/jpeg' : 'image/png', 0.85);
-            pic.style.cssText = still.style.cssText; pic.alt = '';
+            pic.style.cssText = still.style.cssText; pic.alt = ''; pic.decoding = 'sync';
             pic.style.objectFit = 'fill';
             still = pic;
           } catch (err) {} // a video from another site without permission: it stays a canvas
