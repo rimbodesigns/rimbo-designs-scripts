@@ -4559,6 +4559,47 @@
     '.rf .blog_section .blog_list.rf-two .blog_container { width: 100%; }',
     '@media (min-width: 992px) { .rf .blog_section .blog_list.rf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }',
     '.rf .blog_section .btn-animate-chars { display: none; }', // "See All Resources": the header row has "All articles"
+    // ---- the opening (Rimbo's pick from the lab in prototype/post-entrance, round 2): one CSS sequence of about 1.4 s.
+    // It waits for html.rf-go, which rdPostRefresh sets once the page is on screen (after a page transition has landed),
+    // and until then the hero, cover and article stay hidden, so the transition's copy of this page shows them empty.
+    // Webflow's own page-load fades on the title, lead, author and cover still run: rf-rest (first in each list, so the
+    // opening's own keyframes win) holds them at rest
+    '.rf:not(.rf-go) .rf-hero, .rf:not(.rf-go) .cover_holder, .rf:not(.rf-go) .richtextbox { visibility: hidden; }',
+    '.rf-go .rf-dot { animation: rf-pop .55s cubic-bezier(.16, 1, .3, 1) .04s both; }',
+    '.rf-eb { display: inline-block; }',
+    '.rf-go .rf-eb { animation: rf-wipe .75s cubic-bezier(.625, .05, 0, 1) .09s both; }',
+    '.rf-go .rf-hero .h1_small { animation: rf-rest-t 1ms both; }',
+    '.rf-w { display: inline-block; overflow: clip; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }',
+    '.rf-w > span { display: inline-block; transform-origin: 0 0; }',
+    '.rf-go .rf-w > span { animation: rf-rise .95s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(90ms + var(--i, 0) * 45ms); }',
+    '.rf-go .rf-hero .sumary { animation: rf-rest 1ms both, rf-soft .9s cubic-bezier(.16, 1, .3, 1) .26s both; }',
+    '.rf-go .rf-hero .rl_blogpost1_content-top { animation: rf-rest 1ms both, rf-up .8s cubic-bezier(.16, 1, .3, 1) .32s both; }',
+    '.rf-go .rf-hero .rl_blogpost1_author-image { animation: rf-photo .9s cubic-bezier(.16, 1, .3, 1) .32s both; }',
+    '.rf-go .rf-toc summary { animation: rf-up .7s cubic-bezier(.16, 1, .3, 1) .44s both; }',
+    '.rf-go .rf-toc li { animation: rf-in .7s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(500ms + var(--n, 0) * 40ms); }',
+    // below 1200px the sections are folded into one row with a line above and below: that whole row comes up at once
+    '@media (max-width: 1199px) { .rf-go .rf-toc { animation: rf-up .7s cubic-bezier(.16, 1, .3, 1) .44s both; } }',
+    '@media (min-width: 1200px) {' +
+      ' .rf-go .rf-toc { position: relative; border-top-color: transparent; }' +
+      ' .rf-go .rf-toc::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: rgba(19, 19, 19, .12); transform-origin: 0 50%; animation: rf-line 1s cubic-bezier(.625, .05, 0, 1) .38s both; }' +
+    ' }',
+    '.rf-go .cover_holder { animation: rf-rest 1ms both, rf-open 1.4s cubic-bezier(.625, .05, 0, 1) .32s both; }',
+    '.rf-go .cover_image { animation: rf-zoom 2s cubic-bezier(.16, 1, .3, 1) .32s both; }',
+    '.rf-go .richtextbox { animation: rf-soft 1s cubic-bezier(.16, 1, .3, 1) .7s both; }',
+    '@keyframes rf-rest { from, to { opacity: 1; filter: none; } }',
+    '@keyframes rf-rest-t { from, to { opacity: 1; filter: none; transform: none; } }',
+    '@keyframes rf-pop { from { transform: scale(0); } 60% { transform: scale(1.35); } to { transform: scale(1); } }',
+    '@keyframes rf-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }',
+    '@keyframes rf-rise { from { transform: translateY(125%) rotate(4deg); } to { transform: none; } }',
+    '@keyframes rf-soft { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }',
+    '@keyframes rf-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }',
+    '@keyframes rf-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }',
+    '@keyframes rf-photo { from { transform: scale(.82); filter: grayscale(1); } to { transform: none; filter: none; } }',
+    '@keyframes rf-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }',
+    '@keyframes rf-open { from { clip-path: inset(100% 14% 0 14% round 6px); transform: translateY(48px); } to { clip-path: inset(0 0 0 0 round 4px); transform: none; } }',
+    '@keyframes rf-zoom { from { transform: scale(1.22); } to { transform: none; } }',
+    // reduced motion: everything at its resting place at once
+    '@media (prefers-reduced-motion: reduce) { .rf-go .rf-hero *, .rf-go .rf-toc::before, .rf-go .cover_holder, .rf-go .cover_image, .rf-go .richtextbox { animation-duration: 1ms !important; animation-delay: 0s !important; } }',
     '@media (max-width: 767px) {' +
       ' .rf .blog_section .padding-section-large { padding-top: 5rem; }' +
       ' .rf-kr-head { flex-direction: column; align-items: flex-start; }' +
@@ -4615,7 +4656,10 @@
     var eyebrow = document.createElement('div');
     eyebrow.className = 'rf-eyebrow rf-hero-eyebrow';
     eyebrow.innerHTML = '<span class="rf-dot"></span>';
-    eyebrow.appendChild(document.createTextNode('Article' + (category ? ' · ' + category : '')));
+    var eyebrowText = document.createElement('span');
+    eyebrowText.className = 'rf-eb';
+    eyebrowText.textContent = 'Article' + (category ? ' · ' + category : '');
+    eyebrow.appendChild(eyebrowText);
 
     // the summary is a lead paragraph, not a second heading above the article (one H1, then the article's H2s)
     var summary = qs('.blog_intro .summary');
@@ -4673,6 +4717,7 @@
           postJumpTo(h);
         });
         var li = document.createElement('li');
+        li.style.setProperty('--n', ol.children.length);
         li.appendChild(a);
         ol.appendChild(li);
       });
@@ -4696,6 +4741,33 @@
     }
     hero.appendChild(main); hero.appendChild(side);
     container.appendChild(hero);
+
+    // ---- the opening: the title in words (each rises out of its own line), then html.rf-go starts the CSS sequence.
+    // After a page transition it waits until the transition has landed, so it plays on screen, not under the blocks
+    var words = h1.textContent.trim().split(/\s+/);
+    if (words.length && words[0] && !qs('.rf-w', h1)) {
+      h1.setAttribute('aria-label', h1.textContent.trim());
+      h1.textContent = '';
+      words.forEach(function (t, i) {
+        var outer = document.createElement('span'), inner = document.createElement('span');
+        outer.className = 'rf-w';
+        outer.setAttribute('aria-hidden', 'true');
+        inner.textContent = t;
+        inner.style.setProperty('--i', i);
+        outer.appendChild(inner);
+        h1.appendChild(outer);
+        if (i < words.length - 1) h1.appendChild(document.createTextNode(' '));
+      });
+    }
+    var root = document.documentElement, waited = 0;
+    rdUndo(function () { root.classList.remove('rf-go'); });
+    var startOpening = function () {
+      var landing = barbaOn && barba.transitions && barba.transitions.isRunning;
+      if (landing && waited++ < 600) return; // about ten seconds at most
+      gsap.ticker.remove(startOpening);
+      root.classList.add('rf-go');
+    };
+    rdTick(startOpening);
 
     // ---- end of the page: the closing CTA is Rimbo's CTA_explore on the Blog posts template, then keep reading
     // keep reading: these are the highlighted posts, not this post's category, so the heading stays general
