@@ -41,6 +41,7 @@ http.createServer(async (req, res) => {
     res.writeHead(upstream.status, { 'content-type': type });
     res.end(Buffer.from(await upstream.arrayBuffer()));
   } catch (err) {
+    if (res.headersSent) return res.end(); // the download broke halfway: end what was sent instead of answering twice
     res.writeHead(502);
     res.end(String(err));
   }

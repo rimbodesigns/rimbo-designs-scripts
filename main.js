@@ -441,6 +441,246 @@
   }
 
   // -----------------------------------------
+  // IMPACT: Rimbo's pick from the Cube Lab (prototype/cube-lab-rd, private page claude.ai/artifact/WMKkoiZHHRGnQ7wDY5Cirp)
+  // The page breaks into solid blocks from the spot you clicked: the nearest blocks go first and are pushed furthest,
+  // tumble back into the void, turn over and land as the new page. The blocks show copies of what both pages have on
+  // screen (snapshot()); the real new page waits underneath, its own animations held, and takes over once they land.
+  // The numbers are the lab's. ?cube=1 on staging shows the cube it replaced
+  // -----------------------------------------
+  var IMPACT = { stagger: 0.035, dur: 1.4, far: [300, 1300], spinZ: 80, spinY: 60, drift: 0.1, burst: 260, hang: 0.1 };
+  var useCube = /[?&]cube=1/.test(location.search);
+  var impactStyle = null;
+
+  function impactCss() {
+    if (impactStyle) return;
+    impactStyle = document.createElement('style');
+    impactStyle.textContent =
+      '.rd-impact{position:fixed;inset:0;z-index:999;overflow:hidden;pointer-events:none}' +
+      '.rd-impact__grain{position:absolute;inset:0;opacity:.22}' +
+      '.rd-impact__scene,.rd-impact__piece,.rd-impact__box{position:absolute;transform-style:preserve-3d}' +
+      '.rd-impact__scene,.rd-impact__box{inset:0}' +
+      // will-change: each face is drawn once and moved as a picture, not redrawn at every size on its way into the depth
+      '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
+      '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
+      '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
+      // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
+      '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
+    document.head.appendChild(impactStyle);
+  }
+
+  // where the click landed: the middle of the link, or the bottom middle of the screen for a click we can't see
+  function impactPoint(data) {
+    var t = data.trigger;
+    if (t && t.nodeType === 1 && t.isConnected) {
+      var r = t.getBoundingClientRect();
+      if (r.width || r.height) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    return { x: window.innerWidth / 2, y: window.innerHeight };
+  }
+
+  // A copy of what a page shows on screen right now, made from the live page. Boxes that run far past the screen are
+  // opened and only their visible children copied; the rest is copied whole. Every copied box is placed where it was
+  // measured, so the copy doesn't depend on the page's own layout. Videos and canvases become still pictures
+  function snapshot(container, W, H) {
+    var root = document.createElement('div');
+    root.className = 'rd-snap';
+    root.style.cssText = 'width:' + W + 'px;height:' + H + 'px;background:' + getComputedStyle(document.body).backgroundColor;
+    var onScreen = function (r) { return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H && r.right > 0 && r.left < W; };
+
+    function place(clone, el, r, base, cs) {
+      var s = clone.style, t = cs.transform;
+      if (t === 'none' || /^matrix\(1, 0, 0, 1,/.test(t)) { // nothing or a plain move: the measured box is the box
+        s.transform = 'none';
+        s.left = (r.left - base.x) + 'px'; s.top = (r.top - base.y) + 'px'; s.width = r.width + 'px'; s.height = r.height + 'px';
+      } else { // turned or scaled: keep its own transform around the same middle
+        var w = el.offsetWidth, h = el.offsetHeight;
+        s.left = (r.left + r.width / 2 - w / 2 - base.x) + 'px'; s.top = (r.top + r.height / 2 - h / 2 - base.y) + 'px';
+        s.width = w + 'px'; s.height = h + 'px';
+      }
+      s.position = 'absolute'; s.right = 'auto'; s.bottom = 'auto'; s.margin = '0'; s.boxSizing = 'border-box';
+      s.minWidth = '0'; s.maxWidth = 'none'; s.minHeight = '0'; s.maxHeight = 'none'; s.translate = 'none';
+    }
+
+    // videos and canvases in a copy are blank (or start decoding again): freezeInside() turns them into stills of the original
+    function walk(el, parent, base) {
+      if (el.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(el.tagName)) return;
+      var cs = getComputedStyle(el);
+      if (cs.display === 'none') return;
+      if (cs.display === 'contents') { Array.prototype.forEach.call(el.children, function (k) { walk(k, parent, base); }); return; }
+      var r = el.getBoundingClientRect();
+      if (!onScreen(r)) return;
+      var open = r.height > H * 1.2 && el.children.length > 0 && cs.transform === 'none' && !/^(VIDEO|CANVAS|IMG|IFRAME|PICTURE|svg)$/i.test(el.tagName);
+      var clone = el.cloneNode(!open);
+      place(clone, el, r, base, cs);
+      parent.appendChild(clone);
+      if (open) {
+        var inner = { x: r.left + el.clientLeft, y: r.top + el.clientTop };
+        Array.prototype.forEach.call(el.children, function (k) { walk(k, clone, inner); });
+      } else {
+        var wrap = document.createElement('div'); // freezeInside() looks at descendants, so the copy gets a parent for the moment
+        parent.replaceChild(wrap, clone); wrap.appendChild(clone);
+        freezeInside(el, wrap);
+        parent.replaceChild(wrap.firstChild, wrap);
+      }
+    }
+    function freezeInside(el, wrap) {
+      var sel = 'video, canvas, iframe';
+      var a = (el.matches(sel) ? [el] : []).concat(qsa(sel, el));
+      var b = qsa(sel, wrap);
+      a.forEach(function (m, i) {
+        var c = b[i];
+        if (!c) return;
+        var w = m.offsetWidth, h = m.offsetHeight;
+        var still = document.createElement(m.tagName === 'IFRAME' ? 'div' : 'canvas');
+        // its place and size, not its class: page code looks videos up by class and must not find a still
+        var ms = getComputedStyle(m);
+        ['position', 'top', 'left', 'right', 'bottom', 'display', 'transform', 'borderRadius', 'zIndex', 'opacity', 'margin'].forEach(function (k) { still.style[k] = ms[k]; });
+        still.style.width = w + 'px'; still.style.height = h + 'px';
+        if (m.tagName === 'IFRAME') still.style.background = 'var(--color--black, #131313)';
+        else {
+          var k = Math.min(window.devicePixelRatio || 1, 1.5);
+          still.width = Math.max(1, Math.round(w * k)); still.height = Math.max(1, Math.round(h * k));
+          var g = still.getContext('2d');
+          try {
+            if (m.tagName === 'VIDEO') {
+              if (m.readyState >= 2 && m.videoWidth) { // like object-fit: cover
+                var f = Math.max(still.width / m.videoWidth, still.height / m.videoHeight), vw = m.videoWidth * f, vh = m.videoHeight * f;
+                g.drawImage(m, (still.width - vw) / 2, (still.height - vh) / 2, vw, vh);
+              }
+            } else g.drawImage(m, 0, 0, still.width, still.height);
+          } catch (err) {}
+          try { // a picture instead of a canvas: every block would otherwise get a canvas layer of its own
+            var pic = document.createElement('img');
+            pic.src = still.toDataURL(m.tagName === 'VIDEO' ? 'image/jpeg' : 'image/png', 0.85);
+            pic.style.cssText = still.style.cssText; pic.alt = '';
+            pic.style.objectFit = 'fill';
+            still = pic;
+          } catch (err) {} // a video from another site without permission: it stays a canvas
+        }
+        c.parentNode.replaceChild(still, c);
+      });
+    }
+
+    walk(container, root, { x: 0, y: 0 });
+    var top = root.firstElementChild;
+    if (top) { top.style.visibility = 'visible'; top.style.opacity = '1'; } // the arriving page is hidden while it waits
+    qsa('[id]', root).forEach(function (el) { if (!el.closest('svg')) el.removeAttribute('id'); }); // page code must never find a copy
+    qsa('[data-barba], [data-barba-namespace]', root).forEach(function (el) { el.removeAttribute('data-barba'); el.removeAttribute('data-barba-namespace'); }); // nor Barba
+    return root;
+  }
+
+  // a copy of a snapshot for one block (canvases are copied empty, so they get their picture again)
+  function snapCopy(snap) {
+    var c = snap.cloneNode(true), from = snap.querySelectorAll('canvas'), to = c.querySelectorAll('canvas');
+    for (var i = 0; i < to.length; i++) { try { to[i].getContext('2d').drawImage(from[i], 0, 0); } catch (err) {} }
+    return c;
+  }
+
+  // the new page's own animations wait under the blocks, so its entrance plays when you can see it
+  function holdNewPage() {
+    var list = pageScope && pageScope.gsap ? pageScope.gsap.getTweens().filter(function (t) {
+      return typeof t.pause === 'function' && typeof t.paused === 'function' && !t.scrollTrigger && !t.paused() && t.progress() < 1;
+    }) : [];
+    list.forEach(function (t) { t.pause(); });
+    return function () { list.forEach(function (t) { t.resume(); }); };
+  }
+
+  // the arriving page's pictures on screen get a moment to load, so its blocks aren't empty
+  function picturesReady(container, H, ms) {
+    var waits = qsa('img', container).filter(function (img) {
+      if (img.complete) return false;
+      var r = img.getBoundingClientRect();
+      return r.bottom > 0 && r.top < H;
+    }).map(function (img) { return new Promise(function (done) { img.addEventListener('load', done, { once: true }); img.addEventListener('error', done, { once: true }); }); });
+    return Promise.race([Promise.all(waits), new Promise(function (done) { setTimeout(done, ms); })]);
+  }
+
+  function impactBlocks(oldSnap, newSnap, W, H, point) {
+    impactCss();
+    var cols = W < 600 ? 3 : W < 1000 ? 5 : 7, rows = Math.max(2, Math.round(cols * H / W));
+    var w = W / cols, h = H / rows, depth = h / 2;
+    var stage = document.createElement('div'), grain = document.createElement('div'), scene = document.createElement('div');
+    stage.className = 'rd-impact'; grain.className = 'rd-impact__grain'; scene.className = 'rd-impact__scene';
+    stage.style.background = CUBE_VOID; stage.style.perspective = W + 'px';
+    grain.style.backgroundImage = CUBE_GRAIN;
+    stage.appendChild(grain); stage.appendChild(scene);
+    var face = function (box, css, snap, c, r) {
+      var f = document.createElement('div');
+      f.className = 'rd-impact__face' + (snap ? '' : ' rd-impact__side');
+      f.style.cssText = css;
+      if (snap) { var copy = snapCopy(snap); copy.style.left = (-c * w) + 'px'; copy.style.top = (-r * h) + 'px'; f.appendChild(copy); }
+      box.appendChild(f);
+    };
+    var blocks = [];
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      var piece = document.createElement('div'), box = document.createElement('div');
+      piece.className = 'rd-impact__piece'; box.className = 'rd-impact__box';
+      piece.style.cssText = 'left:' + c * w + 'px;top:' + r * h + 'px;width:' + w + 'px;height:' + h + 'px';
+      face(box, 'transform:rotateX(0deg) translateZ(' + depth + 'px)', oldSnap, c, r);           // the page you leave
+      face(box, 'transform:rotateX(90deg) translateZ(' + (depth + 0.5) + 'px)', newSnap, c, r);  // where you go
+      face(box, 'transform:rotateX(-90deg) translateZ(' + depth + 'px)');
+      face(box, 'transform:rotateX(180deg) translateZ(' + depth + 'px)');
+      [90, -90].forEach(function (deg) { face(box, 'left:' + (w / 2 - depth) + 'px;width:' + depth * 2 + 'px;transform:rotateY(' + deg + 'deg) translateZ(' + w / 2 + 'px)'); });
+      piece.appendChild(box); scene.appendChild(piece);
+      gsap.set(box, { z: -depth, transformOrigin: '50% 50%', force3D: true });
+      blocks.push({ box: box, r: r, c: c });
+    }
+
+    var o = IMPACT, tl = gsap.timeline({ paused: true });
+    var rand = function (a, b) { return a + Math.random() * (b - a); };
+    blocks.forEach(function (b) {
+      var cx = (b.c + 0.5) * w, cy = (b.r + 0.5) * h;
+      var vx = cx - point.x, vy = cy - point.y, dist = Math.hypot(vx, vy) || 1;
+      var at = dist / w * o.stagger, d = o.dur;
+      var push = o.burst * (1 - Math.min(dist / Math.hypot(W, H), 1) * 0.6); // the nearest blocks are pushed furthest
+      var dx = rand(-0.5, 0.5) * W * o.drift + vx / dist * push, dy = vy / dist * push;
+      tl.to(b.box, { z: -depth - rand(o.far[0], o.far[1]), x: dx, y: dy, rotateZ: rand(-0.5, 0.5) * o.spinZ, rotateY: rand(-0.5, 0.5) * o.spinY, duration: d * 0.45, ease: 'power3.out' }, at);
+      tl.to(b.box, { rotateX: -90, duration: d * 0.6, ease: 'power2.inOut' }, at + d * 0.2);
+      tl.to(b.box, { z: -depth, x: 0, y: 0, rotateZ: 0, rotateY: 0, duration: d * 0.55, ease: 'power3.inOut' }, at + d * 0.45 + o.hang);
+    });
+    return { stage: stage, tl: tl };
+  }
+
+  function runImpactLeave(current, next, data) {
+    return new Promise(function (resolve) {
+      var point = impactPoint(data); // before anything moves
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () { // Webflow.destroy() needs a frame before it can start again (restartWebflow)
+          var W = document.documentElement.clientWidth, H = window.innerHeight;
+          var oldSnap = snapshot(current, W, H);
+          PAGE_HTML_CLASSES.forEach(function (name) { if (document.documentElement.classList.contains(name) && oldSnap.firstElementChild) oldSnap.firstElementChild.classList.add(name); });
+          if (rdNavFull.handOver) rdNavFull.handOver(oldSnap); // an open menu breaks up with the page
+          impactCss();
+          var cover = document.createElement('div'); // the old page's copy holds the screen while the blocks are made
+          cover.className = 'rd-impact';
+          cover.appendChild(oldSnap);
+          document.body.appendChild(cover);
+          var started = startCube(data);
+          current.remove(); // its copy stands in for it from here
+          if (window.lenis) window.lenis.stop();
+          var release = holdNewPage();
+          picturesReady(next, H, 350).then(function () {
+            var newSnap = snapshot(next, W, H);
+            var blocks = impactBlocks(oldSnap, newSnap, W, H, point);
+            document.body.appendChild(blocks.stage);
+            cover.remove();
+            blocks.tl.eventCallback('onComplete', function () {
+              gsap.set(next, { clearProps: 'opacity,visibility' });
+              blocks.stage.remove();
+              release();
+              playVideos(started.nextVideos);
+              finishCube(started);
+              resolve();
+            });
+            // two frames standing still first: the blocks get drawn before they move, so that first heavy frame doesn't stutter the flight
+            window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { blocks.tl.play(); }); });
+          });
+        });
+      });
+    });
+  }
+
+  // -----------------------------------------
   // TICKET TEAR
   // The Journey pass's button (any link inside .pass) rips the ticket along its perforation: the main part goes up, the
   // stub goes down, and the next page (/apply) was behind it all along. On that page X ([data-tear-close]) and the Back
@@ -1012,10 +1252,10 @@
         leave: function (data) { return runFadeLeave(data.current.container); },
         enter: function (data) { return runFadeEnter(data.next.container, data); }
       }, {
-        name: 'cube',
+        name: 'impact',
         sync: true,
         custom: function (data) { return data.trigger !== 'back' && data.trigger !== 'forward' && data.trigger !== 'popstate' && !linkHash && !reducedMotion && !tearRule(data); },
-        leave: function (data) { return runPageLeaveAnimation(data.current.container, data.next.container, data); },
+        leave: function (data) { return useCube ? runPageLeaveAnimation(data.current.container, data.next.container, data) : runImpactLeave(data.current.container, data.next.container, data); },
         enter: function () { return runPageEnterAnimation(); }
       }, {
         name: 'tear',
