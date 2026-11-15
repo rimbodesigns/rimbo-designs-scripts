@@ -7067,6 +7067,378 @@
     }, 800);
   }
 
+  // =========================================================
+  // IMAGINE — the big ball and the word on the home (section.im_sheet [data-im="sheet"], classes im_*; the approved lab is
+  // prototype/service-imagine/ball.*, round 2 "magic", default path only; it came over from the service page 2026-11-15).
+  // Everything you see is Designer elements + classes; the states and the build are in the section's own embed. This only
+  // paints and moves:
+  // 1. THE LIVING WORD. ONE canvas, ONE WebGL context paints the ball AND the letters of IMAGINE (the site's ball shader, same
+  //    grain, same four colours). The letters come from a text mask: the real <h2> is measured letter by letter and drawn on
+  //    a 2D canvas the shader reads; the <h2> stays in the page, see-through (search, screen readers). The letters show the
+  //    ball mixed with a second, livelier view of it, deeper in light, so the word always reads.
+  // 2. THE BUILD = the service hero ball's (its order and curves, mirrored because this ball stands on its line): cross
+  //    > radius out, the number counting > the dashed ring sweeps round > the colour BLOOMS from the middle > cross and
+  //    radius fade > tick. The word draws its outline, fills, the outline goes; last beat: one light passes through it.
+  // 3. THE POINTER = the hero ball's heat spot on the ball; in the letters a small light with a clean edge: a letter is deep
+  //    or lit (warm rose, never white). A part A-D lights its share of the word and marks its tick. Touch: a tap is a light
+  //    for a moment. Scrolling makes the colours move a little faster.
+  // 4. The section's notch tabs drift only while they are near the screen.
+  // Weight: the canvas is made the first time the poster is near and draws ONLY while it is on screen (30 draws a second;
+  // every frame only during the 3 s bloom), listeners only while on screen, and the page leaving gives the WebGL context back.
+  // A hidden copy starts nothing: display none is skipped, and no WebGL is made while the section is visibility hidden (also
+  // the moment a page transition still fades the page in). Reduced motion: the still image and solid ink, no build.
+  // =========================================================
+  function rdImagine() {
+    var sheet = qsa('[data-im="sheet"]').filter(function (el) { return el.getClientRects().length; })[0]; // a copy set to display none is skipped
+    if (!sheet || sheet.dataset.on) return;
+    sheet.dataset.on = '1';
+    var NS = 'http://www.w3.org/2000/svg';
+    var FRAG = "#version 300 es\nprecision highp float;\n" +
+      "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float grainScale; uniform float t;\n" +
+      "uniform vec3 stops[4]; uniform vec2 edges[3]; uniform sampler2D mask; uniform vec2 word;\n" +
+      "uniform float reveal; uniform float disc; uniform float fill;\n" +
+      "uniform vec2 ptr; uniform float ptrR; uniform float lit[8]; uniform float ptrAmt; uniform float push; uniform float pull; uniform float ptrTo;\n" +
+      "uniform float lMix; uniform float lInk; uniform float lBias; uniform float lSpan; uniform float swirl; uniform float glow; uniform float lSharp;\n" +
+      "out vec4 outColor;\nconst vec3 INK = vec3(0.0745);\n" +
+      "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
+      "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
+      "  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n" +
+      "float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n" +
+      "float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n" +
+      "vec3 fromLab(vec3 c) {\n" +
+      "  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n" +
+      "  l = l * l * l; m = m * m * m; s = s * s * s;\n" +
+      "  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n}\n" +
+      // d = how deep: the same four colours with less light (in OKLab, so they stay colours and do not turn to mud)
+      "vec3 ramp(float v, float d) { vec3 c = stops[0]; for (int i = 0; i < 3; i++) c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); c.x *= 1.0 - d; return fromLab(c); }\n" +
+      // the ball's colour field (the site's ball shader, unchanged), as a function so the letters can look at it from elsewhere
+      "float field(vec2 l, float h, float tt) {\n" +
+      "  float ang = h * 6.2831 + tt * 0.16;\n  float g = 0.53 + 0.14 * dot(l, vec2(cos(ang), sin(ang)));\n" +
+      "  vec2 drift = vec2(sin(tt * 0.34 + h * 6.2831), cos(tt * 0.27 + h * 12.566)) * 0.62;\n" +
+      "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
+      "  return g + (fbm(l * 1.0 + w * 1.3 + h * 90.0) - 0.5) * 1.5;\n}\n" +
+      "vec3 shade(float v, float g1, float grain, float d) { vec3 c = ramp(clamp(v, 0.0, 1.0), d) + grain; return clamp(mix(c, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0), d) + grain, 0.35), 0.0, 1.0); }\n" +
+      "void main() {\n  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n  vec2 l = (p - center) / R;\n" +
+      "  float r = length(l), aa = 1.2 / R;\n" +
+      // the letters: coverage from the text mask (its red says which letter this is), filled left to right
+      "  vec4 mk = texture(mask, p / res); float cov = mk.a;\n" +
+      "  float xn = clamp((p.x - word.x) / max(word.y, 1.0), 0.0, 1.0);\n" +
+      "  float la = cov * smoothstep(0.0, 1.0, (fill - xn * 0.375) / 0.625);\n" +
+      "  float edge = smoothstep(1.0 + aa, 1.0 - aa, r), da = disc * edge;\n" +
+      "  if (da <= 0.0 && la <= 0.0) { outColor = vec4(0.0); return; }\n" +
+      "  vec2 gp = floor(p / grainScale);\n  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
+      "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n  float h = hash(vec2(seed));\n" +
+      // the pointer: the hero ball's heat spot (push)
+      "  float dp = length(p - ptr) / max(ptrR, 1.0), k = ptrAmt * exp(-dp * dp);\n" +
+      "  float fb = field(l, h, t);\n  float v = fb + bias + push * k;\n" +
+      // how the colour comes in: the hero ball's bloom (an organic edge that grows from the middle and settles)
+      "  float e = reveal * 1.35, wob = (fbm(l * 2.2 + h * 30.0 + t * 0.15) - 0.5) * 0.55 * (1.0 - reveal * 0.6);\n" +
+      "  float m = smoothstep(e, e - 0.18, r + wob) * smoothstep(0.0, 0.06, reveal);\n" +
+      "  da *= m;\n  vec3 o = shade(v, g1, grain, 0.0) * da; float a = da;\n" +
+      "  if (la > 0.0) {\n" +
+      // the ball itself seen through the letters, mixed (lMix) with a second, livelier view of the same field that twists a
+      // little around the pointer, and deeper (lInk) so the word always reads. The light goes letter by letter (lit[], set
+      // below): a whole letter is deep or lit, never half. A lit letter takes the warm end of the four colours with an ink
+      // hairline (the mask's green: 0 on the letter's rim), so it reads on every part of the ball
+      "    float vl = fb, kl = mix(k, lit[int(clamp(floor(mk.r * 8.0), 0.0, 7.0))] * edge, lSharp);\n" +
+      "    if (lMix > 0.0) { vec2 d = (p - ptr) / R; float th = swirl * k, cs = cos(th), sn = sin(th);\n" +
+      "      vl = mix(fb, field((l + vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs) - d) * 1.7, fract(h + 0.37), t * 1.9 + 11.0), lMix); }\n" +
+      "    vl = mix((vl - 0.5) * lSpan + 0.5 + lBias, ptrTo, pull * kl);\n" +
+      "    vec3 lc = shade(vl, g1, grain * (1.0 - 0.5 * lInk), lInk * (1.0 - glow * kl) - 0.08 * kl * lSharp);\n" +
+      "    lc = mix(INK, mix(lc, INK, (1.0 - mk.g) * kl * lSharp), m);\n" +
+      "    o = lc * la + o * (1.0 - la); a = la + a * (1.0 - la);\n  }\n" +
+      "  outColor = vec4(o, a);\n}";
+    function oklab(hex) {
+      var c = [0, 2, 4].map(function (i) { var v = parseInt(hex.substr(i, 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+      var l = Math.cbrt(0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]);
+      var m = Math.cbrt(0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]);
+      var s = Math.cbrt(0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]);
+      return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+    }
+    // the hero's curves: a CSS cubic-bezier as a function (its CustomEase "0.625, 0.05, 0, 1" and the bloom "0.32, 0, 0.12, 1")
+    function bez(a, b, c, d) {
+      return function (x) {
+        if (x <= 0) return 0; if (x >= 1) return 1;
+        var lo = 0, hi = 1, t = x, i, u;
+        for (i = 0; i < 22; i++) { t = (lo + hi) / 2; u = 1 - t; if (3 * a * u * u * t + 3 * c * u * t * t + t * t * t < x) lo = t; else hi = t; }
+        u = 1 - t; return 3 * b * u * u * t + 3 * d * u * t * t + t * t * t;
+      };
+    }
+    var OSMO = bez(0.625, 0.05, 0, 1), BLOOM = bez(0.32, 0, 0.12, 1);
+    function inOut3(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; } // GSAP power2.inOut
+    function seg(T, at, dur) { return Math.min(1, Math.max(0, (T - at) / dur)); }
+    // the build's beats in seconds (the hero's order): the embed's CSS carries the same numbers for the cross, the radius,
+    // the label and the tick
+    var NUM = 0.35, RING = 0.75, BLOOM_AT = 1.25, LIGHT = 2.65, FAST = 3.55, END = 4.3;
+
+    // the painter: a half canvas (the part above the horizon), the ball's centre on its bottom edge
+    function makeBall(cv) {
+      var gl = cv.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false });
+      if (!gl) return null;
+      function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; }
+      var prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); return null; }
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      var U = {}; ['res', 'center', 'R', 'seed', 'bias', 'grainScale', 't', 'stops', 'edges', 'mask', 'word', 'reveal', 'disc', 'fill', 'ptr', 'ptrR', 'lit', 'ptrAmt', 'push', 'pull', 'ptrTo',
+        'lMix', 'lInk', 'lBias', 'lSpan', 'swirl', 'glow', 'lSharp'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+      gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
+      gl.uniform2fv(U.edges, new Float32Array([0.12, 0.28, 0.26, 0.46, 0.5, 0.84]));
+      gl.uniform1f(U.seed, +(cv.dataset.seed || 23)); gl.uniform1f(U.bias, +(cv.dataset.bias || -0.12));
+      // the text mask: empty until the word has been measured
+      gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+      gl.uniform1i(U.mask, 0); gl.clearColor(0, 0, 0, 0);
+      var W = 0, H = 0, K = 1, CW = 0;
+      return {
+        gl: gl,
+        size: function (cssW, scale) {
+          var w = Math.round(cssW * scale); if (w === W) return false; W = w; K = scale; CW = cssW;
+          H = Math.round(w / 2); cv.width = w; cv.height = H; gl.viewport(0, 0, w, H);
+          gl.uniform2f(U.res, w, H); gl.uniform1f(U.grainScale, Math.max(1, scale * 0.75));
+          return true;
+        },
+        mask: function (c2) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c2); },
+        draw: function (S) {
+          gl.uniform1f(U.t, S.t); gl.uniform2f(U.center, W / 2, H * (1 + S.rise)); gl.uniform1f(U.R, CW * 0.4875 * K * S.grow);
+          gl.uniform1f(U.reveal, S.reveal); gl.uniform1f(U.disc, S.disc); gl.uniform1f(U.fill, S.fill);
+          gl.uniform2f(U.word, S.wx * K, S.ww * K);
+          gl.uniform2f(U.ptr, S.px * K, S.py * K); gl.uniform1f(U.ptrR, S.pr * K); gl.uniform1fv(U.lit, S.lit); gl.uniform1f(U.ptrAmt, S.amt);
+          gl.uniform1f(U.push, S.push); gl.uniform1f(U.pull, S.pull); gl.uniform1f(U.ptrTo, S.to);
+          gl.uniform1f(U.lMix, S.lMix); gl.uniform1f(U.lInk, S.lInk); gl.uniform1f(U.lBias, S.lBias); gl.uniform1f(U.lSpan, S.lSpan);
+          gl.uniform1f(U.swirl, S.swirl); gl.uniform1f(U.glow, S.glow); gl.uniform1f(U.lSharp, S.lSharp);
+          gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+      };
+    }
+
+    // where the letters of the <h2> really are (each engine places this font differently): x per letter, the baseline
+    function measure(word, box) {
+      var node = word.firstChild; if (!node || node.nodeType !== 3) return null;
+      var txt = node.textContent, cs = getComputedStyle(word), br = box.getBoundingClientRect(), k = box.offsetWidth ? br.width / box.offsetWidth : 1;
+      if (!(k > 0.2)) k = 1;
+      var probe = document.createElement('span'); probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+      word.appendChild(probe); var base = (probe.getBoundingClientRect().bottom - br.top) / k; probe.remove();
+      var range = document.createRange(), out = { base: base, fs: parseFloat(cs.fontSize), font: cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily, letters: [] };
+      for (var i = 0; i < txt.length; i++) {
+        if (txt[i] === ' ') continue;
+        range.setStart(node, i); range.setEnd(node, i + 1);
+        var r = range.getBoundingClientRect();
+        out.letters.push({ ch: cs.textTransform === 'uppercase' ? txt[i].toUpperCase() : txt[i], x: (r.left - br.left) / k, r: (r.right - br.left) / k });
+      }
+      if (!out.letters.length) return null;
+      out.left = out.letters[0].x; out.width = out.letters[out.letters.length - 1].r - out.left;
+      return out;
+    }
+    // the word's outline draws itself letter by letter (as the hero's title), then the fill takes over and the outline goes
+    function drawWord(word, hero) {
+      var m = measure(word, word); if (!m) { word.classList.add('is-drawn'); return; }
+      var D = Math.round(m.fs * 14), svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'im_word_svg'); svg.setAttribute('aria-hidden', 'true');
+      var letters = m.letters.map(function (L, i) {
+        var t = document.createElementNS(NS, 'text'); t.textContent = L.ch;
+        t.setAttribute('x', L.x.toFixed(2)); t.setAttribute('y', m.base.toFixed(2));
+        t.style.strokeDasharray = D + ' ' + D; t.style.strokeDashoffset = D; t.style.transitionDelay = (hero ? 0.05 + i * 0.05 : i * 0.07) + 's';
+        svg.appendChild(t); return t;
+      });
+      word.appendChild(svg);
+      svg.getBoundingClientRect();
+      letters.forEach(function (t) { t.style.strokeDashoffset = 0; });
+      setTimeout(function () { word.classList.add('is-drawn'); svg.classList.add('is-settled'); setTimeout(function () { svg.remove(); }, 800); }, hero ? 1550 : 1300 + letters.length * 70);
+    }
+
+    var stage = qs('[data-im="stage"]', sheet), sky = qs('.im_sky', sheet), sun = qs('[data-im="sun"]', sheet), cv = qs('[data-im="ball"]', sheet),
+        word = qs('[data-im="word"]', sheet), dia = qs('[data-im="dia"]', sheet), ring = qs('.im_ring', sheet), parts = qsa('.im_part', sheet);
+    var calm = reducedMotion;
+    // how the letters look and answer (the lab's composition A, Rimbo's pick)
+    var LOOK = { lMix: 0.45, lInk: 0.6, lBias: 0, lSpan: 1, swirl: 1.1, glow: 1, disc: 1, sharp: 1, pull: 0.9, to: 0.3 };
+    var S = { t: 0, rise: 0, grow: 1, reveal: 0, fill: 0, wx: 0, ww: 1, px: 0, py: 0, pr: 100, lit: new Float32Array(8), amt: 0, push: 0, pull: LOOK.pull, to: LOOK.to,
+      disc: LOOK.disc, lMix: LOOK.lMix, lInk: LOOK.lInk, lBias: LOOK.lBias, lSpan: LOOK.lSpan, swirl: LOOK.swirl, glow: LOOK.glow, lSharp: LOOK.sharp };
+    var label = function () { if (dia && sun) dia.textContent = 'Ø ' + Math.round(sun.clientWidth) + ' PX'; };
+    label();
+    if (!('IntersectionObserver' in window)) return;
+    var obs = [], raf = 0, on = false, ball = null, last = 0, lastT = 0, dead = false, time = 0, inAt = 0, built = false, wordM = null, dirty = true, sweep = -1, diaT = '',
+        c2 = null, near = null, waitT = 0, P = { x: 0, y: 0, tx: 0, ty: 0, target: 0, push: 0, pull: LOOK.pull, to: LOOK.to, share: -1 }, stir = 0, stirTo = 0, sy = 0, st = 0, tapT = 0, heard = false, hot = null, at = null, td = null;
+    var gl = !calm && !!cv && !!sun && !!window.WebGL2RenderingContext;
+    if (gl) sheet.classList.add('is-gl');
+
+    // 4. the notch tabs of this section drift only while they are near the screen
+    var edges = new IntersectionObserver(function (es) { es.forEach(function (e) { e.target.classList.toggle('is-on', e.isIntersecting); }); }, { rootMargin: '-1px 0px' });
+    qsa('.nt_edge', sheet).forEach(function (el) { edges.observe(el); });
+    obs.push(edges);
+    if ('ResizeObserver' in window && sun) { var ro = new ResizeObserver(function () { if (built || !inAt || !gl) label(); dirty = true; }); ro.observe(sun); obs.push(ro); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(inZone(function () { dirty = true; }));
+
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+    // no painter (no WebGL, or the context was lost): the still image and a solid ink word, at once
+    function noGl() { gl = false; ball = null; stop(); hear(false); if (cv) cv.style.display = 'none'; sheet.classList.remove('is-gl'); if (sun) sun.classList.remove('is-live'); label(); }
+    // the page left (page transition, see PAGE SCOPE at the top): stop everything and give the WebGL context back
+    function quit() {
+      if (dead) return; dead = true; stop(); hear(false); clearTimeout(tapT); clearTimeout(waitT);
+      if (ball) { var x = ball.gl.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); cv.width = cv.height = 1; ball = null; }
+      obs.forEach(function (o) { o.disconnect(); }); document.removeEventListener('visibilitychange', vis);
+    }
+    rdUndo(quit);
+
+    // the text mask: the letters where the <h2> has them, in the canvas' own pixels
+    function paintMask(scale) {
+      var m = measure(word, sun); if (!m) return;
+      c2 = c2 || document.createElement('canvas');
+      if (c2.width !== cv.width || c2.height !== cv.height) { c2.width = cv.width; c2.height = cv.height; }
+      var x = c2.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c2.width, c2.height); x.setTransform(scale, 0, 0, scale, 0, 0);
+      x.font = m.font; x.textBaseline = 'alphabetic'; x.lineJoin = 'round'; x.lineWidth = Math.max(2.5, m.fs * 0.03);
+      m.letters.forEach(function (L, i) { // red = which letter, green = 0 on the letter's rim (the hairline of a lit letter)
+        var r = Math.min(i, 7) * 32 + 16;
+        x.globalCompositeOperation = 'source-over'; x.fillStyle = 'rgb(' + r + ',255,255)'; x.fillText(L.ch, L.x, m.base);
+        x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgb(' + r + ',0,255)'; x.strokeText(L.ch, L.x, m.base);
+      });
+      ball.mask(c2); wordM = m; S.wx = m.left; S.ww = m.width;
+    }
+
+    // 3. the pointer
+    function mark(part) { if (hot === part) return; if (hot) hot.classList.remove('is-hot'); hot = part; if (hot) hot.classList.add('is-hot'); }
+    function spot(x, y) { var r = sun.getBoundingClientRect(), k = sun.offsetWidth ? r.width / sun.offsetWidth : 1; P.tx = (x - r.left) / (k || 1); P.ty = (y - r.top) / (k || 1); }
+    // a light the visitor did not point: in the word only, the ball stays as it is (orange belongs to a real pointer)
+    function own(x) { P.tx = x; P.ty = wordM.base - wordM.fs * 0.36; P.push = 0; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; }
+    // which letters are lit: the one the light is on (and its neighbour when the light is near their gap), or a part's share
+    function lamps() {
+      var n = wordM.letters.length, reach = wordM.fs * 0.27, top = wordM.base - wordM.fs * 0.74, i, L, dx, dy, hit;
+      for (i = 0; i < n && i < 8; i++) {
+        L = wordM.letters[i];
+        if (P.share >= 0) { dx = ((L.x + L.r) / 2 - wordM.left) / wordM.width * parts.length; hit = dx >= P.share && dx < P.share + 1; }
+        else { dx = Math.max(L.x - P.x, 0, P.x - L.r); dy = Math.max(top - P.y, 0, P.y - wordM.base); hit = dx * dx + dy * dy < reach * reach; }
+        S.lit[i] += ((hit && S.amt > 0.34 ? 1 : 0) - S.lit[i]) * 0.7;
+      }
+    }
+    function aim(e) {
+      var part = e.target.closest && e.target.closest('.im_part');
+      if (part && wordM) { var i = parts.indexOf(part); own(wordM.left + wordM.width * (i + 0.5) / parts.length); P.share = i; } // a part lights its share of the word
+      else { spot(e.clientX, e.clientY); P.push = -0.6; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; } // the hero ball's heat spot
+      at = part ? null : { x: e.clientX, y: e.clientY };
+      if (P.target < 0.5 && S.amt < 0.02) { P.x = P.tx; P.y = P.ty; S.push = P.push; S.pull = P.pull; S.to = P.to; }
+      P.target = 1; mark(part || null);
+    }
+    function move(e) { if (e.pointerType !== 'touch') aim(e); }
+    function leave() { P.target = 0; mark(null); }
+    function left(e) { if (e.pointerType !== 'touch') leave(); }
+    // touch: a tap is a light for a moment. It waits for the finger to lift without having moved, so a thumb that lands on
+    // the poster to scroll lights nothing
+    function down(e) { td = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY } : null; }
+    function up(e) {
+      if (e.pointerType !== 'touch' || !td) return;
+      var d = Math.abs(e.clientX - td.x) + Math.abs(e.clientY - td.y); td = null;
+      if (d < 10) { aim(e); clearTimeout(tapT); tapT = setTimeout(leave, 1500); }
+    }
+    // scrolling makes the colours move a little faster, nothing else; a resting pointer stays where it is on the screen
+    function scrolled() {
+      var y = window.scrollY, n = performance.now(), v = Math.abs(y - sy) / Math.max(n - st, 8); sy = y; st = n;
+      if (v < 20) stirTo = Math.max(stirTo, Math.min(1, v / 2.2));
+      if (!wordM || !built) return;
+      if (P.target && at) spot(at.x, at.y);
+    }
+    function hear(yes) {
+      if (!stage || yes === heard) return; heard = yes;
+      var f = yes ? 'addEventListener' : 'removeEventListener';
+      stage[f]('pointermove', move); stage[f]('pointerleave', left); stage[f]('pointerdown', down); stage[f]('pointerup', up);
+      window[f]('scroll', scrolled, { passive: true });
+      if (yes) { sy = window.scrollY; st = performance.now(); } else { td = null; leave(); }
+    }
+
+    function frame(now) {
+      raf = 0;
+      if (!sheet.isConnected) { quit(); return; }
+      if (!on || document.hidden || !ball) return;
+      raf = requestAnimationFrame(frame);
+      var dt = lastT ? Math.min((now - lastT) / 1000, 0.05) : 0.016; lastT = now;
+      stir += (stirTo - stir) * 0.1; stirTo *= 0.93;
+      time += dt * (1 + stir * 2.4);
+      P.x += (P.tx - P.x) * 0.12; P.y += (P.ty - P.y) * 0.12; S.amt += (P.target - S.amt) * 0.06; // the hero ball's eases
+      S.push += (P.push - S.push) * 0.1; S.pull += (P.pull - S.pull) * 0.1; S.to += (P.to - S.to) * 0.1;
+      var T = inAt ? (now - inAt) / 1000 : -1;
+      // 30 draws a second for slow colours; every frame only while the letters fill and the colour blooms (as the hero's ball)
+      if (!(inAt && !built && T > 0.7 && T < FAST) && now - last < 32) return;
+      last = now;
+      var w = sun.clientWidth; if (!w) return;
+      var scale = Math.min(window.devicePixelRatio || 1, 1.5);
+      if (ball.size(w, scale) || dirty) { dirty = false; paintMask(scale); }
+      S.t = time; S.px = P.x; S.py = P.y; S.fill = 1; S.pr = Math.min(Math.max(w * 0.4875 * 0.4, 60), 160);
+      // 2. the build
+      if (built) { S.reveal = 1; S.rise = 0; S.grow = 1 + Math.sin(time * 0.37) * 0.015; } // the hero ball's slow breath
+      else {
+        S.fill = seg(T, 0.75, 0.72); S.reveal = BLOOM(seg(T, BLOOM_AT, 1.9)); S.grow = 0.88 + 0.12 * BLOOM(seg(T, BLOOM_AT, 2.3));
+        // the last beat of the build: one light passes through the word, left to right (what the pointer does afterwards)
+        var fl = seg(T, LIGHT, END - 0.05 - LIGHT);
+        if (fl > 0 && fl < 1 && !P.target && wordM) {
+          own(wordM.left + wordM.width * (-0.12 + 1.24 * (fl < 0.5 ? 2 * fl * fl : 1 - 2 * (1 - fl) * (1 - fl))));
+          P.x = P.tx; P.y = P.ty; S.push = 0; S.pull = P.pull; S.to = P.to;
+          S.amt = Math.max(S.amt, Math.sin(Math.PI * fl));
+        }
+        var sw = inOut3(seg(T, RING, 1.4));
+        if (ring && sw !== sweep) { sweep = sw; ring.style.setProperty('--im-sweep', sw.toFixed(4)); }
+        var d = 'Ø ' + Math.round(w * OSMO(seg(T, NUM, 0.9))) + ' PX';
+        if (dia && T >= 0 && d !== diaT) dia.textContent = diaT = d;
+        if (T > END) done();
+      }
+      if (wordM) lamps();
+      ball.draw(S);
+      if (!sun.classList.contains('is-live')) sun.classList.add('is-live');
+    }
+    function done() { built = true; sheet.classList.add('is-built'); if (ring) ring.style.removeProperty('--im-sweep'); label(); }
+    function wake() { if (!raf && on && !document.hidden && ball && !dead && inAt) { lastT = 0; raf = requestAnimationFrame(frame); } } // nothing to paint before the build
+    function vis() { if (!sheet.isConnected) { quit(); return; } wake(); }
+
+    // 1. the painter: made the first time the poster is on screen and really shown, lives while it is on screen (not while
+    // it only looks in at the bottom)
+    function shown() { return sheet.getClientRects().length > 0 && getComputedStyle(sheet).visibility !== 'hidden'; }
+    function light() {
+      waitT = 0;
+      if (!on || dead || !gl) return;
+      if (!ball) {
+        if (!shown()) { waitT = setTimeout(light, 300); return; } // hidden, or the page is still fading in: look again soon
+        ball = makeBall(cv);
+        if (!ball) { near.disconnect(); noGl(); return; }
+        cv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); if (dead) return; near.disconnect(); noGl(); });
+      }
+      hear(true); wake();
+    }
+    if (gl) {
+      near = new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          on = e.isIntersecting;
+          if (on) { if (!waitT) light(); } else { clearTimeout(waitT); waitT = 0; stop(); hear(false); }
+        });
+      }, { rootMargin: '0px 0px -24% 0px' });
+      near.observe(stage); obs.push(near);
+      document.addEventListener('visibilitychange', vis);
+    }
+
+    // 2. the build, once. is-go = the ball and the word start (with the painter: as soon as a third of the sky is on screen,
+    // so a visitor who scrolls on still gets the colour); is-in = the ruler is on screen: the lines and the parts
+    if (calm || !stage) return;
+    sheet.classList.add('is-armed');
+    function go() {
+      if (inAt) return; inAt = performance.now(); sheet.classList.add('is-go'); if (!gl) label(); wake();
+      if (word) (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(inZone(function () { if (!dead) drawWord(word, gl); }));
+    }
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (!e.isIntersecting) return; io.disconnect(); go(); sheet.classList.add('is-in'); });
+    }, { rootMargin: '0px 0px -8% 0px' });
+    io.observe(qs('.im_ruler', sheet) || stage); obs.push(io);
+    if (gl && sky) {
+      var early = new IntersectionObserver(function (es) {
+        es.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio >= 0.34) { early.disconnect(); go(); } });
+      }, { threshold: 0.35 });
+      early.observe(sky); obs.push(early);
+    }
+  }
+
   // What runs on which page. Runs on every page, first load or swap
   function initPageFunctions() {
     var path = pagePath();
@@ -7099,6 +7471,7 @@
     };
     later('.loc_steps', 'location balls', rdLocBalls);
     if (qs('.wall_section')) later('.wall_section', 'wall of love', rdWall); else soon('wall of love', rdWall); // a wall outside a .wall_section has nothing to watch for
+    soon('imagine', rdImagine); // the big ball + IMAGINE (home): light to start, its WebGL waits until the section is on screen
     soon('faq', rdFaq);
     soon('journey pass', rdPass);
     soon('dfs card', rdDfc);
