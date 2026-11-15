@@ -218,7 +218,9 @@ function initOrbitTiles() {
   // ---- 1. the clips
   var clips = items.map(function (el) {
     var v = el.querySelector('video');
-    return { v: v, at: +v.dataset.whAt, from: +v.dataset.whFrom || 0, due: null, card: el.querySelector('.wh_card'), project: +el.querySelector('.wh_card').dataset.whProject };
+    // Added for this site: data-wh-slow-for / data-wh-slow-rate = the first seconds of the moment play slowed down (Tinko's quick draw)
+    var sf = +v.dataset.whSlowFor || 0, sr = +v.dataset.whSlowRate || 1;
+    return { v: v, at: +v.dataset.whAt, from: +v.dataset.whFrom || 0, slowFor: sf, slowRate: sr, due: null, card: el.querySelector('.wh_card'), project: +el.querySelector('.wh_card').dataset.whProject };
   });
   var running = false, pausedAt = null, wasPlaying = [];
   var LEAVE = 0.9;   // seconds the leaving clip plays on into the swap before it freezes (freezing at once read as a stop)
@@ -272,18 +274,20 @@ function initOrbitTiles() {
       }
       if (c.until != null) { if (v.paused && !v.ended) v.play().catch(function () {}); return; } // leaving: just plays on
       if (c.due == null || v.readyState < 1) return;
-      var want = c.at + (now - c.due);                      // where the clip should be right now
+      var el = now - c.due, slowReal = c.slowFor / c.slowRate; // slowed start: slowFor clip seconds take slowReal seconds
+      var base = el >= 0 && el < slowReal ? c.slowRate : 1;
+      var want = c.at + (el < slowReal ? Math.max(el, 0) * c.slowRate + Math.min(el, 0) : c.slowFor + (el - slowReal)); // where the clip should be right now
       if (want < c.from) {                                  // too early: wait on its first allowed frame
         if (!v.paused) v.pause();
         if (!v.seeking && Math.abs(v.currentTime - c.from) > 0.04) v.currentTime = c.from;
         return;
       }
       if (want > v.duration - 0.1) { c.due = null; return; } // ran out: it stays on its last frame
-      if (v.paused || v.ended) { v.currentTime = want; v.playbackRate = 1; v.play().catch(function () {}); return; }
+      if (v.paused || v.ended) { v.currentTime = want; v.playbackRate = base; v.play().catch(function () {}); return; }
       if (v.seeking) return;
       var off = want - v.currentTime;
       if (Math.abs(off) > 0.4) v.currentTime = want;        // far off (the tab was away): jump
-      else v.playbackRate = Math.abs(off) < 0.02 ? 1 : Math.max(0.75, Math.min(1.35, 1 + off * 1.5)); // close: glide into step
+      else v.playbackRate = base * (Math.abs(off) < 0.02 ? 1 : Math.max(0.75, Math.min(1.35, 1 + off * 1.5))); // close: glide into step
       if (now > c.due + 2.5) { c.due = null; v.playbackRate = 1; } // the moment has passed, let it run on
     });
   }
@@ -363,7 +367,25 @@ function initOrbitTiles() {
   });
 
   // hover: the front tile and its name are one link, pointing at either lights up both
-  var hoverOn = function () { hero.classList.add('is-hover'); }, hoverOff = function () { hero.classList.remove('is-hover'); };
+  // Added for this site: the marquee cursor of the project pages (a small card with words running through it)
+  // follows the pointer while it is on the front tile or its name. Computers only.
+  var cur = hero.querySelector('[data-wh-cursor]');
+  var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (cur && fine) {
+    var cx = gsap.quickTo(cur, 'x', { duration: 0.4, ease: 'power3' }), cy = gsap.quickTo(cur, 'y', { duration: 0.4, ease: 'power3' });
+    hero.addEventListener('pointermove', function (e) { cx(e.clientX); cy(e.clientY); }, { passive: true });
+    hero.addEventListener('pointerdown', function () { if (hero.classList.contains('is-hover')) cur.setAttribute('data-press', ''); });
+    window.addEventListener('pointerup', function () { cur.removeAttribute('data-press'); });
+  }
+  var hoverOn = function (e) {
+    hero.classList.add('is-hover');
+    if (!cur || !fine) return;
+    if (e && e.clientX != null) { gsap.set(cur, { x: e.clientX, y: e.clientY }); }
+    var word = (links[shown] && links[shown].getAttribute('data-wh-cursor-text')) || 'Visit site';
+    [].forEach.call(cur.querySelectorAll('.wh_cursor_text'), function (t) { t.textContent = word + ' \u00b7 '; });
+    cur.setAttribute('data-state', 'on');
+  };
+  var hoverOff = function () { hero.classList.remove('is-hover'); if (cur) cur.setAttribute('data-state', 'off'); };
   clips.forEach(function (c) { c.card.addEventListener('pointerenter', hoverOn); c.card.addEventListener('pointerleave', hoverOff); });
   links.forEach(function (a) { a.addEventListener('pointerenter', hoverOn); a.addEventListener('pointerleave', hoverOff); });
   hero.addEventListener('dragstart', function (e) { e.preventDefault(); });
@@ -372,6 +394,17 @@ function initOrbitTiles() {
   // shows its still, so nothing pops or jumps; then it eases in, slowly and in one go: the front tile rises into
   // place, the others follow, then the name and the label. The orbit starts with it.
   var head = hero.querySelector('.wh_head'), hint = hero.querySelector('.wh_scroll');
+  // Added for this site: "Scroll" takes you to the next section
+  if (hint) {
+    hint.removeAttribute('aria-hidden'); hint.setAttribute('role', 'button'); hint.tabIndex = 0;
+    hint.setAttribute('aria-label', 'Scroll to the next section');
+    var goNext = function () {
+      var next = hero.nextElementSibling; if (!next) return;
+      if (window.lenis && window.lenis.scrollTo) window.lenis.scrollTo(next, { duration: 1.4 }); else next.scrollIntoView({ behavior: 'smooth' });
+    };
+    hint.addEventListener('click', goNext);
+    hint.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goNext(); } });
+  }
   var cards = clips.map(function (c) { return c.card; });
   if (!reduce) {
     gsap.set(cards, { autoAlpha: 0 });
