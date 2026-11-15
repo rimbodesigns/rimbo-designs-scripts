@@ -7439,9 +7439,11 @@
       if (word) (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(inZone(function () { if (!dead) drawWord(word, gl); }));
     }
     var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { if (!e.isIntersecting) return; io.disconnect(); ask(); sheet.classList.add('is-in'); });
+      // also when the ruler is already above the screen (Back or a reload to a spot below it), and the boxes are watched too
+      // (a jump from above the ruler straight past it never makes the ruler intersect): the boxes must never stay hidden
+      es.forEach(function (e) { if (!e.isIntersecting && e.boundingClientRect.top >= 0) return; io.disconnect(); ask(); sheet.classList.add('is-in'); });
     }, { rootMargin: '0px 0px -8% 0px' });
-    io.observe(qs('.im_ruler', sheet) || stage); obs.push(io);
+    io.observe(qs('.im_ruler', sheet) || stage); var boxes = qs('.im_boxes', sheet); if (boxes) io.observe(boxes); obs.push(io);
     if (gl && sky) {
       var early = new IntersectionObserver(function (es) {
         es.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio >= 0.34) { early.disconnect(); ask(); } });
