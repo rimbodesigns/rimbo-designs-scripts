@@ -450,22 +450,80 @@
   var IMPACT = { stagger: 0.035, dur: 1.4, far: [300, 1300], spinZ: 80, spinY: 60, drift: 0.1, burst: 260, hang: 0.1 };
   var useCube = /[?&]cube=1/.test(location.search);
   var impactStyle = null;
+  var pageVisits = 0; // 1 on the page you arrived on, more after every page transition
+
+  var IMPACT_CSS =
+    '.rd-impact{position:fixed;inset:0;z-index:999;overflow:hidden;pointer-events:none}' +
+    '.rd-impact__root{position:absolute;inset:0}' +
+    '.rd-impact__grain{position:absolute;inset:0;opacity:.22}' +
+    '.rd-impact__scene,.rd-impact__piece,.rd-impact__box{position:absolute;transform-style:preserve-3d}' +
+    '.rd-impact__scene,.rd-impact__box{inset:0}' +
+    // will-change: each face is drawn once and moved as a picture, not redrawn at every size on its way into the depth
+    '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
+    '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
+    '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
+    // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
+    '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
 
   function impactCss() {
     if (impactStyle) return;
     impactStyle = document.createElement('style');
-    impactStyle.textContent =
-      '.rd-impact{position:fixed;inset:0;z-index:999;overflow:hidden;pointer-events:none}' +
-      '.rd-impact__grain{position:absolute;inset:0;opacity:.22}' +
-      '.rd-impact__scene,.rd-impact__piece,.rd-impact__box{position:absolute;transform-style:preserve-3d}' +
-      '.rd-impact__scene,.rd-impact__box{inset:0}' +
-      // will-change: each face is drawn once and moved as a picture, not redrawn at every size on its way into the depth
-      '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
-      '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
-      '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
-      // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
-      '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
+    impactStyle.textContent = IMPACT_CSS;
     document.head.appendChild(impactStyle);
+  }
+
+  // The copies live in a shadow tree, so nothing on the page can find them: page code looks for its elements in the
+  // whole document, and a copy of the home hero once got the hero's code run on it, which hid the menu bar for an
+  // opening that never came (Rimbo: "now I lost my menu again"). The site's CSS is handed to the tree as copies of the
+  // document's style sheets, made once per sheet. A browser without this keeps the copies in the page, as before
+  var impactShadow = !!(document.body.attachShadow && typeof CSSStyleSheet === 'function' && 'adoptedStyleSheets' in Document.prototype && typeof WeakMap === 'function');
+  var sheetCopies = impactShadow ? new WeakMap() : null;
+  var impactSheet = null;
+
+  function shadowSheets() {
+    var out = [];
+    Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+      var rules;
+      try { rules = sheet.cssRules; } catch (err) { return; } // a sheet from another site that we may not read
+      if (sheet.disabled || !rules) return;
+      var copy = sheetCopies.get(sheet);
+      if (!copy || copy.n !== rules.length) {
+        var css = '';
+        for (var i = 0; i < rules.length; i++) css += rules[i].cssText + '\n';
+        var made = sheet.href ? new CSSStyleSheet({ baseURL: sheet.href }) : new CSSStyleSheet();
+        made.replaceSync(css);
+        copy = { n: rules.length, sheet: made };
+        sheetCopies.set(sheet, copy);
+      }
+      out.push(copy.sheet);
+    });
+    if (!impactSheet) { impactSheet = new CSSStyleSheet(); impactSheet.replaceSync(IMPACT_CSS); }
+    out.push(impactSheet);
+    return out;
+  }
+
+  // the layer the copies stand in: { host } goes on the page, { root } takes the copies
+  function impactStage() {
+    impactCss();
+    var host = document.createElement('div');
+    host.className = 'rd-impact';
+    if (impactShadow) {
+      try {
+        var sheets = shadowSheets();
+        var shadow = host.attachShadow({ mode: 'open' });
+        shadow.adoptedStyleSheets = sheets;
+        var root = document.createElement('div');
+        // rules that hang on a class of <html> (.rf …) still reach the copies
+        root.className = 'rd-impact__root ' + document.documentElement.className.replace(/\blenis\S*/g, '');
+        shadow.appendChild(root);
+        return { host: host, root: root };
+      } catch (err) {
+        impactShadow = false;
+        host = document.createElement('div');
+        host.className = 'rd-impact';
+      }
+    }
+    return { host: host, root: host };
   }
 
   // where the click landed: the middle of the link, or the bottom middle of the screen for a click we can't see
@@ -564,7 +622,7 @@
     walk(container, root, { x: 0, y: 0 });
     var top = root.firstElementChild;
     if (top) { top.style.visibility = 'visible'; top.style.opacity = '1'; } // the arriving page is hidden while it waits
-    qsa('[id]', root).forEach(function (el) { if (!el.closest('svg')) el.removeAttribute('id'); }); // page code must never find a copy
+    if (!impactShadow) qsa('[id]', root).forEach(function (el) { if (!el.closest('svg')) el.removeAttribute('id'); }); // in the page, code must never find a copy by its id
     qsa('[data-barba], [data-barba-namespace]', root).forEach(function (el) { el.removeAttribute('data-barba'); el.removeAttribute('data-barba-namespace'); }); // nor Barba
     return root;
   }
@@ -576,13 +634,52 @@
     return c;
   }
 
-  // the new page's own animations wait under the blocks, so its entrance plays when you can see it
+  // While the blocks fly, everything the new page animates with GSAP waits: a hero's opening would otherwise play, or
+  // half play, where nobody sees it (Rimbo on the Service page: "does it block the whole animation?"). Whole animations
+  // are paused, never a tween inside a timeline: a paused child is left behind when its timeline ends, and that once
+  // left the menu bar invisible. Looked at every frame, because page code starts its opening late: after the fonts,
+  // after a script of its own arrives. keep(tl) names the one animation that must run: the blocks
   function holdNewPage() {
-    var list = pageScope && pageScope.gsap ? pageScope.gsap.getTweens().filter(function (t) {
-      return typeof t.pause === 'function' && typeof t.paused === 'function' && !t.scrollTrigger && !t.paused() && t.progress() < 1;
-    }) : [];
-    list.forEach(function (t) { t.pause(); });
-    return function () { list.forEach(function (t) { t.resume(); }); };
+    var held = [], mine = null, on = true;
+    function sweep() {
+      if (!on) return;
+      gsap.globalTimeline.getChildren(false, true, true).forEach(function (a) {
+        if (a === mine || a.scrollTrigger || a.paused() || a.progress() >= 1) return;
+        a.pause();
+        held.push(a);
+      });
+    }
+    sweep();
+    gsap.ticker.add(sweep);
+    return {
+      keep: function (tl) { mine = tl; },
+      release: function () {
+        on = false;
+        gsap.ticker.remove(sweep);
+        held.forEach(function (a) { if (a.paused()) a.resume(); });
+      }
+    };
+  }
+
+  // Scripts the arriving page adds for itself (the Work hero's file comes from a CDN). The copy waits for them, with a
+  // limit, so the blocks show the page the way its code set it up and not a moment before
+  function watchScripts() {
+    var waits = [];
+    var note = function (records) {
+      records.forEach(function (m) {
+        Array.prototype.forEach.call(m.addedNodes, function (n) {
+          if (n.tagName !== 'SCRIPT' || !n.src) return;
+          waits.push(new Promise(function (done) { n.addEventListener('load', done, { once: true }); n.addEventListener('error', done, { once: true }); }));
+        });
+      });
+    };
+    var mo = new window.MutationObserver(note);
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    return function (ms) {
+      note(mo.takeRecords());
+      mo.disconnect();
+      return Promise.race([Promise.all(waits), new Promise(function (done) { setTimeout(done, ms); })]);
+    };
   }
 
   // the arriving page's pictures on screen get a moment to load, so its blocks aren't empty
@@ -596,14 +693,14 @@
   }
 
   function impactBlocks(oldSnap, newSnap, W, H, point) {
-    impactCss();
     var cols = W < 600 ? 3 : W < 1000 ? 5 : 7, rows = Math.max(2, Math.round(cols * H / W));
     var w = W / cols, h = H / rows, depth = h / 2;
-    var stage = document.createElement('div'), grain = document.createElement('div'), scene = document.createElement('div');
-    stage.className = 'rd-impact'; grain.className = 'rd-impact__grain'; scene.className = 'rd-impact__scene';
-    stage.style.background = CUBE_VOID; stage.style.perspective = W + 'px';
+    var layer = impactStage(), stage = layer.host;
+    var grain = document.createElement('div'), scene = document.createElement('div');
+    grain.className = 'rd-impact__grain'; scene.className = 'rd-impact__scene';
+    stage.style.background = CUBE_VOID; layer.root.style.perspective = W + 'px';
     grain.style.backgroundImage = CUBE_GRAIN;
-    stage.appendChild(grain); stage.appendChild(scene);
+    layer.root.appendChild(grain); layer.root.appendChild(scene);
     var face = function (box, css, snap, c, r) {
       var f = document.createElement('div');
       f.className = 'rd-impact__face' + (snap ? '' : ' rd-impact__side');
@@ -650,24 +747,27 @@
           var oldSnap = snapshot(current, W, H);
           PAGE_HTML_CLASSES.forEach(function (name) { if (document.documentElement.classList.contains(name) && oldSnap.firstElementChild) oldSnap.firstElementChild.classList.add(name); });
           if (rdNavFull.handOver) rdNavFull.handOver(oldSnap); // an open menu breaks up with the page
-          impactCss();
-          var cover = document.createElement('div'); // the old page's copy holds the screen while the blocks are made
-          cover.className = 'rd-impact';
-          cover.appendChild(oldSnap);
-          document.body.appendChild(cover);
+          var scripts = watchScripts();
           var started = startCube(data);
+          var scriptsReady = scripts(900);
           current.remove(); // its copy stands in for it from here
+          var coverLayer = impactStage(), cover = coverLayer.host; // the old page's copy holds the screen while the blocks are made
+          coverLayer.root.appendChild(oldSnap);
+          document.body.appendChild(cover); // same moment as the old page going, so nothing shows in between
           if (window.lenis) window.lenis.stop();
-          var release = holdNewPage();
-          picturesReady(next, H, 350).then(function () {
+          var hold = holdNewPage();
+          Promise.all([picturesReady(next, H, 350), scriptsReady]).then(function () {
+            return new Promise(function (frame) { window.requestAnimationFrame(frame); }); // what a late script just set up is on the page
+          }).then(function () {
             var newSnap = snapshot(next, W, H);
             var blocks = impactBlocks(oldSnap, newSnap, W, H, point);
+            hold.keep(blocks.tl);
             document.body.appendChild(blocks.stage);
             cover.remove();
             blocks.tl.eventCallback('onComplete', function () {
               gsap.set(next, { clearProps: 'opacity,visibility' });
               blocks.stage.remove();
-              release();
+              hold.release();
               playVideos(started.nextVideos);
               finishCube(started);
               resolve();
@@ -1302,6 +1402,7 @@
   }
 
   function openPage() {
+    pageVisits++;
     if (!barbaOn) return;
     pageScope = { dead: false, undo: [], styles: [], gsap: gsap.context(function () {}) };
   }
@@ -3598,7 +3699,9 @@
 
     // ---- the opening, in order: the band rises, the title letters come up like the old hero,
     // the eyebrow and the buttons follow, the scroll line, and last the logo and the burger.
-    nav.forEach(function (el) { el.style.opacity = '0'; }); // a plain style, not gsap.set: the page's revert on leaving would clear it again after the next page's opening had hidden the logo
+    // Only on the page you arrive on: after a page transition the logo and burger are already on screen, and hiding them
+    // until the end of the opening took the menu away for nine seconds (Rimbo: "now I lost my menu again")
+    if (pageVisits <= 1) nav.forEach(function (el) { el.style.opacity = '0'; }); // a plain style, not gsap.set: the page's revert on leaving would clear it again after the next page's opening had hidden the logo
     var opened = false;
     var open = function () {
       if (opened) return; opened = true;
