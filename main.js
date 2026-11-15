@@ -468,7 +468,7 @@
     '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
     '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
     '.rd-impact__cuts{position:absolute;inset:0}' +
-    '.rd-impact__cut{position:absolute;box-shadow:0 0 0 1px rgba(19,19,19,.18);will-change:transform}' +
+    '.rd-impact__cut{position:absolute;background:#E4441C;will-change:transform}' +
     '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
     // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
     '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
@@ -510,7 +510,10 @@
     return out;
   }
 
-  // the layer the copies stand in: { host } goes on the page, { root } takes the copies
+  // the layer the copies stand in: { host } goes on the page, { root } takes the copies. restyle() hands the tree the
+  // style sheets that came after it was made: the layer is made at the click, and the arriving page brings its own CSS
+  // later (its embeds, what its code adds). Without them its copy flew in half styled: the post's hero is hidden until
+  // its opening, and the copy showed the bare eyebrow and section list on an empty page (Rimbo's screenshot)
   function impactStage() {
     impactCss();
     var host = document.createElement('div');
@@ -523,14 +526,23 @@
         var root = document.createElement('div');
         root.className = 'rd-impact__root';
         shadow.appendChild(root);
-        return { host: host, root: root };
+        return {
+          host: host, root: root,
+          restyle: function () {
+            try {
+              var have = shadow.adoptedStyleSheets;
+              var more = shadowSheets().filter(function (sheet) { return Array.prototype.indexOf.call(have, sheet) < 0; });
+              if (more.length) shadow.adoptedStyleSheets = Array.prototype.concat.call([], Array.prototype.slice.call(have), more); // the old page's stay: its copy still stands
+            } catch (err) {}
+          }
+        };
       } catch (err) {
         impactShadow = false;
         host = document.createElement('div');
         host.className = 'rd-impact';
       }
     }
-    return { host: host, root: host };
+    return { host: host, root: host, restyle: function () {} };
   }
 
   // where the click landed: the middle of the link, or the bottom middle of the screen for a click we can't see
@@ -773,6 +785,7 @@
     // bit like the website is breaking"), so they are drawn: up from the bottom and in from the left and the right in
     // turn, the ones nearest the click first, and only then do the pieces part. It runs on the browser's own animation
     // track (element.animate, transform and opacity only), so it stays smooth while the next page is set up behind it
+    // The lines are Deep Orange (docs/brand.md; Rimbo: "the cut can be in the brand color instead of gray")
     var k = IMPACT_CUT, moves = [], drawn = typeof scene.animate === 'function';
     var cuts = document.createElement('div');
     cuts.className = 'rd-impact__cuts';
@@ -782,7 +795,7 @@
     if (drawn) seams.forEach(function (m) {
       var el = document.createElement('div');
       el.className = 'rd-impact__cut';
-      el.style.cssText = 'background:' + CUBE_VOID + ';' + (m.up
+      el.style.cssText = (m.up
         ? 'left:' + (m.at - thick / 2) + 'px;top:0;width:' + thick + 'px;height:100%;transform-origin:50% 100%'
         : 'top:' + (m.at - thick / 2) + 'px;left:0;height:' + thick + 'px;width:100%;transform-origin:' + (m.right ? '100%' : '0') + ' 50%');
       cuts.appendChild(el);
@@ -809,7 +822,7 @@
     });
     return {
       stage: stage, tl: tl,
-      fill: function (newSnap) { blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); },
+      fill: function (newSnap) { layer.restyle(); blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); },
       // the cut's own animations hand the parted blocks to the timeline, in one frame
       burst: function () {
         moves.forEach(function (m) { m.cancel(); });
