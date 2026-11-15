@@ -7079,10 +7079,12 @@
   // 2. THE BUILD = the service hero ball's (its order and curves, mirrored because this ball stands on its line): cross
   //    > radius out, the number counting > the dashed ring sweeps round > the colour BLOOMS from the middle > cross and
   //    radius fade > tick. The word draws its outline, fills, the outline goes; last beat: one light passes through it.
-  // 3. THE POINTER = the hero ball's heat spot on the ball; in the letters a small light with a clean edge: a letter is deep
-  //    or lit (warm rose, never white). A part A-D lights its share of the word and marks its tick. Touch: a tap is a light
-  //    for a moment. Scrolling makes the colours move a little faster.
+  // 3. THE POINTER = the hero ball's heat spot on the ball; the letters stay deep under it (home ball lab 2026-11-15). A box
+  //    001-004 under the ruler ([data-im="part"], Rimbo's row of boxes) lights its share of the word (warm rose, never white,
+  //    no outline: 001 = I+M, 002 = A, 003 = G+I, 004 = N+E) and gets is-hot. Touch: a tap is a light for a moment.
+  //    Scrolling makes the colours move a little faster.
   // 4. The section's notch tabs drift only while they are near the screen.
+  // 5. THE STORY under the boxes: its words light up on scroll and stay read (imStory, at the end).
   // Weight: the canvas is made the first time the poster is near and draws ONLY while it is on screen (30 draws a second;
   // every frame only during the 3 s bloom), listeners only while on screen, and the page leaving gives the WebGL context back.
   // A hidden copy starts nothing: display none is skipped, and no WebGL is made while the section is visibility hidden (also
@@ -7092,6 +7094,7 @@
     var sheet = qsa('[data-im="sheet"]').filter(function (el) { return el.getClientRects().length; })[0]; // a copy set to display none is skipped
     if (!sheet || sheet.dataset.on) return;
     sheet.dataset.on = '1';
+    imStory();
     var NS = 'http://www.w3.org/2000/svg';
     var FRAG = "#version 300 es\nprecision highp float;\n" +
       "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float grainScale; uniform float t;\n" +
@@ -7138,14 +7141,14 @@
       "  if (la > 0.0) {\n" +
       // the ball itself seen through the letters, mixed (lMix) with a second, livelier view of the same field that twists a
       // little around the pointer, and deeper (lInk) so the word always reads. The light goes letter by letter (lit[], set
-      // below): a whole letter is deep or lit, never half. A lit letter takes the warm end of the four colours with an ink
-      // hairline (the mask's green: 0 on the letter's rim), so it reads on every part of the ball
+      // below): a whole letter is deep or lit, never half. A lit letter takes the warm end of the four colours, no outline
+      // (home ball lab, 2026-11-15: Rimbo found the ink hairline round a lit letter corny)
       "    float vl = fb, kl = mix(k, lit[int(clamp(floor(mk.r * 8.0), 0.0, 7.0))] * edge, lSharp);\n" +
       "    if (lMix > 0.0) { vec2 d = (p - ptr) / R; float th = swirl * k, cs = cos(th), sn = sin(th);\n" +
       "      vl = mix(fb, field((l + vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs) - d) * 1.7, fract(h + 0.37), t * 1.9 + 11.0), lMix); }\n" +
       "    vl = mix((vl - 0.5) * lSpan + 0.5 + lBias, ptrTo, pull * kl);\n" +
       "    vec3 lc = shade(vl, g1, grain * (1.0 - 0.5 * lInk), lInk * (1.0 - glow * kl) - 0.08 * kl * lSharp);\n" +
-      "    lc = mix(INK, mix(lc, INK, (1.0 - mk.g) * kl * lSharp), m);\n" +
+      "    lc = mix(INK, lc, m);\n" +
       "    o = lc * la + o * (1.0 - la); a = la + a * (1.0 - la);\n  }\n" +
       "  outColor = vec4(o, a);\n}";
     function oklab(hex) {
@@ -7255,10 +7258,12 @@
     }
 
     var stage = qs('[data-im="stage"]', sheet), sky = qs('.im_sky', sheet), sun = qs('[data-im="sun"]', sheet), cv = qs('[data-im="ball"]', sheet),
-        word = qs('[data-im="word"]', sheet), dia = qs('[data-im="dia"]', sheet), ring = qs('.im_ring', sheet), parts = qsa('.im_part', sheet);
+        word = qs('[data-im="word"]', sheet), dia = qs('[data-im="dia"]', sheet), ring = qs('.im_ring', sheet), parts = qsa('[data-im="part"]', sheet);
+    if (!parts.length) parts = qsa('.im_part', sheet); // the old row of parts A-D (a copy that still has it)
     var calm = reducedMotion;
-    // how the letters look and answer (the lab's composition A, Rimbo's pick)
-    var LOOK = { lMix: 0.45, lInk: 0.6, lBias: 0, lSpan: 1, swirl: 1.1, glow: 1, disc: 1, sharp: 1, pull: 0.9, to: 0.3 };
+    // how the letters look and answer (the lab's composition A, Rimbo's pick). glow 0.5 (was 1, home ball lab 2026-11-15):
+    // without the outline a lit letter (a part's share) stays a deeper rose, so it still reads on the ball
+    var LOOK = { lMix: 0.45, lInk: 0.6, lBias: 0, lSpan: 1, swirl: 1.1, glow: 0.5, disc: 1, sharp: 1, pull: 0.9, to: 0.3 };
     var S = { t: 0, rise: 0, grow: 1, reveal: 0, fill: 0, wx: 0, ww: 1, px: 0, py: 0, pr: 100, lit: new Float32Array(8), amt: 0, push: 0, pull: LOOK.pull, to: LOOK.to,
       disc: LOOK.disc, lMix: LOOK.lMix, lInk: LOOK.lInk, lBias: LOOK.lBias, lSpan: LOOK.lSpan, swirl: LOOK.swirl, glow: LOOK.glow, lSharp: LOOK.sharp };
     var label = function () { if (dia && sun) dia.textContent = 'Ø ' + Math.round(sun.clientWidth) + ' PX'; };
@@ -7293,11 +7298,9 @@
       c2 = c2 || document.createElement('canvas');
       if (c2.width !== cv.width || c2.height !== cv.height) { c2.width = cv.width; c2.height = cv.height; }
       var x = c2.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c2.width, c2.height); x.setTransform(scale, 0, 0, scale, 0, 0);
-      x.font = m.font; x.textBaseline = 'alphabetic'; x.lineJoin = 'round'; x.lineWidth = Math.max(2.5, m.fs * 0.03);
-      m.letters.forEach(function (L, i) { // red = which letter, green = 0 on the letter's rim (the hairline of a lit letter)
-        var r = Math.min(i, 7) * 32 + 16;
-        x.globalCompositeOperation = 'source-over'; x.fillStyle = 'rgb(' + r + ',255,255)'; x.fillText(L.ch, L.x, m.base);
-        x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgb(' + r + ',0,255)'; x.strokeText(L.ch, L.x, m.base);
+      x.font = m.font; x.textBaseline = 'alphabetic';
+      m.letters.forEach(function (L, i) { // red = which letter
+        x.fillStyle = 'rgb(' + (Math.min(i, 7) * 32 + 16) + ',255,255)'; x.fillText(L.ch, L.x, m.base);
       });
       ball.mask(c2); wordM = m; S.wx = m.left; S.ww = m.width;
     }
@@ -7306,21 +7309,25 @@
     function mark(part) { if (hot === part) return; if (hot) hot.classList.remove('is-hot'); hot = part; if (hot) hot.classList.add('is-hot'); }
     function spot(x, y) { var r = sun.getBoundingClientRect(), k = sun.offsetWidth ? r.width / sun.offsetWidth : 1; P.tx = (x - r.left) / (k || 1); P.ty = (y - r.top) / (k || 1); }
     // a light the visitor did not point: in the word only, the ball stays as it is (orange belongs to a real pointer)
-    function own(x) { P.tx = x; P.ty = wordM.base - wordM.fs * 0.36; P.push = 0; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; }
-    // which letters are lit: the one the light is on (and its neighbour when the light is near their gap), or a part's share
+    function own(x) { P.tx = x; P.ty = wordM.base - wordM.fs * 0.36; P.push = 0; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; P.mine = true; }
+    // which letters are lit: the one the light is on (and its neighbour when the light is near their gap), or a part's
+    // share. Only a light of the section's own lights a letter (the build's last beat, a box 001-004): the visitor's pointer on
+    // the word lights none (home ball lab, 2026-11-15: the word stays calm, the ball around it still answers)
     function lamps() {
       var n = wordM.letters.length, reach = wordM.fs * 0.27, top = wordM.base - wordM.fs * 0.74, i, L, dx, dy, hit;
       for (i = 0; i < n && i < 8; i++) {
         L = wordM.letters[i];
         if (P.share >= 0) { dx = ((L.x + L.r) / 2 - wordM.left) / wordM.width * parts.length; hit = dx >= P.share && dx < P.share + 1; }
-        else { dx = Math.max(L.x - P.x, 0, P.x - L.r); dy = Math.max(top - P.y, 0, P.y - wordM.base); hit = dx * dx + dy * dy < reach * reach; }
+        else if (P.mine) { dx = Math.max(L.x - P.x, 0, P.x - L.r); dy = Math.max(top - P.y, 0, P.y - wordM.base); hit = dx * dx + dy * dy < reach * reach; }
+        else hit = false;
         S.lit[i] += ((hit && S.amt > 0.34 ? 1 : 0) - S.lit[i]) * 0.7;
       }
     }
     function aim(e) {
-      var part = e.target.closest && e.target.closest('.im_part');
+      var part = e.target.closest && e.target.closest('[data-im="part"], .im_part');
+      if (part && parts.indexOf(part) < 0) part = null;
       if (part && wordM) { var i = parts.indexOf(part); own(wordM.left + wordM.width * (i + 0.5) / parts.length); P.share = i; } // a part lights its share of the word
-      else { spot(e.clientX, e.clientY); P.push = -0.6; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; } // the hero ball's heat spot
+      else { spot(e.clientX, e.clientY); P.push = -0.6; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; P.mine = false; } // the hero ball's heat spot
       at = part ? null : { x: e.clientX, y: e.clientY };
       if (P.target < 0.5 && S.amt < 0.02) { P.x = P.tx; P.y = P.ty; S.push = P.push; S.pull = P.pull; S.to = P.to; }
       P.target = 1; mark(part || null);
@@ -7421,7 +7428,7 @@
     }
 
     // 2. the build, once. is-go = the ball and the word start (with the painter: as soon as a third of the sky is on screen,
-    // so a visitor who scrolls on still gets the colour); is-in = the ruler is on screen: the lines and the parts
+    // so a visitor who scrolls on still gets the colour); is-in = the ruler is on screen: the ruler and the boxes
     if (calm || !stage) return;
     sheet.classList.add('is-armed');
     // with the painter, the build never starts before the painter draws (its observer starts lower on the screen than these),
@@ -7440,6 +7447,71 @@
         es.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio >= 0.34) { early.disconnect(); ask(); } });
       }, { threshold: 0.35 });
       early.observe(sky); obs.push(early);
+    }
+
+    // 5. THE STORY under the boxes (home ball lab 2026-11-15; the service lab's lit paragraph r2-para, calm: no measures,
+    // no pointer light). The words of [data-im="story"] go from faint (20% ink) to full ink as the paragraph scrolls up
+    // through the screen, line by line and left to right, and stay read. The faint state exists only once this has armed
+    // the sheet (is-reading), so without it, under reduced motion and in print every word is ink. The scroll listener
+    // lives only while the paragraph is on screen and goes for good once every word is read.
+    // LINE = the reading line, as a share of the screen's height: low (0.93), so the last word is read by the time the
+    // paragraph's bottom is that far down, and a visitor who stops with the whole poster in view reads it all.
+    function imStory() {
+      var para = qs('[data-im="story"]', sheet);
+      if (!para || reducedMotion || !('IntersectionObserver' in window)) return;
+      var units = [], DIM = 0.2, LINE = 0.93, SOFT = 0.7, lh = 0, sraf = 0, over = false, follow = false, tries = 0, seen, sizes;
+      try {
+        (function walk(node) { // every word becomes span.im_w; the underlined phrase (wall_mark) lights as one piece
+          [].slice.call(node.childNodes).forEach(function (n) {
+            if (n.nodeType === 1) { if (n.classList.contains('wall_mark')) units.push({ el: n }); else walk(n); return; }
+            if (n.nodeType !== 3 || !/[^ \t\r\n]/.test(n.nodeValue)) return;
+            var frag = document.createDocumentFragment();
+            n.nodeValue.split(/([ \t\r\n]+)/).forEach(function (part) { // a hard space keeps its two words together
+              if (!part) return;
+              if (/^[ \t\r\n]+$/.test(part)) { frag.appendChild(document.createTextNode(' ')); return; }
+              var w = document.createElement('span'); w.className = 'im_w'; w.textContent = part; frag.appendChild(w); units.push({ el: w });
+            });
+            n.parentNode.replaceChild(frag, n);
+          });
+        })(para);
+      } catch (err) { return; }
+      if (!units.length) return;
+      // where every word sits inside the paragraph, in layout numbers (a page still scaling in a transition cannot bend them)
+      function place() {
+        var w = para.offsetWidth, x0 = para.offsetLeft, y0 = para.offsetTop; if (!w) return;
+        lh = parseFloat(getComputedStyle(para).lineHeight) || parseFloat(getComputedStyle(para).fontSize) * 1.25;
+        units.forEach(function (u) { u.cy = u.el.offsetTop - y0 + u.el.offsetHeight / 2; u.x = (u.el.offsetLeft - x0) / w; });
+      }
+      function paint() {
+        sraf = 0;
+        if (over || !para.isConnected) return;
+        if (!lh) place();
+        var r = para.getBoundingClientRect(), R = window.innerHeight * LINE - r.top, all = true;
+        if (Math.abs(r.width - para.offsetWidth) > 1 && tries++ < 180) { tick(); return; } // still turning in a page transition
+        units.forEach(function (u) {
+          // a word is read once the reading line has gone down past its place: line by line, left to right in a line
+          var v = (R - (u.cy - lh / 2) - u.x * lh) / (lh * SOFT);
+          v = v < 0 ? 0 : v > 1 ? 1 : v;
+          if (u.v > v) v = u.v; // once read, it stays read
+          if (v < 1) all = false;
+          if (v !== u.v) { u.v = v; u.el.style.opacity = v >= 1 ? '' : (DIM + (1 - DIM) * v).toFixed(3); }
+        });
+        if (all) end();
+      }
+      function tick() { if (!sraf && !over) sraf = requestAnimationFrame(paint); }
+      function hearScroll(yes) { if (yes === follow) return; follow = yes; window[yes ? 'addEventListener' : 'removeEventListener']('scroll', tick, { passive: true }); }
+      function end() { // read to the end (or the page left): nothing follows the scroll any more
+        if (over) return; over = true; hearScroll(false); if (sraf) cancelAnimationFrame(sraf); sraf = 0;
+        if (seen) seen.disconnect(); if (sizes) sizes.disconnect();
+        units.forEach(function (u) { u.el.style.opacity = ''; }); sheet.classList.remove('is-reading');
+      }
+      rdUndo(end);
+      units.forEach(function (u) { u.el.style.opacity = DIM; }); // armed in one go, the fades start with the first paint
+      sheet.classList.add('is-reading');
+      seen = new IntersectionObserver(function (es) { es.forEach(function (e) { hearScroll(e.isIntersecting); if (e.isIntersecting) tick(); }); });
+      seen.observe(para);
+      if ('ResizeObserver' in window) { sizes = new ResizeObserver(function () { lh = 0; tick(); }); sizes.observe(para); }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(inZone(function () { lh = 0; tick(); }));
     }
   }
 
