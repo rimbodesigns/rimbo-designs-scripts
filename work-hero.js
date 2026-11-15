@@ -216,8 +216,22 @@ function initOrbitTiles() {
   var clock = function () { return gsap.globalTimeline.time(); };
 
   // ---- 1. the clips
+  // Added for this site: a tile can hold a live app instead of a clip ([data-wh-live], Tinko via tinko-live.js).
+  // It gets a stand-in with the few things of a video the clock below uses: "play" starts his arrival, going back to
+  // the start ("currentTime = from", out of sight) puts him back to sleep.
+  function appClip(el) {
+    var api = window.TinkoLive.mount(el), t = 0, playing = false, started = false, from = +el.dataset.whFrom || 0;
+    return { isApp: true, dataset: el.dataset, readyState: 4, seeking: false, ended: false, duration: 1e9, playbackRate: 1,
+      get paused() { return !playing; },
+      get currentTime() { return t; },
+      set currentTime(x) { t = x; if (x <= from + 0.01 && started) { started = false; api.wait(); } },
+      play: function () { playing = true; if (!started) { started = true; api.play(); } return Promise.resolve(); },
+      pause: function () { playing = false; },
+      addEventListener: function () {} };
+  }
   var clips = items.map(function (el) {
-    var v = el.querySelector('video');
+    var app = el.querySelector('[data-wh-live]');
+    var v = el.querySelector('video') || (app && window.TinkoLive ? appClip(app) : null);
     // Added for this site: data-wh-slow-for / data-wh-slow-rate = the first seconds of the moment play slowed down (Tinko's quick draw)
     var sf = +v.dataset.whSlowFor || 0, sr = +v.dataset.whSlowRate || 1;
     return { v: v, at: +v.dataset.whAt, from: +v.dataset.whFrom || 0, slowFor: sf, slowRate: sr, due: null, card: el.querySelector('.wh_card'), project: +el.querySelector('.wh_card').dataset.whProject };
@@ -245,6 +259,7 @@ function initOrbitTiles() {
   // send a file in parts (a plain local server) makes them unseekable, then the whole clip is fetched once and
   // played from memory. Webflow's hosting is fine.
   function prepare(c) {
+    if (c.v.isApp) return Promise.resolve();
     return new Promise(function (done) {
       var v = c.v;
       var onStill = function () { if (v.readyState >= 2) done(); else v.addEventListener('loadeddata', done, { once: true }); };
