@@ -7861,12 +7861,15 @@
       }
     }
     function aim(e) {
+      var was = P.mine; // the build's own light was the last one
       var part = e.target.closest && e.target.closest('[data-im="part"], .im_part');
       if (part && parts.indexOf(part) < 0) part = null;
       if (part) { at = null; P.target = 0; mark(part); return; } // a box only marks itself; the word stays as it is (Rimbo 2026-11-15: lighting letters from a box felt corny)
       else { spot(e.clientX, e.clientY); P.push = -0.6; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; P.mine = false; } // the hero ball's heat spot
       at = part ? null : { x: e.clientX, y: e.clientY };
-      if (P.target < 0.5 && S.amt < 0.02) { P.x = P.tx; P.y = P.ty; S.push = P.push; S.pull = P.pull; S.to = P.to; }
+      // the first pointer after the build: the build's own light (in the word) may still be fading out at the word's end; the
+      // pointer takes over from where it is instead of gliding across the ball from there (Rimbo saw that as a glitch)
+      if (P.target < 0.5 && (S.amt < 0.02 || was)) { if (was) S.amt = 0; P.x = P.tx; P.y = P.ty; S.push = P.push; S.pull = P.pull; S.to = P.to; }
       P.target = 1; mark(part || null);
     }
     function move(e) { if (e.pointerType !== 'touch') aim(e); }
