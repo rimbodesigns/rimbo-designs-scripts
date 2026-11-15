@@ -412,11 +412,18 @@ function initOrbitTiles() {
     var STIFF = 300, DAMP = 40, BEND = 0.085, lastY = window.scrollY, vel = 0, bow = 0, bowVel = 0, drawn = null, edgeH = 0;
     var measure = function () { edgeH = edge.getBoundingClientRect().height; };
     measure(); window.addEventListener('resize', measure);
+    // Added for this site: time comes from the FRAME (document.timeline), the clock main.js drives Lenis with.
+    // GSAP's own delta wobbles a few ms per frame; dividing the scroll step by it made the edge shiver.
+    var lastFrame = null;
     gsap.ticker.add(function edgeTick(time, deltaMs) {
       if (gone(edgeTick)) return;
-      var dt = Math.min(0.05, Math.max(0.001, deltaMs / 1000));
+      var frame = document.timeline && typeof document.timeline.currentTime === 'number' ? document.timeline.currentTime : time * 1000;
+      var dt = lastFrame == null ? deltaMs / 1000 : (frame - lastFrame) / 1000;
+      lastFrame = frame;
+      if (!(dt > 0)) return;                                          // same frame twice: nothing moved
+      dt = Math.min(0.05, Math.max(0.004, dt));
       var y = window.scrollY;
-      vel += ((y - lastY) / dt - vel) * Math.min(1, dt * 14);   // scroll speed, smoothed
+      vel += ((y - lastY) / dt - vel) * Math.min(1, dt * 10);   // scroll speed, smoothed
       lastY = y;
       if (edgeH < 1) { measure(); return; }                             // not laid out (a hidden tab)
       if (y > window.innerHeight * 1.3 && Math.abs(bow) < 0.05) return; // the edge is long gone
