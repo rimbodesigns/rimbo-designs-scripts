@@ -7814,7 +7814,7 @@
     function aim(e) {
       var part = e.target.closest && e.target.closest('[data-im="part"], .im_part');
       if (part && parts.indexOf(part) < 0) part = null;
-      if (part && wordM) { var i = parts.indexOf(part); own(wordM.left + wordM.width * (i + 0.5) / parts.length); P.share = i; } // a part lights its share of the word
+      if (part) { at = null; P.target = 0; mark(part); return; } // a box only marks itself; the word stays as it is (Rimbo 2026-11-15: lighting letters from a box felt corny)
       else { spot(e.clientX, e.clientY); P.push = -0.6; P.pull = LOOK.pull; P.to = LOOK.to; P.share = -1; P.mine = false; } // the hero ball's heat spot
       at = part ? null : { x: e.clientX, y: e.clientY };
       if (P.target < 0.5 && S.amt < 0.02) { P.x = P.tx; P.y = P.ty; S.push = P.push; S.pull = P.pull; S.to = P.to; }
