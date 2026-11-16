@@ -5101,38 +5101,10 @@
     function pageIsLight() {
       return [0.12, 0.5, 0.88].some(function (k) { return lightAt(window.innerHeight * k); });
     }
-    var ease = 'cubic-bezier(.65, 0, .35, 1)';
-    // The look is in the Designer: the component Nav_full, classes bold-nav*. Here only what a class can't hold: the old
-    // navigation stepping aside, and everything that moves or switches
-    var css = [
-      '#FIXED_NAV, #Top_Nav, .burgermenu, .nav { display: none !important; }',
-      '.bold-nav-full__hamburger:focus { outline: none; } .bold-nav-full__hamburger:focus-visible, .bold-nav-full__logo:focus-visible { outline: 1px solid #fff; outline-offset: 4px; border-radius: 2px; }',
-      '.bold-nav-full__hamburger-bar { transition: transform .7s ' + ease + '; }',
-      '.bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(1, 1) rotate(0.001deg); }',
-      '.bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(1, 1) rotate(0.001deg); }',
-      '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, -.45em) scale(.5, 1) rotate(0.001deg); }',
-      '.bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, .45em) scale(.5, 1) rotate(0.001deg); }',
-      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(1, 1); }',
-      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(2) { transform: translate(-200%, 0) rotate(0.001deg) scale(1, 1); }',
-      '[data-navigation-status="active"] .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(1, 1); }',
-      '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(1) { transform: translate(0, 0) rotate(45deg) scale(.7, 1); }',
-      '[data-navigation-status="active"] .bold-nav-full__hamburger:hover .bold-nav-full__hamburger-bar:nth-child(3) { transform: translate(0, 0) rotate(-45deg) scale(.7, 1); }',
-      // the tile's edge (clip-path) and the letters are driven by the timeline below
-      '.bold-nav-full__tile { -webkit-backdrop-filter: blur(10px); will-change: clip-path; }',
-      '.bold-nav-full__li { transition: opacity .5s ' + ease + '; }',
-      '.bold-nav-full__link { will-change: transform; }',
-      '.bold-nav-full__link:focus, .bold-nav-full__link:focus-visible { color: #f8f5ee; outline: none; }', // the site's global link hover would turn it coral
-      // hover: the other links fade back, the hovered one stays as it is (no colour change, no roll)
-      '.bold-nav-full__ul:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) .bold-nav-full__li { opacity: .25; }',
-      '.bold-nav-full__ul .bold-nav-full__li:has(.bold-nav-full__link:hover, .bold-nav-full__link:focus-visible) { opacity: 1; }',
-      '.bold-nav__time { font-variant-numeric: tabular-nums; }',
-      '.bold-nav__mail { transition: color .3s; }',
-      // the language toggle, the same pill as on Resources (rdLangToggle drives it)
-      '.bold-nav__lang .rs-lang__pill { position: absolute; top: .1875rem; bottom: .1875rem; left: .1875rem; width: calc((100% - .375rem) / var(--toggle-count, 2)); transform: translateX(calc(var(--toggle-active, 0) * 100%)); border-radius: .25rem; background-color: #f8f5ee; transition: transform .5s cubic-bezier(.625, .05, 0, 1); }',
-      '.bold-nav__lang-link { transition: color .3s; }',
-      '.bold-nav__lang-link[data-toggle-active] { color: #131313; }',
-      '.bold-nav__lang-link:focus-visible { outline: 1px solid #f8f5ee; outline-offset: 2px; }'
-    ].join('\n');
+    // The look is in the Designer: the component Nav_full (bold-nav* classes, colours as variables) and its embed "Menu CSS"
+    // (burger hover and cross, links fading back, focus rings, the language pill). Moved there from this file in v1.7.184.
+    // Only the switch stays here: the old navigation steps aside once this menu is known to work
+    var css = '#FIXED_NAV, #Top_Nav, .burgermenu, .nav { display: none !important; }';
     var style = document.createElement('style');
     style.textContent = css;
     rdHead(style);
