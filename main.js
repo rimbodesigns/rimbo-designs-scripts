@@ -5565,61 +5565,9 @@
     var cut = function (k) { return ((1 - k) * 100).toFixed(2) + '%'; };
     var rgba = function (c, a) { return 'rgba(' + c.join(',') + ',' + clamp(a).toFixed(3) + ')'; };
 
-    var ease = 'cubic-bezier(.625, .05, 0, 1)';
-    // only what the Designer can't hold: what the script makes or switches (build, guides, hover states, the notch)
-    var css = [
-      '.rdf { --rdf-fg: #f8f5ee; --rdf-grey: #a4a4a4; --rdf-brand: #e4441c; --rdf-hair: rgba(248, 245, 238, .12); --rdf-dash: rgba(248, 245, 238, .22); --rdf-lift: rgba(248, 245, 238, .035); --rdf-key: #8fb3ff; --rdf-str: #e4441c; -webkit-font-smoothing: antialiased; }',
-      '.rdf a { text-decoration: none; font-size: inherit; line-height: inherit; font-weight: inherit; letter-spacing: inherit; }', // the site's own link styles stay out
-      '.rdf-prev { position: relative; z-index: 2 !important; }',
-      // the page above ends in two cut corners on every page (Rimbo, 15 Nov: the home's notch everywhere). The size is the
-      // Webflow variable Footer notch (32px), a little smaller on phones. A section with a clip-path of its own keeps it
-      '.rdf-prev.rdf-notch { clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--rdf-n)), calc(100% - var(--rdf-n)) 100%, var(--rdf-n) 100%, 0 calc(100% - var(--rdf-n))); --rdf-n: var(--footer-notch, 32px); }',
-      '@media (max-width: 767px) { .rdf-prev.rdf-notch { --rdf-n: calc(var(--footer-notch, 32px) * .875); } }',
-      // a notched section above (a clip-path on it, e.g. is-notched): the footer starts 6rem higher, under the page, so its cut
-      // corners show the footer coming up, in the page's shade; the edge line goes, it would close the corners
-      '.rdf.is-under { margin-top: -6rem; height: calc(100svh + 6rem); }',
-      '.rdf.is-under .rdf-in { top: 6rem; }',
-      '.rdf.is-under .rdf-drop { border-top-color: transparent; height: calc(clamp(9rem, 34vh, 18rem) + 6rem); background-image: linear-gradient(to bottom, rgba(0, 0, 0, .62) 6rem, rgba(0, 0, 0, .384) calc(6rem + (100% - 6rem) * .16), rgba(0, 0, 0, .223) calc(6rem + (100% - 6rem) * .36), rgba(0, 0, 0, .099) calc(6rem + (100% - 6rem) * .58), rgba(0, 0, 0, .031) calc(6rem + (100% - 6rem) * .8), rgba(0, 0, 0, 0)); }',
-      '@media (max-width: 767px) { .rdf.is-under { height: auto; padding-top: 6rem; min-height: calc(100svh + 6rem); } .rdf.is-under .rdf-in { top: auto; } }',
-      '.rdf .rdf-grain.grain { position: absolute; inset: 0; z-index: 7; pointer-events: none; }',
-      '.rdf-in { will-change: transform; }',
-      '.rdf-lines { position: absolute; inset: 0; pointer-events: none; }',
-      '.rdf-v { position: absolute; border-left: 1px dashed var(--rdf-dash); }',
-      '.rdf-h { position: absolute; border-top: 1px dashed var(--rdf-dash); }',
-      '.rdf-ruler svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; shape-rendering: crispEdges; }',
-      '.rdf-ruler path { fill: none; stroke-width: 1; stroke: var(--rdf-hair); } .rdf-ruler path + path { stroke: var(--rdf-dash); }',
-      '.rdf-logo-art canvas { display: block; }',
-      // hover
-      '.rdf-cell { transition: background-color .4s ' + ease + '; }',
-      '.rdf-cell.is-drawn { background-color: var(--rdf-lift); }',
-      '.rdf-pt-a, .rdf-pt-b, .rdf-swap-a, .rdf-swap-b { transition: transform .55s ' + ease + '; }',
-      '.rdf-cell.is-drawn .rdf-swap-a, .rdf-cell.is-drawn .rdf-pt-a { transform: translateY(-110%); } .rdf-cell.is-drawn .rdf-swap-b, .rdf-cell.is-drawn .rdf-pt-b { transform: none; }',
-      '.rdf-arrow { transition: transform .45s ' + ease + ', opacity .3s, color .3s; }',
-      '.rdf-cell.is-drawn .rdf-arrow { transform: none; opacity: 1; color: var(--rdf-fg); }',
-      '.rdf-soc { transition: color .3s, background-color .4s ' + ease + '; }',
-      '.rdf-soc-arrow { transition: opacity .3s, transform .45s ' + ease + '; }',
-      '@media (hover: hover) { .rdf-soc:hover .rdf-soc-arrow { opacity: 1; transform: none; } }',
-      '.rdf-lang-link { transition: opacity .3s; } .rdf-lang-link.is-on { color: var(--rdf-fg); opacity: 1; }',
-      // the build: an outline per box, the HTML it types, the caret
-      '.rdf-frame { position: absolute; inset: 0; z-index: 6; width: 100%; height: 100%; overflow: visible; pointer-events: none; }', // above the shade: the orange line starts at its full colour
-      '.rdf-frame rect { fill: none; stroke: rgba(228, 68, 28, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }',
-      '.rdf-rev { position: relative; z-index: 1; will-change: clip-path; }',
-      '.rdf-ch { transition: opacity .7s; }',
-      '.rdf-caret { position: absolute; width: 2px; background: var(--rdf-brand); pointer-events: none; opacity: 0; z-index: 6; }',
-      '.rdf-code { position: absolute; left: 1.6rem; top: 1.3rem; right: 1rem; z-index: 2; pointer-events: none; font-size: .64rem; line-height: 1.6; letter-spacing: .04em; white-space: pre-wrap; word-break: break-all; text-transform: none; color: var(--rdf-grey); transition: opacity .25s; }',
-      '.rdf-code .t { color: var(--rdf-fg); } .rdf-code .k { color: var(--rdf-key); } .rdf-code .s { color: var(--rdf-str); }',
-      '.rdf-code .cur { display: inline-block; width: .55em; height: 1.05em; margin-left: .1em; vertical-align: -.15em; background: var(--rdf-brand); animation: rdf-blink 1s steps(1) infinite; }',
-      '@keyframes rdf-blink { 50% { opacity: 0; } }',
-      // hover: two strokes from the top-left corner, meeting bottom right
-      '.rdf-draw { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }',
-      '.rdf-draw path { fill: none; stroke: var(--rdf-brand); stroke-width: 1; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .45s cubic-bezier(.4, 0, .6, 1); }',
-      '.rdf-cell.is-drawn .rdf-draw path { stroke-dashoffset: 0; transition: stroke-dashoffset .8s cubic-bezier(.45, 0, .25, 1); }',
-      '@media (max-width: 767px) { .rdf-code { left: 1rem; top: 1.1rem; font-size: .58rem; } }',
-      '@media (prefers-reduced-motion: reduce) { .rdf-code .cur { animation: none; } }'
-    ].join('\n');
-    var style = document.createElement('style');
-    style.textContent = css;
-    rdHead(style);
+    // its CSS lives in Webflow too: the rdf-* classes (look at rest, colours as variables, transitions) and the embed
+    // "Footer CSS" inside Footer_rdf (the states this switches on: is-drawn, is-on, is-under, rdf-prev/rdf-notch, and the
+    // parts drawn here: grid lines, ruler, build outline, typed code, caret). Was a style block in this file until v1.7.183.
 
     // the language links: the old menu's Webflow locale links know the right URL for this page
     function localeHref(lang) {
