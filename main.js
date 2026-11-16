@@ -6728,30 +6728,6 @@
   }
 
   // =========================================================
-  // STAGING LINKS — on webflow.io only: the menu, the buttons and every other internal link to the OLD
-  // service and work pages open the new ones (Service V2, Work V2), so Rimbo can click through the new
-  // experience without falling back to the old pages. The Webflow links stay as they are (the live site keeps working
-  // untouched); this only rewrites the href here, until the URL structure is cleared up. Dutch (/nl) links go to the Dutch copies.
-  // =========================================================
-  function rdStagingLinks() {
-    if (!/\.webflow\.io$/.test(location.hostname)) return;
-    var MAP = { '/service': '/service-v2', '/work': '/work-v2', '/nl/service': '/nl/service-v2', '/nl/work': '/nl/work-v2' }; // Dutch too: Rimbo tests the whole flow from the Dutch city pages
-    function fix(a) {
-      if (!a || !a.getAttribute) return;
-      var h = a.getAttribute('href');
-      if (!h || h.charAt(0) === '#' || /^(mailto|tel|javascript):/i.test(h)) return;
-      var u; try { u = new URL(a.href, location.href); } catch (e) { return; }
-      if (u.origin !== location.origin) return;
-      var to = MAP[u.pathname.replace(/\/+$/, '') || '/'];
-      if (to) a.setAttribute('href', to + u.search + u.hash);
-    }
-    qsa('a[href]').forEach(fix);
-    ['pointerdown', 'mouseover', 'focusin', 'click'].forEach(function (type) {
-      rdOn(document, type, function (e) { fix(e.target && e.target.closest && e.target.closest('a')); }, true); // capture: before Barba reads the href
-    });
-  }
-
-  // =========================================================
   // DFS LOGO TURN — the Digital Feng Shui logo on the closing cards (.duo_svg, .duo_svg_day, .dfc_svg), as on that site
   // itself: every 4.4 s the ring (.m-ring) turns +45 and the star (.m-inner) -45, in .6 s. Each logo keeps its own count
   // (rdA on the svg), so on a new page it starts at 0 again. The logo and the rule that keeps CSS transitions off its
@@ -8110,7 +8086,6 @@
     run('band', rdBand);   // builds the home-opening rows before the marquees start
     run('global', rdGlobal);
     // from here: not needed to show the first screen, so on a first load these take their turn (soon, at the top of this file)
-    soon('staging links', rdStagingLinks);
     soon('location faq button', rdLocFaqBtn);
     soon('location button lines', rdLocBtnAlt);
     soon('buttons', rdButtons);
