@@ -402,7 +402,8 @@ function initOrbitTiles() {
   };
   var hoverOff = function () { hero.classList.remove('is-hover'); if (cur) cur.setAttribute('data-state', 'off'); };
   clips.forEach(function (c) { c.card.addEventListener('pointerenter', hoverOn); c.card.addEventListener('pointerleave', hoverOff); });
-  links.forEach(function (a) { a.addEventListener('pointerenter', hoverOn); a.addEventListener('pointerleave', hoverOff); });
+  // Rimbo 2026-11-16: the name is no longer one link with the tile. Only its address is a link, with its own hover
+  // (orange, the arrow moves; CSS), so pointing at it doesn't bring the tile's cursor or lean.
   hero.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
   // ---- 3. the opening. The screen starts empty (just the page's dark and grain) until every clip is loaded and
