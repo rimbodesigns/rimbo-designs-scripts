@@ -453,7 +453,9 @@
   // how far the furthest seam starts behind the nearest) and leaves a pale hairline. From partAt every block shrinks a
   // little about its own middle (part, spread per block away from the click), so the hairlines open. minHold = how long
   // the cut page stands before it bursts, however fast the next page is: the whole cut has to fit in it. Seconds
-  var IMPACT_CUT = { scale: 0.955, stroke: 0.36, strokeLen: 0.42, lineSpread: 0.4, partAt: 0.7, part: 0.28, spread: 0.018, minHold: 1.1 };
+  // trail = the hairline then fades away from the end the stroke came in: how far the fade travels (a part of the seam)
+  // and trailDur = in how many seconds (his picks from round 8 of the lab: "Thinner" and "Trails out")
+  var IMPACT_CUT = { scale: 0.955, stroke: 0.36, strokeLen: 0.42, lineSpread: 0.4, partAt: 0.7, part: 0.28, spread: 0.018, minHold: 1.1, trail: 0.9, trailDur: 0.9 };
   var impactPending = null; // the cut page, between the click and the moment the next page is ready
   var useCube = /[?&]cube=1/.test(location.search);
   var impactStyle = null;
@@ -471,9 +473,15 @@
     '.rd-impact__cuts{position:absolute;inset:0}' +
     // one seam: a line of its own, laid along the seam from the edge where the stroke comes in
     '.rd-impact__seam{position:absolute;left:0;top:0;height:0;transform-origin:0 0}' +
-    '.rd-impact__seam div{position:absolute;left:0;top:0;height:1px;will-change:transform}' +
-    '.rd-impact__stroke{background:linear-gradient(90deg,rgba(228,68,28,0),#E4441C 70%)}' + // Deep Orange, docs/brand.md
-    '.rd-impact__scar{width:100%;transform-origin:0 50%;transform:scaleX(0);background:#DACCAE;box-shadow:0 0 0 .5px rgba(19,19,19,.28)}' +
+    '.rd-impact__stroke{position:absolute;left:0;top:0;height:1px;will-change:transform;background:linear-gradient(90deg,rgba(228,68,28,0),#E4441C 70%)}' + // Deep Orange, docs/brand.md
+    // the hairline: half a pixel in the void's colour with a faint ink edge. __scar is a window on the seam; in it a strip
+    // twice the seam's length whose first half fades in (__line) slides along: first with the stroke's tip, so the line
+    // appears behind it, then on (__trail), so the faded half comes in and the line trails out from where it began
+    '.rd-impact__scar{position:absolute;left:0;top:-.25px;width:100%;height:1px;overflow:hidden}' +
+    '.rd-impact__trail{position:absolute;inset:0;will-change:transform}' +
+    '.rd-impact__line{position:absolute;left:0;top:0;width:200%;height:100%;will-change:transform;' +
+      'background:linear-gradient(180deg,rgba(19,19,19,.28) 0 .25px,#DACCAE .25px .75px,rgba(19,19,19,.28) .75px 1px);' +
+      '-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 50%);mask-image:linear-gradient(90deg,transparent 0,#000 50%)}' +
     '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
     // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
     '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
@@ -808,8 +816,9 @@
     // The cut. The lines appearing all at once read as the site breaking (Rimbo: "the first fraction of a second feels a
     // bit like the website is breaking"), so the page is cut by strokes: up from the bottom and in from the left and the
     // right in turn, the seams nearest the click first, and only then do the pieces part. A stroke is orange and gone
-    // again ("it doesn't stay red, so it's like a swoosh"); what it leaves is a hairline in the void's colour, 1px, no
-    // glow, no white core, no point (his notes on the lab). It all runs on the browser's own animation track
+    // again ("it doesn't stay red, so it's like a swoosh"); what it leaves is a hairline in the void's colour, half a
+    // pixel, that "kind of stays but slowly trails out"; no glow, no white core, no point (his notes on the lab). It all
+    // runs on the browser's own animation track
     // (element.animate, transform and opacity only), so it stays smooth while the next page is set up behind it.
     // Stroke and hairline share one set of steps, so the hairline ends exactly under the stroke's tip
     var k = IMPACT_CUT, moves = [], drawn = typeof scene.animate === 'function';
@@ -822,7 +831,11 @@
     for (n = 0; n <= STEPS; n++) { var t = n / STEPS; tip.push((1 + k.strokeLen) * (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)); }
     if (drawn) seams.forEach(function (m) {
       var seam = document.createElement('div'), scar = document.createElement('div'), stroke = document.createElement('div');
+      var trail = document.createElement('div'), line = document.createElement('div');
       seam.className = 'rd-impact__seam'; scar.className = 'rd-impact__scar'; stroke.className = 'rd-impact__stroke';
+      trail.className = 'rd-impact__trail'; line.className = 'rd-impact__line';
+      line.style.transform = 'translateX(' + (-2 * m.len) + 'px)';
+      trail.appendChild(line); scar.appendChild(trail);
       seam.style.width = m.len + 'px';
       seam.style.transform = 'translate(' + m.x + 'px,' + m.y + 'px) rotate(' + m.turn + 'deg)';
       stroke.style.width = (k.strokeLen * m.len) + 'px';
@@ -830,7 +843,9 @@
       seam.appendChild(scar); seam.appendChild(stroke); cuts.appendChild(seam);
       var timing = { duration: k.stroke * 1000, delay: m.far * k.lineSpread * 1000, easing: 'linear', fill: 'both' };
       moves.push(stroke.animate(tip.map(function (p) { return { transform: 'translateX(' + ((p - k.strokeLen) * m.len).toFixed(1) + 'px)' }; }), timing));
-      moves.push(scar.animate(tip.map(function (p) { return { transform: 'scaleX(' + Math.min(1, p).toFixed(4) + ')' }; }), timing));
+      moves.push(line.animate(tip.map(function (p) { return { transform: 'translateX(' + ((Math.min(1, p) - 2) * m.len).toFixed(1) + 'px)' }; }), timing));
+      moves.push(trail.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(' + (k.trail * m.len).toFixed(1) + 'px)' }],
+        { duration: k.trailDur * 1000, delay: timing.delay + k.stroke * 800, easing: 'cubic-bezier(.25,.46,.45,.94)', fill: 'both' }));
     });
     layer.root.appendChild(cuts);
     blocks.forEach(function (b) {
