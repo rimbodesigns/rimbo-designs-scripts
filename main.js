@@ -3562,6 +3562,7 @@
             copy.style.translate = '0 ' + st.shift + 'px';
             st.yRest += st.shift;
           }
+          if (bottomFade) bottomFade.style.translate = '0 ' + st.yRest + 'px'; // the shade over the cards' foot moves down with them (else it drew a faded line across the front card)
         } else { st.yFlat = null; st.yRest = 0; }
       }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
       function phoneLab() { return /[?&]m=1\b/.test(query) && window.innerWidth < 768; }
