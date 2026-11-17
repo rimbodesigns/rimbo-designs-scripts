@@ -3551,8 +3551,17 @@
         if (phoneLab()) { // MOBILE LAB (?m=1, Rimbo 2026-11-17): the whole dial on the screen, centred, the title clear of the cards
           st.fit = Math.min(0.9, window.innerWidth * 1.15 / (2 * (dialR() + st.h / 2)) * (persp + dialR()) / persp); // 1.15 screen widths: the sides bleed off a little and the cards stay big enough to read (Rimbo's screenshot, 2026-11-17) // the dial lies at depth -R, so it shows smaller by persp / (persp + R): grown back by that
           st.yFlat = (window.innerHeight / 2 - st.top) * (persp + dialR()) / persp; // the hole's centre (the label) lands on the middle of the screen
-          var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top : 0; // the title's foot, in the hero
+          var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top - (st.shift || 0) : 0; // the title's foot, in the hero (without the centring below)
           st.yRest = Math.max(0, Math.round(tb + 20 - (st.top - st.h / 2))); // the front card starts under it
+          // the copy and the front card as one block, centred on the screen (Rimbo: so much space at the bottom); the copy
+          // moves with the CSS translate property, which its own opening and fade (opacity, filter) leave alone
+          if (copy) {
+            var hTop = hero.getBoundingClientRect().top, shift = st.shift || 0;
+            var cTop = copy.getBoundingClientRect().top - hTop - shift, cBot = st.top + st.h / 2 + st.yRest;
+            st.shift = Math.max(0, Math.round((window.innerHeight - (cBot - cTop)) / 2 - cTop));
+            copy.style.translate = '0 ' + st.shift + 'px';
+            st.yRest += st.shift;
+          }
         } else { st.yFlat = null; st.yRest = 0; }
       }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
       function phoneLab() { return /[?&]m=1\b/.test(query) && window.innerWidth < 768; }
