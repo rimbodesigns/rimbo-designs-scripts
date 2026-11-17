@@ -7765,6 +7765,8 @@
       "    if (lMix > 0.0) { vec2 d = (p - ptr) / R; float th = swirl * k, cs = cos(th), sn = sin(th);\n" +
       "      vl = mix(fb, field((l + vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs) - d) * 1.7, fract(h + 0.37), t * 1.9 + 11.0), lMix); }\n" +
       "    vl = mix((vl - 0.5) * lSpan + 0.5 + lBias, ptrTo, pull * kl);\n" +
+      // the letters never go red: they keep to the steel and sand half of the four colours (Rimbo 2026-11-17: no red text)
+      "    vl = max(vl, 0.45);\n" +
       "    vec3 lc = shade(vl, g1, grain * (1.0 - 0.5 * lInk), lInk * (1.0 - glow * kl) - 0.08 * kl * lSharp);\n" +
       "    lc = mix(INK, lc, m);\n" +
       "    o = lc * la + o * (1.0 - la); a = la + a * (1.0 - la);\n  }\n" +
@@ -7887,7 +7889,7 @@
     var label = function () { if (dia && sun) dia.textContent = 'Ø ' + Math.round(sun.clientWidth) + ' PX'; };
     label();
     if (!('IntersectionObserver' in window)) return;
-    var obs = [], raf = 0, on = false, ball = null, last = 0, lastT = 0, dead = false, time = 0, inAt = 0, want = false, built = false, wordM = null, dirty = true, sweep = -1, diaT = '',
+    var obs = [], raf = 0, on = false, ball = null, last = 0, lastT = 0, dead = false, time = 0, inAt = 0, want = false, built = false, builtAt = 0, wordM = null, dirty = true, sweep = -1, diaT = '',
         c2 = null, near = null, waitT = 0, P = { x: 0, y: 0, tx: 0, ty: 0, target: 0, push: 0, pull: LOOK.pull, to: LOOK.to, share: -1 }, stir = 0, stirTo = 0, sy = 0, st = 0, tapT = 0, heard = false, hot = null, at = null, td = null;
     var gl = !calm && !!cv && !!sun && !!window.WebGL2RenderingContext;
     if (gl) sheet.classList.add('is-gl');
@@ -7998,16 +8000,10 @@
       if (ball.size(w, scale) || dirty) { dirty = false; paintMask(scale); }
       S.t = time; S.px = P.x; S.py = P.y; S.fill = 1; S.pr = Math.min(Math.max(w * 0.4875 * 0.4, 60), 160);
       // 2. the build
-      if (built) { S.reveal = 1; S.rise = 0; S.grow = 1 + Math.sin(time * 0.37) * 0.015; } // the hero ball's slow breath
+      if (built) { S.reveal = 1; S.rise = 0; S.grow = 1 + Math.sin((time - builtAt) * 0.37) * 0.015; } // the hero ball's slow breath, starting from the size the build ended on (it used to jump by up to 1.5% there)
       else {
         S.fill = seg(T, 0.75, 0.72); S.reveal = BLOOM(seg(T, BLOOM_AT, 1.9)); S.grow = 0.88 + 0.12 * BLOOM(seg(T, BLOOM_AT, 2.3));
-        // the last beat of the build: one light passes through the word, left to right (what the pointer does afterwards)
-        var fl = seg(T, LIGHT, END - 0.05 - LIGHT);
-        if (fl > 0 && fl < 1 && !P.target && wordM) {
-          own(wordM.left + wordM.width * (-0.12 + 1.24 * (fl < 0.5 ? 2 * fl * fl : 1 - 2 * (1 - fl) * (1 - fl))));
-          P.x = P.tx; P.y = P.ty; S.push = 0; S.pull = P.pull; S.to = P.to;
-          S.amt = Math.max(S.amt, Math.sin(Math.PI * fl));
-        }
+        // (the build used to end with a light passing through the word; gone: Rimbo wants no highlight on the letters at all)
         var sw = inOut3(seg(T, RING, 1.4));
         if (ring && sw !== sweep) { sweep = sw; ring.style.setProperty('--im-sweep', sw.toFixed(4)); }
         var d = 'Ø ' + Math.round(w * OSMO(seg(T, NUM, 0.9))) + ' PX';
@@ -8018,7 +8014,7 @@
       ball.draw(S);
       if (!sun.classList.contains('is-live')) sun.classList.add('is-live');
     }
-    function done() { built = true; sheet.classList.add('is-built'); if (ring) ring.style.removeProperty('--im-sweep'); label(); }
+    function done() { built = true; builtAt = time; sheet.classList.add('is-built'); if (ring) ring.style.removeProperty('--im-sweep'); label(); }
     function wake() { if (!raf && on && !document.hidden && ball && !dead && inAt) { lastT = 0; raf = requestAnimationFrame(frame); } } // nothing to paint before the build
     function vis() { if (!sheet.isConnected) { quit(); return; } wake(); }
 
