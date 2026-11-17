@@ -3551,15 +3551,18 @@
         if (phoneLab()) { // ON A PHONE (Rimbo 2026-11-17): the whole dial on the screen, centred, the title clear of the cards
           st.fit = Math.min(0.9, window.innerWidth * 1.15 / (2 * (dialR() + st.h / 2)) * (persp + dialR()) / persp); // 1.15 screen widths: the sides bleed off a little and the cards stay big enough to read (Rimbo's screenshot, 2026-11-17) // the dial lies at depth -R, so it shows smaller by persp / (persp + R): grown back by that
           st.yFlat = (window.innerHeight / 2 - st.top) * (persp + dialR()) / persp; // the hole's centre (the label) lands on the middle of the screen
-          var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top - (st.shift || 0) : 0; // the title's foot, in the hero (without the centring below)
+          var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top - (st.copyY || 0) : 0; // the title's foot, in the hero (without the centring below)
           st.yRest = Math.max(0, Math.round(tb + 20 - (st.top - st.h / 2))); // the front card starts under it
           // the copy and the front card as one block, centred on the screen (Rimbo: so much space at the bottom); the copy
           // moves with the CSS translate property, which its own opening and fade (opacity, filter) leave alone
           if (copy) {
-            var hTop = hero.getBoundingClientRect().top, shift = st.shift || 0;
+            var hTop = hero.getBoundingClientRect().top, shift = st.copyY || 0;
             var cTop = copy.getBoundingClientRect().top - hTop - shift, cBot = st.top + st.h / 2 + st.yRest;
             st.shift = Math.max(0, Math.round((window.innerHeight - (cBot - cTop)) / 2 - cTop));
-            copy.style.translate = '0 ' + st.shift + 'px';
+            // the copy a little higher than the block's centring puts it, the card stays where it is (Rimbo's phone test, 2026-11-18:
+            // "the work is nicely in the centre, the texts need to move up a little"); never up into the menu bar
+            st.copyY = st.shift - Math.max(0, Math.min(Math.round(window.innerHeight * 0.03), cTop + st.shift - 88));
+            copy.style.translate = '0 ' + st.copyY + 'px';
             st.yRest += st.shift;
           }
           if (bottomFade) bottomFade.style.translate = '0 ' + st.yRest + 'px'; // the shade over the cards' foot moves down with them (else it drew a faded line across the front card)
