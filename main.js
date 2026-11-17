@@ -6849,17 +6849,20 @@
     function anyOn() { return items.some(function (it) { return it.on; }); }
     function wake() { if (!raf && !reduce && !document.hidden && passes[0].isConnected && anyOn()) raf = requestAnimationFrame(loop); }
 
+    var phone = matchMedia('(max-width: 767px)');
     var items = passes.map(function (p, i) {
       p.dataset.on = '1';
       var it = {
-        p: p, on: false, m: qsa('[data-m]', p), rose: qs('.pass_rose', p), earth: qs('.pass_earth', p), stamp: qs('.pass_stamp', p),
+        p: p, on: false, main: qs('.pass_main', p), m: qsa('[data-m]', p), rose: qs('.pass_rose', p), earth: qs('.pass_earth', p), stamp: qs('.pass_stamp', p),
         imgs: qsa('.pass_img,.pass_tex,.pass_holo', p), g: foilStamp(qs('.pass_stamp svg', p), i)
       };
       new IntersectionObserver(function (es) {
         it.on = es[0].isIntersecting;
         if (!it.on) return;
-        qs('.pass_fill', p).classList.add('is-in');
-        qs('.pass_dot', p).classList.add('is-in');
+        if (!phone.matches) { // on a phone the route follows the scroll instead (route, below)
+          qs('.pass_fill', p).classList.add('is-in');
+          qs('.pass_dot', p).classList.add('is-in');
+        }
         wake();
       }, { threshold: 0.2 }).observe(p);
       var stub = qs('.pass_stub', p), btn = stub && qs('.btn', stub);
@@ -6877,6 +6880,25 @@
       light(it);
       return it;
     });
+
+    // THE ROUTE ON A PHONE (Rimbo, 2026-11-17, from the ticket phone lab): it stands down the ticket's side without its
+    // words and follows the scroll, not a timer. --p on the ticket goes 0 to 1: 0 when the top of the ticket's main part
+    // comes up to 85% of the screen, 1 when the tear line passes the middle. The Designer's phone styles of pass_fill and
+    // pass_dot read it (and show the route full where the script never ran).
+    function route() {
+      if (!phone.matches) return;
+      var vh = window.innerHeight;
+      items.forEach(function (it) {
+        if (!it.main) return;
+        var r = it.main.getBoundingClientRect();
+        if (r.bottom < -vh || r.top > vh * 2) return;
+        var v = Math.max(0, Math.min(1, (vh * 0.85 - r.top) / (vh * 0.35 + r.height)));
+        if (v !== it.rp) { it.rp = v; it.p.style.setProperty('--p', v.toFixed(3)); }
+      });
+    }
+    rdOn(window, 'scroll', route, { passive: true });
+    rdOn(window, 'resize', route);
+    route();
 
     if (reduce) return;
     if (fine) {
