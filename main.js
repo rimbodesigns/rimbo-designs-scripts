@@ -3549,7 +3549,7 @@
       var dialR = function () { return Math.max(arcR() * ringGrow, st.w / (2 * Math.sin(Math.PI / N)) + st.h * 0.3); }; // the flat dial: the drum grown a little, and never so tight that the cards pile up in the middle
       var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))) || 0.45; st.top = ring.offsetTop;
         if (phoneLab()) { // MOBILE LAB (?m=1, Rimbo 2026-11-17): the whole dial on the screen, centred, the title clear of the cards
-          st.fit = Math.min(0.9, window.innerWidth * 0.92 / (2 * (dialR() + st.h / 2)) * (persp + dialR()) / persp); // the dial lies at depth -R, so it shows smaller by persp / (persp + R): grown back by that
+          st.fit = Math.min(0.9, window.innerWidth * 1.15 / (2 * (dialR() + st.h / 2)) * (persp + dialR()) / persp); // 1.15 screen widths: the sides bleed off a little and the cards stay big enough to read (Rimbo's screenshot, 2026-11-17) // the dial lies at depth -R, so it shows smaller by persp / (persp + R): grown back by that
           st.yFlat = (window.innerHeight / 2 - st.top) * (persp + dialR()) / persp; // the hole's centre (the label) lands on the middle of the screen
           var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top : 0; // the title's foot, in the hero
           st.yRest = Math.max(0, Math.round(tb + 20 - (st.top - st.h / 2))); // the front card starts under it
