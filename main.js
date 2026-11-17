@@ -3548,7 +3548,7 @@
       var arcR = function () { return st.pitch / (2 * Math.sin(REST / 2 * rad)); }; // the drum's cylinder: the cards a pitch apart along it
       var dialR = function () { return Math.max(arcR() * ringGrow, st.w / (2 * Math.sin(Math.PI / N)) + st.h * 0.3); }; // the flat dial: the drum grown a little, and never so tight that the cards pile up in the middle
       var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))) || 0.45; st.top = ring.offsetTop;
-        if (phoneLab()) { // MOBILE LAB (?m=1, Rimbo 2026-11-17): the whole dial on the screen, centred, the title clear of the cards
+        if (phoneLab()) { // ON A PHONE (Rimbo 2026-11-17): the whole dial on the screen, centred, the title clear of the cards
           st.fit = Math.min(0.9, window.innerWidth * 1.15 / (2 * (dialR() + st.h / 2)) * (persp + dialR()) / persp); // 1.15 screen widths: the sides bleed off a little and the cards stay big enough to read (Rimbo's screenshot, 2026-11-17) // the dial lies at depth -R, so it shows smaller by persp / (persp + R): grown back by that
           st.yFlat = (window.innerHeight / 2 - st.top) * (persp + dialR()) / persp; // the hole's centre (the label) lands on the middle of the screen
           var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top - (st.shift || 0) : 0; // the title's foot, in the hero (without the centring below)
@@ -3565,7 +3565,7 @@
           if (bottomFade) bottomFade.style.translate = '0 ' + st.yRest + 'px'; // the shade over the cards' foot moves down with them (else it drew a faded line across the front card)
         } else { st.yFlat = null; st.yRest = 0; }
       }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
-      function phoneLab() { return /[?&]m=1\b/.test(query) && window.innerWidth < 768; }
+      function phoneLab() { return window.innerWidth < 768 && !/[?&]m=0\b/.test(query); } // the phone dial is how a phone gets the hero (Rimbo, 2026-11-17); ?m=0 on staging shows the old, desktop-sized dial for comparison
       var spacing = function () { return REST + (FULL - REST) * st.open; };
       var render = function () {
         var sp = spacing(), turn = st.steps + st.scroll, s = st.scale.toFixed(4);
