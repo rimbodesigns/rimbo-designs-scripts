@@ -6763,6 +6763,8 @@
         var g = it.grids[Math.floor(Math.random() * it.grids.length)], r = g.getBoundingClientRect();
         var cols = Math.floor(r.width / 32), s = Math.max(0, -r.top), l = Math.min(r.height, innerHeight - r.top);
         var h = 56 + 120 * Math.random(), d = 140 + 300 * Math.random();
+        // a low band (on a phone the grid sits in two strips of about 85 px): shorter zips that fit it
+        if (r.height < 200) { h = Math.min(h, r.height * 0.4); d = Math.min(d, r.height * 0.45); }
         if (cols < 2 || l - s < h + d) return;
         var z = document.createElement('span');
         z.className = 'dfc_zip';
