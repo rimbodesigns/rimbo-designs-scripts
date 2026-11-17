@@ -3547,7 +3547,15 @@
       var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
       var arcR = function () { return st.pitch / (2 * Math.sin(REST / 2 * rad)); }; // the drum's cylinder: the cards a pitch apart along it
       var dialR = function () { return Math.max(arcR() * ringGrow, st.w / (2 * Math.sin(Math.PI / N)) + st.h * 0.3); }; // the flat dial: the drum grown a little, and never so tight that the cards pile up in the middle
-      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))) || 0.45; st.top = ring.offsetTop; }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
+      var measure = function () { var w = originals[0].offsetWidth || window.innerWidth * 0.285, gap = window.innerWidth * 0.025; st.pitch = w + gap; st.w = w; st.h = originals[0].offsetHeight || w / 1.02; st.fit = Math.min(0.6, window.innerHeight * 1.2 / (2 * (dialR() + st.h / 2))) || 0.45; st.top = ring.offsetTop;
+        if (phoneLab()) { // MOBILE LAB (?m=1, Rimbo 2026-11-17): the whole dial on the screen, centred, the title clear of the cards
+          st.fit = Math.min(0.9, window.innerWidth * 0.92 / (2 * (dialR() + st.h / 2)) * (persp + dialR()) / persp); // the dial lies at depth -R, so it shows smaller by persp / (persp + R): grown back by that
+          st.yFlat = (window.innerHeight / 2 - st.top) * (persp + dialR()) / persp; // the hole's centre (the label) lands on the middle of the screen
+          var tb = title ? title.getBoundingClientRect().bottom - hero.getBoundingClientRect().top : 0; // the title's foot, in the hero
+          st.yRest = Math.max(0, Math.round(tb + 20 - (st.top - st.h / 2))); // the front card starts under it
+        } else { st.yFlat = null; st.yRest = 0; }
+      }; // the flat dial stands 1.2 screens tall, bleeding a little top and bottom like the first ring, whatever the count; top: read here once, not in render, where reading it right after the transforms made the browser lay the page out again every frame
+      function phoneLab() { return /[?&]m=1\b/.test(query) && window.innerWidth < 768; }
       var spacing = function () { return REST + (FULL - REST) * st.open; };
       var render = function () {
         var sp = spacing(), turn = st.steps + st.scroll, s = st.scale.toFixed(4);
@@ -3579,7 +3587,7 @@
         // projected towards the camera, and nothing about the turn moves it
         label.style.top = (st.top + (st.y + 0) * persp / (persp + R)).toFixed(1) + 'px';
       };
-      measure(); render();
+      measure(); if (st.yRest) st.y = st.yRest; render();
       var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(function () { measure(); render(); }, 250); });
       // ---- motion blur (Rimbo: "some effects have motion blur on movement… on the spinning it could be nice"): one SVG
       // filter, a horizontal blur in each card's own frame, which on the ring is the tangent of its travel; its width
@@ -3631,7 +3639,7 @@
           if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - clamp01(screens / 0.07) }); }
           var e = ease3(q / 0.35), x = clamp01((q - 0.75) / 0.25); // e: the tip-over; x: the way out (a quarter of the hold: Rimbo found it too fast)
           st.closing = x > 0;
-          st.tip = 90 * e; st.open = e; st.y = -window.innerHeight * 0.08 * e;
+          st.tip = 90 * e; st.open = e; st.y = st.yFlat != null ? (st.yRest || 0) * (1 - e) + st.yFlat * e : -window.innerHeight * 0.08 * e;
           st.scroll = (q > 0.35 ? Math.min(1, (q - 0.35) / 0.4) * N : 0); // one full round
           st.scale = 1 - (1 - st.fit) * e; st.fade = 1; st.dx = 0;
           // the way out (Rimbo: a fade-out after that is a let-down): the dial rolls off to the left still spinning, or the
