@@ -7563,6 +7563,81 @@
     }, 800);
   }
 
+  // WORK WALL (home, section .wh_sec; lab prototype/work-highlights, Rimbo's settings of 2026-11-17). The look is the
+  // Designer's wh_* classes: lanes of work covers on a tilted wall, a veil over it, a dashed ring, the site's button in the
+  // middle. This only moves things: every lane drifts up or down at its own pace (its covers are copied until the lane can
+  // never run out), a clear circle in the veil follows the pointer (and wanders by itself without one), and the button
+  // leans towards the pointer. The numbers sit on the section: data-wh-speed (px a second), data-wh-spread (how far the
+  // lanes' paces lie apart, 0 to 100), data-wh-lens (the circle's radius in px). It runs only while the section is on screen.
+  function rdWorkWall() {
+    qsa('.wh_sec').forEach(function (sec) {
+      if (!sec.getClientRects().length) return;
+      var ring = qs('.wh_ring', sec), cta = qs('.wh_cta', sec);
+      var speed = parseFloat(sec.getAttribute('data-wh-speed')), spread = parseFloat(sec.getAttribute('data-wh-spread')), lensR = parseFloat(sec.getAttribute('data-wh-lens'));
+      if (isNaN(speed)) speed = 8; if (isNaN(spread)) spread = 66; if (isNaN(lensR)) lensR = 295;
+      var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      var lanes = qsa('.wh_lane', sec).map(function (lane, i) {
+        var track = qs('.wh_track', lane);
+        return track && { lane: lane, track: track, set: [].slice.call(track.children), copies: 1, pos: i * 173 % 600, dir: i % 2 ? -1 : 1, f: ((i * 0.618034 + 0.31) % 1) - 0.5, len: 0 };
+      }).filter(Boolean);
+      var W = 1, H = 1;
+      function measure() {
+        W = sec.offsetWidth || 1; H = sec.offsetHeight || 1;
+        lanes.forEach(function (o) {
+          o.len = 0;
+          if (!o.lane.offsetHeight || !o.set.length) return; // a lane the layout hides (the outer two on a phone)
+          var gap = parseFloat(getComputedStyle(o.track).rowGap) || 0, one = (o.track.scrollHeight + gap) / o.copies;
+          if (!(one > 0)) return;
+          var need = Math.min(8, Math.ceil(o.lane.offsetHeight / one) + 1);
+          for (; o.copies < need; o.copies++) o.set.forEach(function (c) { var k = c.cloneNode(true); k.setAttribute('aria-hidden', 'true'); o.track.appendChild(k); });
+          o.len = one;
+        });
+      }
+      measure();
+      new ResizeObserver(measure).observe(sec);
+
+      var px = 0.5, py = 0.5, has = false, lx = 0.5, ly = 0.5, mx = 0, my = 0, tx = 0, ty = 0, t0 = performance.now();
+      function move(e) {
+        var r = sec.getBoundingClientRect(); px = (e.clientX - r.left) / r.width; py = (e.clientY - r.top) / r.height; has = true;
+        if (cta && fine) {
+          var b = cta.getBoundingClientRect(), dx = e.clientX - (b.left + b.width / 2 - mx), dy = e.clientY - (b.top + b.height / 2 - my);
+          if (Math.sqrt(dx * dx + dy * dy) < Math.max(200, b.width * 1.2)) { tx = dx * 0.3; ty = dy * 0.3; } else { tx = ty = 0; }
+        }
+        wake();
+      }
+      function leave() { has = false; tx = ty = 0; }
+      rdOn(sec, 'pointermove', move); rdOn(sec, 'pointerleave', leave); rdOn(sec, 'pointerup', function (e) { if (e.pointerType === 'touch') leave(); }); rdOn(sec, 'pointercancel', leave);
+
+      // the notch tabs on its edges drift only while they are near the screen (as on the ball's sheet)
+      var edges = new IntersectionObserver(function (es) { es.forEach(function (e) { e.target.classList.toggle('is-on', e.isIntersecting); }); }, { rootMargin: '-1px 0px' });
+      qsa('.nt_edge', sec).forEach(function (e) { edges.observe(e); });
+
+      var on = false, raf = 0, last = 0;
+      function wake() { if (!raf && on && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } }
+      new IntersectionObserver(function (es) { on = es[0].isIntersecting; wake(); }).observe(sec);
+      rdOn(document, 'visibilitychange', wake);
+      function frame(now) {
+        raf = 0;
+        if (!sec.isConnected || !on || document.hidden) return;
+        raf = requestAnimationFrame(frame);
+        var dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now;
+        if (!reducedMotion) lanes.forEach(function (o) {
+          if (!o.len) return;
+          o.pos += speed * (1 + o.f * spread / 50) * dt;
+          var p = ((o.pos % o.len) + o.len) % o.len;
+          o.track.style.transform = 'translate3d(0,' + (o.dir > 0 ? -p : p - o.len).toFixed(2) + 'px,0)';
+        });
+        var gx = px, gy = py;
+        if (!has) { var s = (now - t0) / 1000; gx = reducedMotion ? 0.5 : 0.5 + Math.sin(s * 0.45) * 0.3; gy = reducedMotion ? 0.5 : 0.5 + Math.sin(s * 0.7) * 0.2; }
+        lx += (gx - lx) * 0.1; ly += (gy - ly) * 0.1;
+        sec.style.setProperty('--r', Math.min(lensR, W * 0.45).toFixed(0) + 'px');
+        sec.style.setProperty('--lx', (lx * 100).toFixed(2) + '%'); sec.style.setProperty('--ly', (ly * 100).toFixed(2) + '%');
+        if (ring) ring.style.transform = 'translate3d(' + (lx * W).toFixed(1) + 'px,' + (ly * H).toFixed(1) + 'px,0)';
+        if (cta) { mx += (tx - mx) * 0.12; my += (ty - my) * 0.12; cta.style.translate = mx.toFixed(2) + 'px ' + my.toFixed(2) + 'px'; }
+      }
+    });
+  }
+
   // =========================================================
   // IMAGINE — the big ball and the word on the home (section.im_sheet [data-im="sheet"], classes im_*; the approved lab is
   // prototype/service-imagine/ball.*, round 2 "magic", default path only; it came over from the service page 2026-11-15).
@@ -8048,6 +8123,7 @@
     later('.loc_steps', 'location balls', rdLocBalls);
     if (qs('.wall_section')) later('.wall_section', 'wall of love', rdWall); else soon('wall of love', rdWall); // a wall outside a .wall_section has nothing to watch for
     soon('imagine', rdImagine); // the big ball + IMAGINE (home): light to start, its WebGL waits until the section is on screen
+    later('.wh_sec', 'work wall', rdWorkWall); // the wall of work covers before the questions (home): starts when it comes near
     soon('faq', rdFaq);
     soon('journey pass', rdPass);
     soon('dfs card', rdDfc);
