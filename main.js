@@ -7569,6 +7569,8 @@
   // never run out), a clear circle in the veil follows the pointer (and wanders by itself without one), and the button
   // leans towards the pointer. The numbers sit on the section: data-wh-speed (px a second), data-wh-spread (how far the
   // lanes' paces lie apart, 0 to 100), data-wh-lens (the circle's radius in px). It runs only while the section is on screen.
+  // No work twice on screen (tidy): a cover that is out of sight and about to come in takes a work that is not on the wall
+  // at that moment, so the works in the Designer's lanes are a pool, not a fixed order. Add works by adding covers.
   function rdWorkWall() {
     qsa('.wh_sec').forEach(function (sec) {
       if (!sec.getClientRects().length) return;
@@ -7576,10 +7578,15 @@
       var speed = parseFloat(sec.getAttribute('data-wh-speed')), spread = parseFloat(sec.getAttribute('data-wh-spread')), lensR = parseFloat(sec.getAttribute('data-wh-lens'));
       if (isNaN(speed)) speed = 8; if (isNaN(spread)) spread = 66; if (isNaN(lensR)) lensR = 295;
       var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      function pic(c) { return c.tagName === 'IMG' ? c : qs('img', c); }
       var lanes = qsa('.wh_lane', sec).map(function (lane, i) {
         var track = qs('.wh_track', lane);
-        return track && { lane: lane, track: track, set: [].slice.call(track.children), copies: 1, pos: i * 173 % 600, dir: i % 2 ? -1 : 1, f: ((i * 0.618034 + 0.31) % 1) - 0.5, len: 0 };
+        if (!track) return null;
+        var set = [].slice.call(track.children);
+        return { lane: lane, track: track, set: set, n: set.length, work: set.map(function (c) { var m = pic(c); return m ? m.getAttribute('src') : ''; }), copies: 1, pos: i * 173 % 600, dir: i % 2 ? -1 : 1, f: ((i * 0.618034 + 0.31) % 1) - 0.5, len: 0 };
       }).filter(Boolean);
+      var pool = [], used = {};
+      lanes.forEach(function (o) { o.work.forEach(function (w) { if (w && pool.indexOf(w) < 0) pool.push(w); }); });
       var W = 1, H = 1;
       function measure() {
         W = sec.offsetWidth || 1; H = sec.offsetHeight || 1;
@@ -7593,7 +7600,47 @@
           o.len = one;
         });
       }
+      function place(o) {
+        var p = ((o.pos % o.len) + o.len) % o.len;
+        o.track.style.transform = 'translate3d(0,' + (o.dir > 0 ? -p : p - o.len).toFixed(2) + 'px,0)';
+      }
+      // tidy(free): free = the wall itself is out of sight, so the covers on it may change too (the start)
+      function tidy(free) {
+        if (pool.length < 2) return;
+        var sr = sec.getBoundingClientRect(), near = sr.height * 0.7, seen = {}, cand = [];
+        lanes.forEach(function (o) {
+          if (!o.len) return;
+          for (var j = 0; j < o.n; j++) {
+            if (!o.work[j]) continue;
+            var vis = false, d = 1e9, at = null;
+            for (var c = 0; c < o.copies; c++) {
+              var el = o.track.children[j + c * o.n]; if (!el) continue;
+              var r = el.getBoundingClientRect(), mid = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+              if (r.bottom > sr.top && r.top < sr.bottom && r.right > sr.left && r.left < sr.right) { vis = true; at = mid; }
+              else { var g = Math.max(sr.top - r.bottom, r.top - sr.bottom, sr.left - r.right, r.left - sr.right); if (g < d && !vis) { d = g; at = mid; } }
+            }
+            if (vis && !free) (seen[o.work[j]] = seen[o.work[j]] || []).push(at);
+            else if (vis || d < near) cand.push({ o: o, j: j, d: vis ? -1 : d, at: at });
+          }
+        });
+        function far(w, at) { var m = 1e9; (seen[w] || []).forEach(function (q) { m = Math.min(m, Math.abs(q.x - at.x) + Math.abs(q.y - at.y)); }); return m; }
+        cand.sort(function (a, b) { return a.d - b.d; });
+        cand.forEach(function (k) {
+          var w = k.o.work[k.j], pick = null, best = Infinity, mine = far(w, k.at);
+          if (mine < 1e9) {
+            pool.forEach(function (q) { if (!seen[q] && (used[q] || 0) < best) { best = used[q] || 0; pick = q; } }); // a work that is not on the wall: the one shown longest ago
+            if (!pick) { best = mine * 1.5; pool.forEach(function (q) { var f = far(q, k.at); if (f > best) { best = f; pick = q; } }); } // more covers than works: the one whose twin is clearly further away
+            if (pick) {
+              for (var c = 0; c < k.o.copies; c++) { var m = pic(k.o.track.children[k.j + c * k.o.n]); if (m) { m.removeAttribute('srcset'); m.removeAttribute('sizes'); m.setAttribute('src', pick); } }
+              k.o.work[k.j] = w = pick; used[pick] = performance.now();
+            }
+          }
+          (seen[w] = seen[w] || []).push(k.at);
+        });
+      }
       measure();
+      lanes.forEach(function (o) { if (o.len) place(o); });
+      tidy(true);
       new ResizeObserver(measure).observe(sec);
 
       var px = 0.5, py = 0.5, has = false, lx = 0.5, ly = 0.5, mx = 0, my = 0, tx = 0, ty = 0, t0 = performance.now();
@@ -7612,7 +7659,7 @@
       var edges = new IntersectionObserver(function (es) { es.forEach(function (e) { e.target.classList.toggle('is-on', e.isIntersecting); }); }, { rootMargin: '-1px 0px' });
       qsa('.nt_edge', sec).forEach(function (e) { edges.observe(e); });
 
-      var on = false, raf = 0, last = 0;
+      var on = false, raf = 0, last = 0, tidied = 0;
       function wake() { if (!raf && on && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } }
       new IntersectionObserver(function (es) { on = es[0].isIntersecting; wake(); }).observe(sec);
       rdOn(document, 'visibilitychange', wake);
@@ -7624,9 +7671,9 @@
         if (!reducedMotion) lanes.forEach(function (o) {
           if (!o.len) return;
           o.pos += speed * (1 + o.f * spread / 50) * dt;
-          var p = ((o.pos % o.len) + o.len) % o.len;
-          o.track.style.transform = 'translate3d(0,' + (o.dir > 0 ? -p : p - o.len).toFixed(2) + 'px,0)';
+          place(o);
         });
+        if (now - tidied > 600) { tidied = now; tidy(false); }
         var gx = px, gy = py;
         if (!has) { var s = (now - t0) / 1000; gx = reducedMotion ? 0.5 : 0.5 + Math.sin(s * 0.45) * 0.3; gy = reducedMotion ? 0.5 : 0.5 + Math.sin(s * 0.7) * 0.2; }
         lx += (gx - lx) * 0.1; ly += (gy - ly) * 0.1;
