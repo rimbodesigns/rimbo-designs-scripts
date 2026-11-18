@@ -457,7 +457,15 @@
   // and trailDur = in how many seconds (his picks from round 8 of the lab: "Thinner" and "Trails out")
   var IMPACT_CUT = { scale: 0.955, stroke: 0.36, strokeLen: 0.42, lineSpread: 0.4, partAt: 0.7, part: 0.28, spread: 0.018, minHold: 1.1, trail: 0.9, trailDur: 0.9 };
   var impactPending = null; // the cut page, between the click and the moment the next page is ready
-  var useCube = /[?&]cube=1/.test(location.search);
+  // Phones and tablets take the cube, not Impact. Impact holds 36 copies of the page in over a hundred layers, and the
+  // browser on Rimbo's iPhone 13 mini gave up on it (in Arc: "clicking a link still crashes the site", also after
+  // v1.7.198 made the copies lighter). The cube is two faces and ran on that phone before Impact came. Not reproduced
+  // in the iPhone Simulator, which has a Mac's memory. ?cube=1 shows the cube on a computer, ?impact=1 forces Impact
+  // on a touch device (for trying a lighter Impact on a real phone later). Asked at every move: a hybrid laptop can
+  // change its answer
+  var cubeAsked = /[?&]cube=1/.test(location.search), impactAsked = /[?&]impact=1/.test(location.search);
+  var touchDevice = window.matchMedia ? window.matchMedia('(hover: none) and (pointer: coarse)') : { matches: false };
+  function useCube() { return cubeAsked || (touchDevice.matches && !impactAsked); }
   var impactStyle = null;
   var pageVisits = 0; // 1 on the page you arrived on, more after every page transition
 
@@ -935,7 +943,7 @@
   // The click: the page is copied and cut at once, before the next page has even been asked for, so the click answers
   // straight away (Rimbo: "the screen first gets cut, for a fraction of a second, and then…"). Called from barba.go
   function impactCut(href, trigger) {
-    if (useCube || reducedMotion || impactPending || !trigger || trigger.nodeType !== 1 || !trigger.isConnected) return;
+    if (useCube() || reducedMotion || impactPending || !trigger || trigger.nodeType !== 1 || !trigger.isConnected) return;
     var url = new URL(href, location.href);
     if (url.hash || (url.pathname === location.pathname && url.search === location.search) || tearRule({ trigger: trigger })) return;
     var current = qs('[data-barba="container"]');
@@ -1579,7 +1587,7 @@
         name: 'impact',
         sync: true,
         custom: function (data) { return data.trigger !== 'back' && data.trigger !== 'forward' && data.trigger !== 'popstate' && !linkHash && !reducedMotion && !tearRule(data); },
-        leave: function (data) { return useCube ? runPageLeaveAnimation(data.current.container, data.next.container, data) : runImpactLeave(data.current.container, data.next.container, data); },
+        leave: function (data) { return useCube() ? runPageLeaveAnimation(data.current.container, data.next.container, data) : runImpactLeave(data.current.container, data.next.container, data); },
         enter: function () { return runPageEnterAnimation(); }
       }, {
         name: 'tear',
