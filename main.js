@@ -1327,16 +1327,18 @@
               var copies = qsa('.tear_clone', stage), lean = /rotateX\(([-\d.]+)deg\) rotateY\(([-\d.]+)deg\)/;
               var layers = '.pass_rose, .pass_earth, .pass_stamp, .pass_img, .pass_tex, .pass_holo', shift = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/;
               var real = qsa(layers, pass), twins = copies.map(function (copy) { return qsa(layers, copy); });
-              var foil0 = parseFloat((copies[0] || pass).style.getPropertyValue('--hi')) || 0; // the strength the copies were made with
+              // the foil's values live on the foil layer (.pass_holo) since 2026-11-18, not on the ticket itself (see rdPass)
+              var foilOf = function (el) { return qs('.pass_holo', el) || el; }, passFoil = foilOf(pass), copyFoils = copies.map(foilOf);
+              var foil0 = parseFloat((copyFoils[0] || passFoil).style.getPropertyValue('--hi')) || 0; // the strength the copies were made with
               tl.eventCallback('onUpdate', function () {
                 var t = tl.time(), a = lean.exec(pass.style.transform), k = t >= 0.3 ? 0 : 1 - t / 0.3;
                 k = k * k * (3 - 2 * k);
                 if (a && t < 0.3) gsap.set(copies, { rotationX: +a[1] * k, rotationY: +a[2] * k });
-                var foil = parseFloat(pass.style.getPropertyValue('--hi'));
+                var foil = parseFloat(passFoil.style.getPropertyValue('--hi'));
                 copies.forEach(function (copy, i) {
-                  copy.style.setProperty('--hx', pass.style.getPropertyValue('--hx'));
-                  copy.style.setProperty('--hy', pass.style.getPropertyValue('--hy'));
-                  if (!isNaN(foil)) copy.style.setProperty('--hi', (foil0 + (foil - foil0) * k).toFixed(3));
+                  copyFoils[i].style.setProperty('--hx', passFoil.style.getPropertyValue('--hx'));
+                  copyFoils[i].style.setProperty('--hy', passFoil.style.getPropertyValue('--hy'));
+                  if (!isNaN(foil)) copyFoils[i].style.setProperty('--hi', (foil0 + (foil - foil0) * k).toFixed(3));
                   twins[i].forEach(function (el, j) {
                     var tf = real[j] && real[j].style.transform;
                     if (tf) el.style.transform = tf.replace(shift, function (all, x, y) { return 'translate(' + (x * k).toFixed(2) + 'px,' + (y * k).toFixed(2) + 'px)'; });
@@ -6839,10 +6841,16 @@
       return g;
     }
     function light(it) {
-      var hi = FLAT + (PEAK - FLAT) * Math.pow(Math.min(1, Math.hypot(x, y)), 1.4), st = it.p.style;
-      st.setProperty('--hx', (50 + x * 50).toFixed(2) + '%');
-      st.setProperty('--hy', (50 + y * 50).toFixed(2) + '%');
-      st.setProperty('--hi', hi.toFixed(3));
+      // SPEED (2026-11-18): these go on the foil layer that reads them (.pass_holo), not on the ticket. A changing CSS
+      // variable on the ticket made the browser restyle every element inside it, on every frame.
+      var hi = (FLAT + (PEAK - FLAT) * Math.pow(Math.min(1, Math.hypot(x, y)), 1.4)).toFixed(3);
+      var hx = (50 + x * 50).toFixed(2) + '%', hy = (50 + y * 50).toFixed(2) + '%';
+      it.holo.forEach(function (e) {
+        var st = e.style;
+        st.setProperty('--hx', hx);
+        st.setProperty('--hy', hy);
+        st.setProperty('--hi', hi);
+      });
       if (it.g) {
         var s = x * 90, t = y * 60;
         it.g.setAttribute('x1', (-40 + s).toFixed(1));
@@ -6859,8 +6867,11 @@
       p.dataset.on = '1';
       var it = {
         p: p, on: false, main: qs('.pass_main', p), m: qsa('[data-m]', p), rose: qs('.pass_rose', p), earth: qs('.pass_earth', p), stamp: qs('.pass_stamp', p),
-        imgs: qsa('.pass_img,.pass_tex,.pass_holo', p), g: foilStamp(qs('.pass_stamp svg', p), i)
+        imgs: qsa('.pass_img,.pass_tex,.pass_holo', p), g: foilStamp(qs('.pass_stamp svg', p), i),
+        holo: qsa('.pass_holo', p), rt: qsa('.pass_fill,.pass_dot', p), near: false
       };
+      if (!it.holo.length) it.holo = [p];
+      if (!it.rt.length) it.rt = [p];
       new IntersectionObserver(function (es) {
         it.on = es[0].isIntersecting;
         if (!it.on) return;
@@ -6895,15 +6906,29 @@
       var vh = window.innerHeight;
       items.forEach(function (it) {
         if (!it.main) return;
+        if (!it.near) return;
         var r = it.main.getBoundingClientRect();
         if (r.bottom < -vh || r.top > vh * 2) return;
         var v = Math.max(0, Math.min(1, (vh * 0.85 - r.top) / (vh * 0.35 + r.height)));
-        if (v !== it.rp) { it.rp = v; it.p.style.setProperty('--p', v.toFixed(3)); }
+        if (v !== it.rp) { it.rp = v; var s = v.toFixed(3); it.rt.forEach(function (e) { e.style.setProperty('--p', s); }); }
       });
     }
-    rdOn(window, 'scroll', route, { passive: true });
+    // SPEED (2026-11-18): --p goes on the two route parts that read it (pass_fill, pass_dot), not on the ticket (a changing
+    // variable there restyled the whole ticket on every scroll). The ticket is only measured while it is within a screen
+    // of the viewport (near), and once per frame at most.
+    var routeQueued = false;
+    function routeSoon() {
+      if (routeQueued || !phone.matches) return;
+      if (!items.some(function (it) { return it.near; })) return;
+      routeQueued = true;
+      requestAnimationFrame(function () { routeQueued = false; route(); });
+    }
+    items.forEach(function (it) {
+      if (!it.main) return;
+      new IntersectionObserver(function (es) { it.near = es[0].isIntersecting; if (it.near) route(); }, { rootMargin: '100% 0px 100% 0px' }).observe(it.main);
+    });
+    rdOn(window, 'scroll', routeSoon, { passive: true });
     rdOn(window, 'resize', route);
-    route();
 
     if (reduce) return;
     if (fine) {
