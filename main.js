@@ -240,6 +240,8 @@
     openPage();
     inPage(initPageFunctions);
     firstLoad = false; // from here on (page transitions) soon() runs things at once
+    // the scripts that came from Webflow: when the page is read, where their Webflow copies started (before Lenis)
+    onReady(function () { inPage(function () { fromWebflow(document); }); });
     // These wait for the whole page, like the old code they replaced
     onReady(function () {
       pageStyles = pageStyles.concat(qsa('body > style')); // a page's footer code comes after this file, so only now
@@ -255,6 +257,7 @@
       runPageScripts(doc.head);   // the order of a real page load: head code, this file, footer code, then Webflow
       initPageFunctions();
       run('lenis buttons', rdLenisButtons);
+      fromWebflow(doc); // the scripts that came from Webflow, where their copies in the page used to run
       runPageScripts(doc.body);
       restartWebflow();
       initLateFunctions();
@@ -8340,6 +8343,1563 @@
       if ('ResizeObserver' in window) { sizes = new ResizeObserver(function () { lh = 0; tick(); }); sizes.observe(para); }
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(inZone(function () { lh = 0; tick(); }));
     }
+  }
+
+  // =========================================================
+  // FROM WEBFLOW — the scripts that sat in Webflow (Code Embeds, page code, the site footer), moved here 2026-11-18
+  // (Rimbo: "make sure everything is in the main.js": one file, in Git, where a later clean-up can see all of it).
+  // Each function below is its Webflow script word for word, only indented: nothing in what they do has changed (one fix:
+  // the /contact copy button). Their CSS stays in the embeds. Tidying them into the rest of this file is a later step.
+  // fromWebflow() starts them the way the site ran the Webflow copies: in the order they stood in the page, every
+  // "wait for the page" (DOMContentLoaded, load) at once after the others have started, window/document listeners
+  // leaving with the page. A page that still carries a Webflow copy runs that copy instead (stillInWebflow), so nothing
+  // runs twice while Webflow is being updated, or if an old copy comes back.
+  // New behaviour does not go in Webflow any more: write an rd* function in this file.
+  // =========================================================
+
+  // rdSvcPlaces — was: /service, embed in .svh_hold
+  function rdSvcPlaces() {
+    /* SERVICE HERO: THE FIRST BAND'S PLACES. Everything in the band is placed from measured lines, in band px:
+       --svh-ex = the E's line, --svh-fl / --svh-fr = the left / right frame line, --svh-rt = the ruler's bottom line.
+       Sub-pixel, from screen positions minus the guide's own build move (GSAP x) and divided by any page scale (the cube).
+       New since the hero shrinks (2026-11-12): the places follow the hero's height, so the ruler numbers and the top pluses
+       stay on the ruler while the hero eases to 80svh. Lets go when the hero leaves the page. */
+    (function () {
+      var hero = document.querySelector('.sv_hero'), band = document.querySelector('[data-svh="band"]');
+      var guide = hero && hero.querySelector('.svh_gv.is-right'), ruler = hero && hero.querySelector('.sv_ruler');
+      var nums = band && band.querySelectorAll('[data-svh="nums"] > *');
+      if (!band || !guide || band.dataset.placed) return; band.dataset.placed = '1';
+      var ro = null, io = null;
+      function place() {
+        if (!hero.isConnected) { window.removeEventListener('resize', place); if (ro) ro.disconnect(); if (io) io.disconnect(); return; }
+        var br = band.getBoundingClientRect(), k = band.offsetWidth ? br.width / band.offsetWidth : 1;
+        if (k < 0.2) k = 1;
+        var moved = window.gsap ? (parseFloat(gsap.getProperty(guide, 'x')) || 0) : 0, hr = hero.getBoundingClientRect();
+        var fl = (hr.left - br.left) / k - 0.5, fr = (hr.right - br.left) / k;
+        band.style.setProperty('--svh-ex', ((guide.getBoundingClientRect().left - br.left) / k - moved).toFixed(2) + 'px');
+        band.style.setProperty('--svh-fl', fl.toFixed(2) + 'px');
+        band.style.setProperty('--svh-fr', fr.toFixed(2) + 'px');
+        if (ruler) band.style.setProperty('--svh-rt', ((ruler.getBoundingClientRect().bottom - br.top) / k - 0.5).toFixed(2) + 'px');
+        // the numbers: the distance of each major tick from the left frame line, in px
+        if (nums) for (var i = 1; i < nums.length; i++) { var t = String(Math.round(i * (fr - fl) / nums.length)); if (nums[i].textContent !== t) nums[i].textContent = t; }
+      }
+      place();
+      hero.addEventListener('svh:play', function () { place(); setTimeout(place, 900); });
+      window.addEventListener('resize', place);
+      if (window.ResizeObserver) { ro = new ResizeObserver(place); ro.observe(hero); }
+      if (window.IntersectionObserver) { io = new IntersectionObserver(function (es) { band.classList.toggle('is-off', !es[0].isIntersecting); }); io.observe(band); }
+    })();
+  }
+
+  // rdSvcPin — was: /service, embed in .svh_hold
+  function rdSvcPin() {
+    /* SERVICE HERO: PINNED + SHRINK. It only changes --svh-p, the hero's height (100svh, down to 80svh).
+       - Nobody scrolls: 5.8 s after the hero's 'svh:play' the hero eases down in 1.3 s, so the next section looks in.
+       - Somebody scrolls first: the scroll itself takes the hero down, 1 svh for every svh scrolled, until it is at 80svh.
+         Nothing moves that the visitor did not move (before 2026-11-14 a scroll started a timed 0.9 s shrink: a 50 px
+         scroll threw the next section 26svh up, Rimbo's "it jumps there"). It never grows back: scrolling up again
+         leaves the hero where it got to, and back at the very top after the wait the timed ease finishes the rest.
+       - Touch screens (2026-11-18): a finger moves the page 1 to 1, so the hero never shrinks under it (it made the
+         next section run 2.5 times as fast as the finger on an iPhone, Rimbo's "awkward first scroll"). There only the
+         timed ease runs, at the very top, and a scroll that starts during it stops it where it is. No scroll correction
+         either: that breaks the swipe's momentum.
+       - Reduced motion, or a load deep in the page: 80svh at once, with the scroll corrected so nothing moves on screen.
+       Follows the build after a page transition too (it waits for 'svh:play', and ignores scrolls while the cube rolls).
+       Stops when the hero leaves the page. */
+    (function () {
+      var hero = document.querySelector('.sv_hero'), wrap = hero && hero.closest('.sv_wrap'), hold = hero && hero.closest('.svh_hold'), pin = hero && hero.closest('.svh_pin');
+      if (!hero || !wrap || !hold || !pin || hero.dataset.pin) return; hero.dataset.pin = '1';
+
+      var FULL = 100, GIVE = 20, WAIT = 5.8;
+      var given = 0, waited = false, tween = null, idle = 0, onLenis = null;
+      var calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var touch = matchMedia('(hover: none) and (pointer: coarse)').matches;
+      function settle() { if (window.lenis && window.lenis.resize) window.lenis.resize(); if (window.ScrollTrigger) window.ScrollTrigger.refresh(); }
+      function stop() {
+        window.removeEventListener('scroll', follow);
+        if (onLenis && window.lenis && window.lenis.off) window.lenis.off('scroll', onLenis);
+        onLenis = null;
+      }
+      // the hero gives way by v svh; it only ever goes down. The page is measured again once it rests
+      function give(v) {
+        v = Math.min(GIVE, v); if (v <= given) return;
+        given = v; wrap.style.setProperty('--svh-p', (FULL - given) + 'svh');
+        clearTimeout(idle); idle = setTimeout(settle, given >= GIVE ? 120 : 300);
+        if (given >= GIVE) stop();
+      }
+      // out of sight, or no motion wanted: be small at once and keep what the visitor is looking at where it is
+      function jump() {
+        var next = hold.nextElementSibling, covered = hold.getBoundingClientRect().bottom <= 0;
+        var before = next ? next.getBoundingClientRect().top : 0; give(GIVE);
+        var d = next ? next.getBoundingClientRect().top - before : 0;
+        if (covered && d) { var y = window.scrollY + d; if (window.lenis && window.lenis.scrollTo) window.lenis.scrollTo(y, { immediate: true, force: true }); else window.scrollTo(0, y); }
+      }
+      function ease() {
+        if (given >= GIVE || tween) return;
+        if (!window.gsap) { give(GIVE); return; }
+        var o = { v: given }, curve = window.CustomEase ? CustomEase.create('svhShrink', '0.625, 0.05, 0, 1') : 'expo.inOut';
+        tween = gsap.to(o, { v: GIVE, duration: 1.3, ease: curve, onUpdate: function () { give(o.v); } });
+      }
+      function follow() {
+        if (!hero.isConnected || given >= GIVE) { stop(); return; }
+        if (document.querySelector('.page-transition__stage')) return; // not while the cube is rolling
+        if (touch) {
+          if (window.scrollY > 4) { if (tween) { tween.kill(); tween = null; clearTimeout(idle); idle = setTimeout(settle, 300); } }
+          else if (waited) ease();
+          return;
+        }
+        if (hold.getBoundingClientRect().bottom <= 0) { jump(); return; }
+        var y = window.scrollY, svh = pin.offsetHeight / (FULL - given); // one svh in px
+        if (y > 4) give(y / svh);
+        else if (waited) ease();
+      }
+      if (calm) { give(GIVE); return; }
+      window.addEventListener('scroll', follow, { passive: true });
+      // with the smooth scroll, in the same frame as the scroll itself (the window's own event comes a frame later)
+      if (window.lenis && window.lenis.on) { onLenis = follow; window.lenis.on('scroll', onLenis); }
+      follow(); // a reload that comes back scrolled
+      function after() { if (waited) return; waited = true; if (hero.isConnected && window.scrollY <= 4) ease(); }
+      hero.addEventListener('svh:play', function () { setTimeout(after, WAIT * 1000); });
+      setTimeout(after, 12000); // the build never started: do not stay full for ever
+    })();
+  }
+
+  // rdSvcMap — was: /service, embed in #map
+  function rdSvcMap() {
+    /* THE MAP: the one effect. The orange dashed route draws itself down the map with the scroll,
+       a small square runs at its head, and each place it passes turns orange. The look is all classes (mp_*); this only
+       moves the line. Light: a scroll listener that exists only while the section is on screen, and a frame loop that
+       stops as soon as the line has caught up. Reduced motion or no script: the whole route is simply drawn. */
+    (function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); })(function () {
+      var sec = document.querySelector('[data-mp="map"]');
+      if (!sec || sec.dataset.on) return;
+      sec.dataset.on = '1';
+      // the notch tabs: every edge on the page drifts only while it is on screen
+      var edges = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) { es.forEach(function (e) { e.target.classList.toggle('is-on', e.isIntersecting); }); }, { rootMargin: '-1px 0px' }) : null;
+      if (edges) [].forEach.call(document.querySelectorAll('.nt_edge'), function (el) { edges.observe(el); });
+      // the page left (page transition): let everything go
+      window.__mpQuit = function () { if (!sec.isConnected) { if (edges) edges.disconnect(); if (typeof stop === 'function') stop(); window.__mpQuit = null; } };
+      if (window.barba && window.barba.hooks && !window.__mpHook) { window.__mpHook = 1; window.barba.hooks.after(function () { if (window.__mpQuit) window.__mpQuit(); }); }
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      var HEAD = 0.72;                         // the line's head sits at 72% of the screen height
+      var mq = window.matchMedia('(max-width: 991px)');
+      var pins = [].slice.call(sec.querySelectorAll('[data-mp-pin]')), runner = sec.querySelector('[data-mp="runner"]');
+      var S = null, cur = 0, tgt = 0, raf = 0, live = false, t = 0;
+
+      function centre(el, box) { var r = el.getBoundingClientRect(); return [r.left + r.width / 2 - box.left, r.top + r.height / 2 - box.top]; }
+
+      function setup() {
+        var svg = sec.querySelector('.mp_routes.' + (mq.matches ? 'is-phone' : 'is-desk')), box = svg.getBoundingClientRect(), k = 1, sx = 1;
+        if (mq.matches) {
+          // one line down the left rail, then a turn into the summit; measured off the pins so it always meets them
+          var a = centre(pins[0], box), z = centre(pins[pins.length - 1], box);
+          var turn = Math.max(a[1], pins[pins.length - 1].closest('.mp_peak').getBoundingClientRect().top - box.top + 8);   // the turn starts where the summit's own block starts
+          var d = 'M' + a[0] + ' ' + a[1] + 'V' + turn + 'C' + a[0] + ' ' + (turn + (z[1] - turn) * .92) + ' ' + (a[0] + (z[0] - a[0]) * .4) + ' ' + z[1] + ' ' + z[0] + ' ' + z[1];
+          svg.setAttribute('viewBox', '0 0 ' + box.width + ' ' + box.height);
+          [].forEach.call(svg.querySelectorAll('[data-mp-d]'), function (p) { p.setAttribute('d', d); });
+        } else { k = svg.viewBox.baseVal.height / box.height; sx = box.width / svg.viewBox.baseVal.width; }
+        var route = svg.querySelector('[data-mp="route"]'), len = route.getTotalLength(), N = 260, ys = [], i;
+        for (i = 0; i <= N; i++) ys.push(route.getPointAtLength(len * i / N).y);
+        function at(y) {                       // route length at a height (the route only ever goes down)
+          if (y <= ys[0]) return 0; if (y >= ys[N]) return len;
+          var lo = 0, hi = N; while (hi - lo > 1) { var m = (lo + hi) >> 1; if (ys[m] <= y) lo = m; else hi = m; }
+          return len * (lo + (y - ys[lo]) / ((ys[hi] - ys[lo]) || 1)) / N;
+        }
+        var mask = svg.querySelector('[data-mp="mask"]');
+        mask.style.strokeDasharray = len + ' ' + len;
+        S = { svg: svg, k: k, sx: sx, len: len, at: at, route: route, mask: mask,
+              stops: pins.map(function (p) { return at(centre(p, box)[1] * k) - 1; }) };
+        draw(cur = Math.min(cur, len));
+      }
+
+      function draw(l) {
+        S.mask.style.strokeDashoffset = S.len - l;
+        var p = S.route.getPointAtLength(l);
+        runner.style.transform = 'translate(' + (p.x * S.sx).toFixed(1) + 'px,' + (p.y / S.k).toFixed(1) + 'px)';
+        for (var i = 0; i < pins.length; i++) pins[i].classList.toggle('is-on', l >= S.stops[i]);
+      }
+      function frame() {
+        raf = 0;
+        cur += (tgt - cur) * .16; if (Math.abs(tgt - cur) < .6) cur = tgt;
+        draw(cur);
+        if (cur !== tgt && live) raf = requestAnimationFrame(frame);
+      }
+      function goal() { return S.at((window.innerHeight * HEAD - S.svg.getBoundingClientRect().top) * S.k); }
+      function onScroll() {
+        if (!sec.isConnected) return stop();   // the page was swapped (page transition): let go
+        tgt = goal();
+        if (!raf) raf = requestAnimationFrame(frame);
+      }
+      function onResize() { clearTimeout(t); t = setTimeout(function () { if (!sec.isConnected) return stop(); setup(); onScroll(); }, 150); }
+      function stop() { live = false; window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onResize); if (io) io.disconnect(); }
+
+      sec.classList.add('is-live');
+      setup();
+      var io = new IntersectionObserver(function (e) {
+        live = e[0].isIntersecting;
+        if (live) { window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
+        else { window.removeEventListener('scroll', onScroll); cur = tgt = goal(); draw(cur); }   // off screen: settle at once, nothing left running
+      }, { rootMargin: '10% 0px' });
+      io.observe(sec);
+      window.addEventListener('resize', onResize);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (sec.isConnected) { setup(); onScroll(); } });
+    });
+  }
+
+  // rdSvcMapLive — was: /service, embed in #map
+  function rdSvcMapLive() {
+    /* THE MAP: contour lines that move. One WebGL canvas under the map draws the terrain as contour lines of a slow
+       noise field; the summit is a hill of firmer lines (no colour fill since 2026-11-16), and the red echo runs out
+       through the lines when the route arrives. Light: draws about 30 times a second and only while the map is on screen, only the rows near the screen, and gives
+       its context back when the page leaves. Reduced motion: one still frame. No WebGL: the still images stay. */
+    (function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); })(function () {
+      var sec = document.querySelector('[data-mp="map"]'), cv = sec && sec.querySelector('[data-mp="live"]');
+      if (!sec || !cv || cv.dataset.on) return; cv.dataset.on = '1';
+      var map = cv.parentNode, peakPin = sec.querySelector('.mp_pin.is-peak');
+      var SPEED = 0.6, calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var gl = cv.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, preserveDrawingBuffer: true });
+      if (!gl) return;
+      var FRAG = "#version 300 es\nprecision highp float;\n" +
+        "uniform vec2 res; uniform float unit; uniform vec2 peak; uniform float t; uniform float px; uniform float front; uniform float amt; uniform float notch; uniform float cut;\nout vec4 outColor;\n" +
+        "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
+        "vec2 grad(vec2 i) { float a = hash(i) * 6.2831853; return vec2(cos(a), sin(a)); }\n" +
+        "float gn(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);\n" +
+        "  return mix(mix(dot(grad(i), f), dot(grad(i + vec2(1, 0)), f - vec2(1, 0)), u.x), mix(dot(grad(i + vec2(0, 1)), f - vec2(0, 1)), dot(grad(i + vec2(1, 1)), f - vec2(1, 1)), u.x), u.y); }\n" +
+        "float fbm(vec2 p) { return gn(p) + 0.42 * gn(p * 2.07 + 17.1) + 0.16 * gn(p * 4.3 + 5.7); }\n" +
+        "const vec3 INK = vec3(0.0745); const vec3 PAPER = vec3(0.973, 0.961, 0.933); const vec3 ORANGE = vec3(0.894, 0.267, 0.110);\n" +
+        "vec3 band(float i) {\n" +
+        "  if (i < 1.0) return vec3(0.855, 0.800, 0.682); if (i < 2.0) return vec3(0.690, 0.702, 0.643); if (i < 3.0) return vec3(0.522, 0.604, 0.596);\n" +
+        "  if (i < 4.0) return vec3(0.294, 0.471, 0.533); if (i < 5.0) return vec3(0.569, 0.447, 0.494); if (i < 6.0) return vec3(0.843, 0.365, 0.431);\n" +
+        "  return vec3(0.894, 0.267, 0.110); }\n" +
+        // one notch of the top edge: 1 inside the cut (a trapezoid, a..b wide at the top, 22px slanted sides), soft over a pixel
+        "float tab(float u, float y, float a, float b) { return clamp(min(u - a - y, b - y - u) * 0.7071 + 0.5, 0.0, 1.0); }\n" +
+        "void main() {\n" +
+        "  vec2 c = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;          // css px, y down\n" +
+        "  vec2 p = c / unit, d = (c - peak) / unit;\n" +
+        "  vec2 q = p * 2.1;\n" +
+        "  vec2 w = vec2(gn(q * 0.55 + vec2(3.1, t * 0.021)), gn(q * 0.55 + vec2(t * 0.017, 8.4)));\n" +
+        "  float n = fbm(q + w * 0.9 + vec2(t * 0.008, -t * 0.006));             // about -1..1\n" +
+        // the hill is a living shape, not a drawn ellipse: it flows like the lines around it, more the further from the top,
+        // and stays put under the square at the end of the route
+        "  float cs = 0.951, sn = -0.309; vec2 e0 = vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs) / vec2(0.138, 0.096);\n" +
+        "  d += w * 0.085 * smoothstep(0.0, 1.6, length(e0));\n" +
+        "  vec2 e = vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs) / vec2(0.138, 0.096);\n" +
+        "  float hill = exp(-dot(e, e) * 0.9) + 0.22 * exp(-dot(e, e) * 0.07);   // the top, and a wide low skirt so the lines around it ring the top too\n" +
+        "  float h = 0.26 + 0.20 * n + 0.80 * hill;\n" +
+        "  float L = h * 40.0, fw = max(fwidth(L), 1e-4);                         // fw = levels per device pixel (how steep it is here)\n" +
+        // three weights of line, as on a drawn map: every third line is an index line, the two between are lighter, and a
+        // hairline runs along the uphill side of each index line. d* = distance to that line in device pixels.
+        "  float s3 = (fract(L / 3.0 - 0.5) - 0.5) * 3.0;                        // signed levels from the nearest index line\n" +
+        "  float dI = abs(s3) / fw, dM = abs(fract(L - 0.5) - 0.5) / fw, dH = abs(s3 - 0.34) / fw;\n" +
+        "  float cI = 1.0 - smoothstep(0.50 * px - 0.6, 0.50 * px + 0.6, dI);    // about 1 css px\n" +
+        "  float cM = 1.0 - smoothstep(0.28 * px - 0.6, 0.28 * px + 0.6, dM);    // about half that\n" +
+        "  float cH = 1.0 - smoothstep(0.16 * px - 0.55, 0.16 * px + 0.55, dH);  // a hair\n" +
+        "  float calm = 1.0 - smoothstep(0.10, 0.30, fw * px);                    // where it gets steep the fine lines step back, so nothing clots\n" +
+        "  float air = 0.72 + 0.28 * gn(p * 1.7 + vec2(9.3, t * 0.01));          // ink that is not the same strength everywhere\n" +
+        "  float bi = floor((L - 27.0) / 3.0);\n" +
+        "  vec4 o = vec4(0.0);\n" +
+        // the echo: a front that runs out from the end. Sharp at its leading edge, a soft tail behind, fading with distance
+        // (front = a height level that runs downhill, so it lights the map's own lines one after another)
+        "  float sd = L - front;\n" +
+        "  float wv = amt * smoothstep(-0.5, 0.0, sd) * (1.0 - smoothstep(0.0, 4.5, sd)) * (1.0 - smoothstep(5.5, 9.5, length(e)));\n" +
+        // 2026-11-16: no colour fill (his pick, lab map-plain.html): the hill is only its lines, firmer on every step up
+        "  float on = bi >= 0.0 ? min(1.2 + bi * 0.32, 3.4) : 1.0;\n" +
+        "  float la = max(cI * 0.25, max(cM * 0.125 * calm, cH * 0.085 * calm)) * air * on;\n" +
+        "  float cW = 1.0 - smoothstep(0.62 * px - 0.6, 0.62 * px + 0.6, dM);     // the echo draws every line a little firmer\n" +
+        "  vec3 lc = mix(INK, ORANGE, clamp(wv * 1.7, 0.0, 1.0)); float a = min(1.0, max(la, cW * wv * 0.9));\n" +
+        // under the pinned hero the top 22px is a row of cut notches. The canvas draws those paper teeth itself (the
+        // Designer band steps back), so the contour lines run on into the teeth instead of stopping in a straight line
+        "  float teeth = cut * step(c.y, 22.0);\n" +
+        "  if (teeth > 0.5) o = vec4(PAPER, 1.0);\n" +
+        "  o = vec4(o.rgb * o.a * (1.0 - a) + lc * a, o.a + a * (1.0 - o.a));\n" +
+        "  if (teeth > 0.5) { float u = mod(c.x - notch, 2220.0); o *= 1.0 - max(max(tab(u, c.y, 0.0, 430.0), tab(u, c.y, 640.0, 890.0)), max(tab(u, c.y, 1100.0, 1620.0), tab(u, c.y, 1830.0, 2010.0))); }\n" +
+        "  outColor = o;\n}";
+      function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.warn('map contours:', gl.getShaderInfoLog(o)); return o; }
+      var prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      var U = {}; ['res', 'unit', 'peak', 't', 'px', 'front', 'amt', 'notch', 'cut'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+      gl.clearColor(0, 0, 0, 0); gl.enable(gl.SCISSOR_TEST);
+      // right under the pinned hero the top edge is a real cut (the hero shows through): the canvas draws that edge
+      var cut = !!(sec.previousElementSibling && sec.previousElementSibling.classList.contains('svh_hold'));
+      gl.uniform1f(U.cut, cut ? 1 : 0);
+
+      var W = 0, H = 0, K = 1, raf = 0, on = false, dead = false, last = 0, t0 = performance.now(), first = true;
+      function size() {
+        var w = map.clientWidth, h = map.clientHeight; if (!w || !h) return false;
+        var k = Math.min(window.devicePixelRatio || 1, 2); if (w * h * k * k > 6e6) k = Math.sqrt(6e6 / (w * h));   // sharp enough for fine lines, capped
+        if (w === W && h === H && k === K) return true;
+        W = w; H = h; K = k; cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+        gl.viewport(0, 0, cv.width, cv.height); gl.uniform2f(U.res, cv.width, cv.height); gl.uniform1f(U.px, k);
+        gl.uniform1f(U.unit, Math.min(Math.max(w, 700), 1600));
+        var m = map.getBoundingClientRect(), pk = peakPin.getBoundingClientRect();
+        gl.uniform2f(U.peak, pk.left + pk.width / 2 - m.left, pk.top + pk.height / 2 - m.top);
+        first = true; return true;
+      }
+      function draw(time) {
+        if (!size()) return;
+        // only the rows on or near the screen (the rest keeps its last frame)
+        var r = map.getBoundingClientRect(), top = first ? 0 : Math.max(0, -r.top - 260), bot = first ? H : Math.min(H, innerHeight - r.top + 260);
+        if (bot <= top) return;
+        gl.scissor(0, Math.round((H - bot) * K), cv.width, Math.round((bot - top) * K));
+        gl.uniform1f(U.t, time); gl.uniform1f(U.notch, calm ? 0 : performance.now() / 1000 * 18.5 % 2220); gl.uniform1f(U.front, echo.front); gl.uniform1f(U.amt, echo.amt); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (first) { first = false; sec.classList.add('is-contour'); }
+      }
+      // the echo starts the moment the route reaches the end (map.js turns the end's pin on), and is ready again once the
+      // visitor has scrolled back before it
+      var ECHO = 3400, echo = { front: 0, amt: 0, t0: -1, there: false };
+      function echoStep(now) {
+        var there = peakPin.classList.contains('is-on');
+        if (there && !echo.there) echo.t0 = now;
+        echo.there = there;
+        if (echo.t0 < 0) { echo.amt = 0; return; }
+        var k = (now - echo.t0) / ECHO;
+        if (k >= 1) { echo.t0 = -1; echo.amt = 0; return; }
+        echo.front = 53 - 44 * (1 - Math.pow(1 - k, 1.35)); echo.amt = Math.min(1, (1 - k) * 3);
+      }
+      function frame(now) {
+        raf = 0;
+        if (!sec.isConnected) { quit(); return; }
+        if (!on || document.hidden) return;
+        raf = requestAnimationFrame(frame);
+        if (now - last < 32) return; last = now;
+        echoStep(now);
+        draw((now - t0) / 1000 * SPEED);
+      }
+      function wake() { if (!raf && on && !document.hidden && !dead && !calm) raf = requestAnimationFrame(frame); }
+      function still() { first = true; draw(0); }
+      function quit() {
+        if (dead) return; dead = true; if (raf) cancelAnimationFrame(raf); raf = 0; io.disconnect();
+        window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', wake);
+        var x = gl.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); cv.width = cv.height = 1;
+      }
+      var rt = 0;
+      function onResize() { clearTimeout(rt); rt = setTimeout(function () { if (!sec.isConnected) return quit(); W = 0; if (calm) still(); else { first = true; wake(); } }, 150); }
+      cv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); sec.classList.remove('is-contour'); dead = true; });
+      var io = new IntersectionObserver(function (es) { on = es[0].isIntersecting; if (on) { if (calm) still(); else wake(); } }, { rootMargin: '15% 0px' });
+      io.observe(sec);
+      window.addEventListener('resize', onResize); document.addEventListener('visibilitychange', wake);
+      window.__mpLiveQuit = function () { if (!sec.isConnected) { quit(); window.__mpLiveQuit = null; } };
+      if (window.barba && window.barba.hooks && !window.__mpLiveHook) { window.__mpLiveHook = 1; window.barba.hooks.after(function () { if (window.__mpLiveQuit) window.__mpLiveQuit(); }); }
+    });
+  }
+
+  // rdSvcMapHold — was: /service, embed in #map
+  function rdSvcMapHold() {
+    /* THE MAP holds still while the next section slides in over it (SERVICE PAGE chat 2026-11-17, his ask).
+       Once the map's bottom edge reaches the bottom of the screen, the map's content (mp_map) is moved down exactly as far
+       as the page scrolls, so it stands still; the section itself keeps scrolling and clips it, so How it goes and the
+       notched edge travel up over a map that doesn't move. data-mp-hold on the section sets how still: 1 = stands still
+       (default), 0.5 = moves at half speed, 0 = off. Laptop and up only (touch scrolling can't keep it steady), not with
+       reduced motion. It follows Lenis's own scroll so the map never trembles; without Lenis it follows the page scroll. */
+    (function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); })(function () {
+      var sec = document.querySelector('[data-mp="map"]'), map = sec && sec.querySelector('.mp_map');
+      if (!sec || !map || sec.dataset.hold) return; sec.dataset.hold = '1';
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var mq = window.matchMedia('(min-width: 992px)'), k = parseFloat(sec.getAttribute('data-mp-hold')), last = 0, L = null, io;
+      if (isNaN(k)) k = 1;
+      function set() {
+        if (!sec.isConnected) return stop();
+        if (window.lenis !== L) hook();
+        var d = mq.matches ? Math.min(Math.max(window.innerHeight - sec.getBoundingClientRect().bottom, 0), window.innerHeight) * k : 0;
+        if (d === last) return; last = d;
+        map.style.transform = d ? 'translate3d(0,' + d.toFixed(2) + 'px,0)' : '';
+      }
+      function hook() { if (window.lenis && window.lenis !== L && window.lenis.on) { if (L && L.off) L.off('scroll', set); L = window.lenis; L.on('scroll', set); } }
+      function stop() { window.removeEventListener('scroll', set); window.removeEventListener('resize', set); if (L && L.off) L.off('scroll', set); if (io) io.disconnect(); }
+      io = new IntersectionObserver(function (e) { if (e[0].isIntersecting) { hook(); set(); } }, { rootMargin: '10% 0px' });
+      io.observe(sec);
+      window.addEventListener('scroll', set, { passive: true });
+      window.addEventListener('resize', set);
+      set();
+    });
+  }
+
+  // rdHowItGoes — was: /service, embed in #how
+  function rdHowItGoes() {
+    /* 03 HOW IT GOES (How it goes chat, lab prototype/service-process, Rimbo's pick: orange dashed + zoom, 2026-11-10).
+       Lives in this embed, inside its own section, so the page code other chats edit can't drop it.
+       The look is the Designer's hw_* classes; this only moves it. p = 0..1 over the pinned hold: the words travel in from
+       the right, an orange dashed line draws each letter, they fill on the logo edge, then we fly into the last word (SCALE's C since 2026-11-16).
+       2026-11-15 (SERVICE PAGE chat): Strategy, Identity, Build, Launch with their deliverables as boxes (option A, lab how-a.html);
+       each word draws by where it is on screen, the first from nothing as the section arrives.
+       F0 = where the travel starts: -0.6 puts BRAND on screen, already drawing, when the section arrives (was -1.25, an empty first screen; SERVICE PAGE chat 2026-11-11).
+       Light: SVG letters built once; one frame loop that runs only while the section is on screen and catching up. */
+    (function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); })(function () {
+      var sec = document.querySelector('[data-hw="section"]');
+      if (!sec || sec.dataset.on) return;
+      sec.dataset.on = '1';
+      var NS = 'http://www.w3.org/2000/svg', CREAM = '248,245,238', LINE = '228,68,28', LINE_A = .9, F0 = -0.6, id = 0, tag = Math.random().toString(36).slice(2, 7); // tag: mask ids stay unique while two pages share the cube
+      var strip = sec.querySelector('.hw_strip'), next = sec.querySelector('.hw_next');
+      var fill = sec.querySelector('.hw_fill'), dot = sec.querySelector('.hw_dot'), ticks = sec.querySelector('.hw_ticks');
+      var ones = [].slice.call(sec.querySelectorAll('.hw_one')), words = [], majors = [], ps = 0;
+      ones.forEach(function (one) { [].forEach.call(one.querySelectorAll('.hw_part'), function (b, i) { b.style.setProperty('--i', i); }); });   // A: the stagger order
+      function clamp(v, a, b) { a = a || 0; b = b === undefined ? 1 : b; return Math.min(b, Math.max(a, v)); }
+      function sm(a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); }
+
+      function build(h3) {
+        var text = h3.textContent.trim().toUpperCase(), ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = '900 100px IntegralNEW';
+        var m = ctx.measureText(text), asc = m.actualBoundingBoxAscent, desc = m.actualBoundingBoxDescent, pad = 4, x = 0;
+        var svg = document.createElementNS(NS, 'svg'), defs = document.createElementNS(NS, 'defs');
+        svg.appendChild(defs);
+        function mk(ch) { var t = document.createElementNS(NS, 'text'); t.setAttribute('y', 0); t.setAttribute('font-family', 'IntegralNEW'); t.setAttribute('font-weight', 900); t.setAttribute('font-size', 100); t.textContent = ch; return t; }
+        var letters = text.split('').map(function (ch) {
+          var adv = ctx.measureText(ch).width, t = mk(ch), ln = mk(ch), mt = mk(ch), mask = document.createElementNS(NS, 'mask'), mid = 'hwm' + tag + (++id);
+          [t, ln, mt].forEach(function (e) { e.setAttribute('x', x); });
+          mask.setAttribute('id', mid); mask.setAttribute('maskUnits', 'userSpaceOnUse');
+          mask.setAttribute('x', -200); mask.setAttribute('y', -200); mask.setAttribute('width', 2000); mask.setAttribute('height', 400);
+          mt.setAttribute('fill', 'none'); mt.setAttribute('stroke', '#fff'); mask.appendChild(mt); defs.appendChild(mask);
+          ln.setAttribute('fill', 'none'); ln.setAttribute('stroke', 'rgb(' + LINE + ')'); ln.setAttribute('mask', 'url(#' + mid + ')');
+          t.setAttribute('stroke', 'none');
+          var l = { ch: ch, t: t, ln: ln, mt: mt, x: x, adv: adv, L: 2.8 * (adv + asc) }; x += adv; return l;
+        });
+        svg.setAttribute('viewBox', (-pad) + ' ' + (-asc - pad) + ' ' + (x + pad * 2) + ' ' + (asc + desc + pad * 2));
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.height = (asc + desc + pad * 2) / 100 + 'em';
+        letters.forEach(function (l) { svg.appendChild(l.ln); svg.appendChild(l.t); });
+        h3.setAttribute('aria-label', h3.textContent.trim());
+        h3.textContent = ''; h3.appendChild(svg);
+        words.push({ h3: h3, letters: letters, pad: pad, asc: asc });
+      }
+      function unit(w) { return 100 / (parseFloat(getComputedStyle(w.h3).fontSize) || 100); }
+      // ko = how much of the line is drawn, kf = fill
+      function paint(w, l, ko, kf, u) {
+        var d = 4 * u;
+        l.t.setAttribute('fill', 'rgba(' + CREAM + ',' + kf.toFixed(3) + ')');
+        l.ln.setAttribute('stroke-width', u.toFixed(3));
+        l.ln.setAttribute('stroke-dasharray', d.toFixed(2) + ' ' + d.toFixed(2));
+        l.mt.setAttribute('stroke-width', (u * 4).toFixed(3));
+        l.mt.setAttribute('stroke-dasharray', (l.L * ko).toFixed(1) + ' ' + l.L);
+        l.ln.setAttribute('stroke-opacity', (ko > 0 ? LINE_A * (1 - kf) : 0).toFixed(3));
+      }
+
+      function render(p) {
+        fill.style.clipPath = 'inset(0 ' + ((1 - p) * 100).toFixed(2) + '% 0 0)';
+        dot.style.left = (p * 100).toFixed(2) + '%';
+        majors.forEach(function (m) { m.el.classList.toggle('is-on', p >= m.at - .001); });
+        var hs = words.map(function (w) { return w.h3; });
+        var f = F0 + clamp(p / .8) * (3 - F0);
+        var off = hs.map(function (h) { return h.offsetLeft - hs[0].offsetLeft; }), step = off[1] - off[0];
+        var i = Math.min(2, Math.floor(Math.max(0, f)));
+        var x = f < 0 ? f * step : f >= 3 ? off[3] : off[i] + (off[i + 1] - off[i]) * (f - i);
+        strip.style.transform = 'translate3d(' + (-x).toFixed(1) + 'px,0,0)';
+        var e = sm(.8, 1, p);
+        var avail = strip.parentNode.clientWidth || innerWidth, pA = (-.15 - F0) / (3 - F0) * .8;   // pA: where the first word is fully drawn
+        words.forEach(function (w, k) {
+          var d = f - k, u = unit(w);
+          w.letters.forEach(function (l, j) {
+            var s = j * .05;
+            // the outline draws by where the word is on screen (nothing at the right edge, done when it reaches its place),
+            // so long and short words draw the same; the first word also starts from nothing on arrival
+            var ko = 1;
+            if (d < 0) {
+              var q = 1 - (off[k] - x) / avail;
+              ko = clamp(sm(0, .8, q) * 1.15 - s);
+              if (k === 0) ko = Math.min(ko, clamp(sm(0, pA, p) * 1.15 - s));
+            }
+            var kf = d < 0 ? 1 - sm(0, .22, -d) : 1 - sm(.3, .95, d);
+            paint(w, l, ko, kf, u);
+          });
+          if (k === 3) {
+            // fly into the last word: scale about a point in an open counter until its dark fills the screen
+            // (a U: the middle of its top opening; a C, as in SCALE: in the middle of its bowl, half way up)
+            var h = w.h3, k100 = parseFloat(getComputedStyle(h).fontSize) / 100, g = Math.pow(e, 2.6), Z = null, zx = 0, zy = 0;
+            w.letters.forEach(function (l) { if (!Z && (l.ch === 'U' || l.ch === 'C')) Z = l; });
+            if (Z && Z.ch === 'U') { zx = Z.x + Z.adv / 2; zy = w.asc * .3; } else if (Z) { zx = Z.x + Z.adv * .6; zy = w.asc * .5; }
+            h.style.transformOrigin = ((w.pad + zx) * k100).toFixed(1) + 'px ' + ((w.pad + zy) * k100).toFixed(1) + 'px';
+            h.style.transform = g > 0 ? 'scale(' + (1 + g * (Z && Z.ch === 'C' ? 170 : 60)).toFixed(3) + ')' : '';   // a C's mouth is a narrow slot: it needs to grow further
+          }
+        });
+        ones.forEach(function (one, k) { one.style.opacity = ((1 - sm(.18, .42, Math.abs(f - k))) * (1 - sm(.8, .85, p))).toFixed(3); });
+        ones.forEach(function (one, k) { one.classList.toggle('is-on', Math.abs(f - k) < .32 && p < .82); });   // A: a stage's boxes come in while its word is current
+        var ne = sm(.88, .97, p);
+        if (next) {                                          // the end word is optional (hidden in the Designer = gone)
+          next.style.opacity = ne.toFixed(3);
+          next.style.letterSpacing = (.3 + (1 - ne) * .4).toFixed(3) + 'em';
+          next.style.transform = 'translate(-50%, -50%)';
+        }
+      }
+
+      function target() { var r = sec.getBoundingClientRect(); return clamp(-r.top / (r.height - innerHeight)); }
+      // light: one frame loop that only runs while the section is on screen and still catching up with the scroll
+      var raf = 0, seen = false;
+      function loop() {
+        raf = 0;
+        if (!sec.isConnected) return;                      // the page left (page transition): stop
+        var t = target(), d = t - ps;
+        if (Math.abs(d) > .0004) { ps += d * .14; render(ps); raf = requestAnimationFrame(loop); }
+        else if (ps !== t) { ps = t; render(ps); }
+      }
+      function wake() { if (!raf && seen && sec.isConnected) raf = requestAnimationFrame(loop); }
+      function start() {
+        if (!sec.isConnected) return;
+        [].slice.call(sec.querySelectorAll('.hw_word')).forEach(build);
+        [0, 1, 2, 3].forEach(function (k) {
+          var at = (k - F0) / (3 - F0) * .8, el = document.createElement('span');
+          el.className = 'hw_major'; el.style.left = at * 100 + '%'; ticks.insertBefore(el, dot); majors.push({ el: el, at: at });
+        });
+        sec.classList.add('is-ready');
+        ps = target(); render(ps);
+        new IntersectionObserver(function (es) { seen = es[0].isIntersecting; wake(); }).observe(sec);
+        window.addEventListener('scroll', wake, { passive: true });
+      }
+      window.addEventListener('resize', function () { if (words.length) render(ps); });
+      if (document.fonts && document.fonts.load) document.fonts.load('900 100px IntegralNEW').then(start, start); else start();
+    });
+  }
+
+  // rdSvcLayers — was: /service, embed in .hx_pass
+  function rdSvcLayers() {
+    /* 1. How it goes holds still at its end (SCALE blown up) while the light wall slides in over it: once the section's
+          bottom reaches the bottom of the screen, its pinned stage is moved down as far as the page scrolls. Laptop and up,
+          follows Lenis's own scroll so it never trembles. data-hw-hold on the section: 1 = still (default), 0 = off.
+       2. The ticket comes out from under the wall: it starts 40% higher and in shade, and settles as its section reaches
+          the middle of the screen. Then it sinks back (24% down, into shade) under Explore the work as that slides over it.
+          Same numbers as /work; the two ways are added up so they never fight. Needs GSAP + ScrollTrigger; without them
+          the ticket simply stands there.
+          NOT ON PHONES (2026-11-18, Rimbo on his phone: "the scroll is just confused on the ticket section"): there the
+          ticket is as tall as the screen, so it never came to rest and ran at about two thirds of the finger's speed the
+          whole way. On phones it now scrolls with the page; its own route still follows the scroll. */
+    (function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); })(function () {
+      var wall = document.querySelector('.sv_page + .wall_section'), pass = document.querySelector('.wall_section + .hx_pass');
+      if (!wall || !pass || pass.dataset.lay) return; pass.dataset.lay = '1';
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      var sec = document.querySelector('[data-hw="section"]'), stage = sec && sec.querySelector('.hw_stage');
+      if (sec && stage) {
+        var mq = window.matchMedia('(min-width: 992px)'), k = parseFloat(sec.getAttribute('data-hw-hold')), last = 0, L = null;
+        if (isNaN(k)) k = 1;
+        var set = function () {
+          if (!sec.isConnected) return stop();
+          if (window.lenis !== L) hook();
+          var d = mq.matches ? Math.min(Math.max(window.innerHeight - sec.getBoundingClientRect().bottom, 0), window.innerHeight) * k : 0;
+          if (d === last) return; last = d;
+          stage.style.transform = d ? 'translate3d(0,' + d.toFixed(2) + 'px,0)' : '';
+        };
+        var hook = function () { if (window.lenis && window.lenis !== L && window.lenis.on) { if (L && L.off) L.off('scroll', set); L = window.lenis; L.on('scroll', set); } };
+        var stop = function () { window.removeEventListener('scroll', set); window.removeEventListener('resize', set); if (L && L.off) L.off('scroll', set); };
+        window.addEventListener('scroll', set, { passive: true });
+        window.addEventListener('resize', set);
+        set();
+      }
+
+      var inner = pass.firstElementChild;
+      if (inner && window.gsap && window.ScrollTrigger && !window.matchMedia('(max-width: 767px)').matches) {
+        var shade = document.createElement('div'); shade.className = 'wk_shade'; shade.setAttribute('aria-hidden', 'true'); pass.appendChild(shade);
+        var a = { y: -40, dim: 0.55 }, b = { y: 0, dim: 0 }, setY = gsap.quickSetter(inner, 'yPercent'), setDim = gsap.quickSetter(shade, 'opacity');
+        var over = document.querySelector('.hx_pass + .wh_sec');
+        var draw = function () { setY(a.y + b.y); setDim(a.dim + b.dim); };
+        gsap.to(a, { y: 0, dim: 0, ease: 'none', onUpdate: draw, scrollTrigger: { trigger: pass, start: 'top bottom', end: 'center center', scrub: true } });
+        if (over) gsap.to(b, { y: 24, dim: 0.55, ease: 'none', onUpdate: draw, scrollTrigger: { trigger: over, start: 'top bottom', end: 'top 10%', scrub: true } });
+        draw();
+      }
+    });
+  }
+
+  // rdFoldFaq — was: home + /service, embed in the FAQ list ([data-fold="faq"])
+  function rdFoldFaq() {
+    /* all questions start closed; one open at a time (opening one closes the other), Rimbo 2026-11-17. A click anywhere in the
+       field toggles it, except while text is being selected or a link in the answer is clicked. */
+    (function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); })(function () {
+      [].forEach.call(document.querySelectorAll('[data-fold="faq"]'), function (sec) {
+        if (sec.dataset.on) return; sec.dataset.on = '1';
+        var all = [].slice.call(sec.querySelectorAll('.sv_qa.is-fold'));
+        function set(qa, open) { qa.classList.toggle('is-open', open); var row = qa.querySelector('.sv_q_row'); if (row) row.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+        function flip(qa) { var open = !qa.classList.contains('is-open'); all.forEach(function (o) { if (o !== qa) set(o, false); }); set(qa, open); }
+        all.forEach(function (qa) {
+          var row = qa.querySelector('.sv_q_row');
+          set(qa, false);
+          qa.addEventListener('click', function (e) { if (e.target.closest('a')) return; var s = window.getSelection && String(window.getSelection()); if (s) return; flip(qa); });
+          if (row) row.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(qa); } });
+        });
+      });
+    });
+  }
+
+  // rdPostEnd — was: component Post_end (.ex_section [data-ex]): posts, /resources, city pages
+  function rdPostEnd() {
+    (function(){
+      function init(){
+        [].forEach.call(document.querySelectorAll('[data-ex]:not([data-ex-on])'),function(root){
+          root.setAttribute('data-ex-on','');
+          var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches,NB=String.fromCharCode(160);
+          var clips=['https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.2/media/echo.mp4','https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.2/media/dfs-home-test.mp4','https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.2/media/dieronesie.mp4','https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.21/media/tinko.mp4'];
+          var names=['Echo','Digital Feng Shui','Dieronesie','Tinko'],hold={dieronesie:3.2},i=0;
+          var v=root.querySelector('.ex_clip');
+          function limit(){var k=Object.keys(hold).filter(function(n){return v.src.indexOf(n)>-1;})[0];v.dataset.limit=k?hold[k]:'';}
+          if(v){v.addEventListener('timeupdate',function(){if(v.dataset.limit&&v.currentTime>+v.dataset.limit)v.pause();});limit();}
+          function scramble(el,to){if(!el||el.textContent===to)return;clearInterval(el._sc);var len=Math.max(el.textContent.length,to.length),f=0,F=16,G='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/+';
+            el._sc=setInterval(function(){f++;var out='';for(var c=0;c<len;c++){out+=f>=F*(c+1)/len?(to[c]||''):(to[c]===' '?' ':G[Math.floor(Math.random()*G.length)]);}el.textContent=out;if(f>=F){clearInterval(el._sc);el.textContent=to;}},40);}
+          function light(){
+            [].forEach.call(root.querySelectorAll('[data-ex-site]'),function(e){e.classList.toggle('is-on',+e.getAttribute('data-ex-site')===i);});
+            [].forEach.call(root.querySelectorAll('[data-ex-now]'),function(e){e.textContent=names[i];});
+            [].forEach.call(root.querySelectorAll('[data-ex-idx]'),function(e){e.textContent='0'+(i+1);});
+            scramble(root.querySelector('[data-ex-name]'),names[i]);
+          }
+          light();
+          if(v&&!reduce)setInterval(function(){i=(i+1)%clips.length;v.classList.add('is-swap');
+            setTimeout(function(){v.src=clips[i];limit();var go=function(){v.removeEventListener('loadeddata',go);v.play&&v.play().catch(function(){});requestAnimationFrame(function(){v.classList.remove('is-swap');});};v.addEventListener('loadeddata',go);light();},450);},6000);
+          var t0=Date.now();setInterval(function(){var t=Math.floor((Date.now()-t0)/1000),m=Math.floor(t/60),s=t%60;[].forEach.call(root.querySelectorAll('[data-ex-tc]'),function(e){e.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;});},500);
+          function clk(){var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Amsterdam'}));var t=(d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes()+' CET';[].forEach.call(root.querySelectorAll('[data-ex-clock]'),function(e){e.textContent=t;});}clk();setInterval(clk,15000);
+          [].forEach.call(root.querySelectorAll('[data-ex-boil]'),function(t){
+            var panel=t.closest('.ex_panel'),chars=[].map.call(t.textContent,function(ch){var c=document.createElement('span');c.style.display='inline-block';c.textContent=ch===' '?NB:ch;return c;});
+            t.setAttribute('aria-label',t.textContent);t.textContent='';chars.forEach(function(c){c.setAttribute('aria-hidden','true');t.appendChild(c);});
+            var R=function(a){return(Math.random()*2-1)*a;},poses=chars.map(function(){return[0,1,2].map(function(){return'translate('+R(.6)+'px,'+R(.7)+'px) rotate('+R(3)+'deg)';});}),timer=null,f=0;
+            function frame(){f++;chars.forEach(function(c,n){c.style.transform=poses[n][(f+n)%3];});}
+            panel.addEventListener('pointerenter',function(e){if(e.pointerType!=='mouse'||timer||reduce)return;frame();timer=setInterval(frame,1000/9);});
+            panel.addEventListener('pointerleave',function(){clearInterval(timer);timer=null;chars.forEach(function(c){c.style.transition='transform .35s cubic-bezier(.2,.8,.2,1)';c.style.transform='';setTimeout(function(){c.style.transition='';},360);});});
+          });
+          /* the globes turn: the big one on My work and the small one inside the stamp */
+          var globes=[].map.call(root.querySelectorAll('.ex_globe,.ex_stamp'),function(g){var es=[].slice.call(g.querySelectorAll('[data-m]'));return{es:es,R:es.length?+es[0].getAttribute('ry'):0};}).filter(function(o){return o.es.length;});
+          if(globes.length&&!reduce)(function spin(t){var ph=t/2600;globes.forEach(function(o){var N=o.es.length;o.es.forEach(function(e,k){e.setAttribute('rx',(o.R*Math.abs(Math.cos(ph+k*Math.PI/N))).toFixed(2));});});requestAnimationFrame(spin);})(0);
+          var m=root.querySelector('.ex_map');
+          if(m){var p=m.querySelector('.r10_prog'),pins=[].slice.call(m.querySelectorAll('.r10_pin'));
+            if(p&&pins.length){var L=p.getTotalLength(),at=pins.map(function(g){var mm=g.getAttribute('transform').match(/([\d.]+)[ ,]+([\d.]+)/),x=+mm[1],y=+mm[2],best=0,bd=1e9;for(var l=0;l<=L;l+=1.5){var q=p.getPointAtLength(l),dd=(q.x-x)*(q.x-x)+(q.y-y)*(q.y-y);if(dd<bd){bd=dd;best=l;}}return best;});
+              p.style.strokeDasharray=L;p.style.strokeDashoffset=L;var k=-1,N=pins.length-1,ease='cubic-bezier(.625,.05,0,1)',boom='cubic-bezier(.75,0,.25,1)';
+              var go=function(){k++;
+                if(k>N){m.classList.add('is-reset');setTimeout(function(){p.style.transition='none';p.style.strokeDashoffset=L;p.getBoundingClientRect();p.style.transition='';k=-1;m.classList.remove('is-reset','is-top');pins.forEach(function(e){e.classList.remove('is-on','is-done');});},1100);setTimeout(go,1900);return;}
+                p.style.transition='stroke-dashoffset '+(k===N?'.85s '+boom:(k===N-1?'.7s '+ease:'1.4s '+ease));p.style.strokeDashoffset=L-at[k];
+                pins.forEach(function(e){var n=+e.getAttribute('data-k');e.classList.toggle('is-on',n===k);e.classList.toggle('is-done',n<k);});
+                if(k===N)setTimeout(function(){m.classList.add('is-top');},700);
+                setTimeout(go,k===0?800:(k===N?4200:(k===N-1?900:(k===N-2?1000:1700))));};
+              if(reduce){p.style.strokeDashoffset=0;pins.forEach(function(e){e.classList.add('is-done');});}
+              else{var io=new IntersectionObserver(function(es){if(es[0].isIntersecting){io.disconnect();setTimeout(go,500);}},{threshold:.35});io.observe(m);}}}
+          if(matchMedia('(hover: hover) and (pointer: fine)').matches&&!reduce){
+            var T={tx:0,ty:0,x:0,y:0,raf:0},cards=[].map.call(root.querySelectorAll('.ex_panel'),function(c){return{c:c,layers:[].map.call(c.querySelectorAll('[data-depth]'),function(e){return{e:e,k:+e.getAttribute('data-depth')};}),holo:c.querySelector('.ex_holo')};});
+            var tl=function(){T.raf=0;T.x+=(T.tx-T.x)*.07;T.y+=(T.ty-T.y)*.07;
+              cards.forEach(function(o){o.c.style.transform='perspective(1600px) rotateX('+(-T.y*5).toFixed(3)+'deg) rotateY('+(T.x*5).toFixed(3)+'deg)';o.layers.forEach(function(l){l.e.style.translate=(T.x*10*l.k).toFixed(2)+'px '+(T.y*10*l.k).toFixed(2)+'px';});if(o.holo)o.holo.style.backgroundPosition=(50+T.x*40)+'% '+(50+T.y*40)+'%';});
+              if(Math.abs(T.tx-T.x)>.0004||Math.abs(T.ty-T.y)>.0004)T.raf=requestAnimationFrame(tl);};
+            addEventListener('pointermove',function(e){T.tx=e.clientX/innerWidth*2-1;T.ty=e.clientY/innerHeight*2-1;if(!T.raf)T.raf=requestAnimationFrame(tl);},{passive:true});
+          }
+        });
+      }
+      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+      window.rdExInit=init;
+    })();
+  }
+
+  // rdWorkHeroLoad — was: /work, embed in #featured (its CSS stays there)
+  function rdWorkHeroLoad() {
+    (function () {
+      // the site loads GSAP at the end of the page: load Tinko, then the hero, once it is there (straight away after a page transition)
+      var BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@525b66f/';
+      function load() {
+        ['tinko-live.js', 'work-hero.js'].forEach(function (f) {
+          var s = document.createElement('script'); s.src = BASE + f; s.async = false; document.body.appendChild(s);
+        });
+      }
+      if (window.gsap && window.CustomEase && window.ScrollTrigger) load();
+      else document.addEventListener('DOMContentLoaded', load);
+    })();
+  }
+
+  // rdWorkSplit — was: /work, embed in .ws_wrap
+  function rdWorkSplit() {
+    (function () {
+      var wrap = document.querySelector('.ws_wrap'); if (!wrap) return;
+      var rows = [].slice.call(wrap.querySelectorAll('[data-ws-row]')), track = wrap.querySelector('[data-ws-track]'), shots = [].slice.call(wrap.querySelectorAll('.ws_shot')), tag = wrap.querySelector('.ws_tag'), pane = wrap.querySelector('.ws_pane');
+      var clips = shots.map(function (s) { return s.querySelector('video'); });
+      var on = -1, hovering = false;
+      function show(i) {
+        if (i === on || !shots[i]) return;
+        track.style.transform = 'translateY(' + (-100 * i) + '%)';
+        shots.forEach(function (s, k) { s.classList.toggle('is-on', k === i); });
+        rows.forEach(function (r, k) { r.classList.toggle('is-on', k === i); });
+        // the clip sliding in plays from its start; the one sliding out keeps playing until it is out of the frame
+        var was = clips[on];
+        var v = clips[i]; if (v) { v.preload = 'auto'; try { v.currentTime = 0; } catch (e) {} v.play().catch(function () {}); }
+        if (clips[i + 1]) clips[i + 1].preload = 'auto';
+        if (was && was !== v) setTimeout(function () { if (clips[on] !== was) was.pause(); }, 1200);
+        if (tag) tag.textContent = ('0' + (i + 1)).slice(-2) + ' · ' + rows[i].querySelector('.ws_name').textContent;
+        on = i;
+      }
+      // the work nearest the middle of the screen is the one shown (the first, before you scroll into the list).
+      // On a phone the preview lies across the top of the list (stacked), so the point to measure from is a third of the
+      // way down the room that is left under it: the lit name is the one just below the preview, never one hidden under it.
+      function pick() {
+        if (hovering || !wrap.isConnected) return;
+        var mid = innerHeight * .5, stacked = false, best = 0, bestD = 1e9;
+        if (pane) { var p = pane.getBoundingClientRect(); stacked = p.width > wrap.clientWidth * .9; if (stacked && p.bottom < innerHeight) mid = p.bottom + (innerHeight - p.bottom) * .35; }
+        if (!stacked && rows[0].getBoundingClientRect().top > innerHeight * .2) { show(0); return; }
+        rows.forEach(function (r, k) { var b = r.getBoundingClientRect(), d = Math.abs(b.top + b.height / 2 - mid); if (d < bestD) { bestD = d; best = k; } });
+        show(best);
+      }
+      // SPEED (2026-11-18): measuring the rows makes the browser lay the page out on the spot. It used to happen on every
+      // scroll event anywhere on the page (so also in the middle of the ticket's and the wall's frames). Now it happens only
+      // while this section is on or near the screen, and once per frame at most.
+      var near = false, queued = false;
+      function onScroll() { if (!near || queued) return; queued = true; requestAnimationFrame(function () { queued = false; pick(); }); }
+      window.addEventListener('scroll', onScroll, { passive: true }); window.addEventListener('resize', onScroll);
+      if (window.matchMedia('(hover: hover)').matches) rows.forEach(function (r, k) {
+        r.addEventListener('pointerenter', function () { hovering = true; show(k); });
+        r.addEventListener('pointerleave', function () { hovering = false; });
+      });
+      // near = the list is on or close to the screen; clips only play while it is on screen
+      new IntersectionObserver(function (es) { near = es[0].isIntersecting; if (near) pick(); }, { rootMargin: '30% 0px' }).observe(wrap);
+      new IntersectionObserver(function (es) { var v = clips[on]; if (!v) return; if (es[0].isIntersecting) v.play().catch(function () {}); else v.pause(); }).observe(wrap);
+      show(0); pick();
+    })();
+  }
+
+  // rdWorkLayers — was: /work, transitions embed in #archive
+  function rdWorkLayers() {
+    (function () {
+      function init() {
+        var pass = document.querySelector('.hx_pass'), arch = document.getElementById('archive');
+        if (!pass || !arch || !window.gsap || !window.ScrollTrigger) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var phone = window.matchMedia('(max-width: 767px)').matches;
+        // A dark section on the lower layer: it comes out from under the section above it (way in) and sinks back under the
+        // section that slides over it (way out). Each way keeps its own numbers and they are added up, so they never fight
+        // where they overlap. inner = what moves, host = the section; its shadow is its own layer (wk_shade), so a frame of
+        // scrolling only moves one layer and fades another, and never restyles what is inside the section.
+        function layer(host, inner, fromY, inEnd, over, toY) {
+          var shade = host.querySelector(':scope > .wk_shade');
+          if (!shade) { shade = document.createElement('div'); shade.className = 'wk_shade'; shade.setAttribute('aria-hidden', 'true'); host.appendChild(shade); }
+          var a = { y: fromY, dim: 0.55 }, b = { y: 0, dim: 0 };
+          var setY = gsap.quickSetter(inner, 'yPercent'), setDim = gsap.quickSetter(shade, 'opacity');
+          function draw() { setY(a.y + b.y); setDim(a.dim + b.dim); }
+          gsap.to(a, { y: 0, dim: 0, ease: 'none', onUpdate: draw, scrollTrigger: { trigger: host, start: 'top bottom', end: inEnd, scrub: true } });
+          if (over) gsap.to(b, { y: toY, dim: 0.55, ease: 'none', onUpdate: draw, scrollTrigger: { trigger: over, start: 'top bottom', end: 'top 10%', scrub: true } });
+          draw();
+        }
+        // the ticket: in from under Selected work (down to the middle), out under the archive. Not on phones: there the
+        // ticket is as tall as the screen and would never come to rest (see PHONES at the top)
+        if (!phone) layer(pass, pass.firstElementChild, -40, 'center center', arch, 24);
+        // the Wall of love: in from under the archive, out under the service sheet
+        var wall = document.querySelector('.wk_wall'), wallIn = wall && wall.querySelector('.wall_section');
+        if (wallIn) layer(wall, wallIn, -16, 'top top', document.querySelector('.wk_wall ~ .im_sheet'), 16);
+        // the Digital Feng Shui card (hidden on this page since 2026-11-17; this still works if it is shown again): drifts in from a little higher, out of the shadow
+        var dfs = document.querySelector('.wk_wall ~ .hx_dfs_sec'), card = dfs && dfs.querySelector('.hx_dfs_root');
+        if (card) layer(dfs, card, -30, 'clamp(center center)', null, 0);
+      }
+      if (window.gsap && window.ScrollTrigger) init(); else document.addEventListener('DOMContentLoaded', init);
+    })();
+  }
+
+  // rdWorkFollower — was: /work, follower embed in #archive (Osmo Image Preview Cursor Follower)
+  function rdWorkFollower() {
+    function initPreviewFollower() {
+      // Find every follower wrap
+      const wrappers = document.querySelectorAll('[data-follower-wrap]');
+
+      wrappers.forEach(wrap => {
+        const collection = wrap.querySelector('[data-follower-collection]');
+        const items = wrap.querySelectorAll('[data-follower-item]');
+        const follower = wrap.querySelector('[data-follower-cursor]');
+        const followerInner = wrap.querySelector('[data-follower-cursor-inner]');
+
+        const offset = 100; // The animation distance in %
+        const duration = 0.5; // The animation duration of all visual transforms
+        const ease = 'power2.inOut';
+
+        // Initialize follower position
+        gsap.set(follower, { xPercent: -50, yPercent: -50 });
+
+        // Quick setters for x/y
+        const xTo = gsap.quickTo(follower, 'x', { duration: 0.6, ease: 'power3' });
+        const yTo = gsap.quickTo(follower, 'y', { duration: 0.6, ease: 'power3' });
+
+        // Move all followers on mousemove
+        window.addEventListener('mousemove', e => {
+          xTo(e.clientX);
+          yTo(e.clientY);
+        });
+
+        // Changed for this site (Rimbo 2026-11-17): one slide at a time. Osmo starts a new slide for every row the mouse
+        // crosses, so a fast move or a scroll over the list ran four slides at once. Now a slide always finishes first;
+        // the rows crossed meanwhile are skipped and the preview then goes straight to the row the mouse is on.
+        let shownIndex = null; // the row whose picture is in the preview
+        let wantedIndex = null; // the row the mouse is on
+        let current = null; // that picture (a copy inside the follower)
+        let busy = false; // a slide is running
+
+        function slide() {
+          if (busy || wantedIndex === null || wantedIndex === shownIndex) return;
+          const index = wantedIndex;
+          const visual = items[index].querySelector('[data-follower-visual]');
+          if (!visual) return;
+          const forward = shownIndex === null || index > shownIndex;
+          const old = current;
+          const clone = visual.cloneNode(true);
+          followerInner.appendChild(clone);
+          shownIndex = index;
+          current = clone;
+          if (!old) return; // the first row you enter: no slide, the preview itself grows in
+          busy = true;
+          gsap.to(old, { yPercent: forward ? -offset : offset, duration, ease, onComplete: () => old.remove() });
+          gsap.fromTo(clone,
+            { yPercent: forward ? offset : -offset },
+            { yPercent: 0, duration, ease, onComplete: () => { busy = false; slide(); } }
+          );
+        }
+
+        items.forEach((item, index) => {
+          item.addEventListener('mouseenter', () => { wantedIndex = index; slide(); });
+        });
+
+        // If pointer leaves the collection, clear any visuals
+        collection.addEventListener('mouseleave', () => {
+          follower.querySelectorAll('[data-follower-visual]').forEach(el => {
+            gsap.killTweensOf(el);
+            gsap.delayedCall(duration, () => el.remove());
+          });
+          shownIndex = null;
+          wantedIndex = null;
+          current = null;
+          busy = false;
+        });
+      });
+    }
+
+    // Initialize Image Preview Cursor Follower
+    document.addEventListener("DOMContentLoaded", () =>{
+      initPreviewFollower();
+    })
+
+    // Added for this site (not Osmo): the previews sit in hidden boxes and Webflow marks them lazy, so each one would only
+    // start loading on its first hover. On screens that show the follower they load when the archive comes near.
+    document.addEventListener("DOMContentLoaded", () => {
+      const wrap = document.querySelector('[data-follower-wrap]');
+      if (!wrap || !window.matchMedia('(hover: hover) and (min-width: 992px)').matches) return;
+      const io = new IntersectionObserver(entries => {
+        if (!entries[0].isIntersecting) return;
+        io.disconnect();
+        wrap.querySelectorAll('[data-follower-visual] img').forEach(img => { img.loading = 'eager'; });
+      }, { rootMargin: '100% 0px' });
+      io.observe(wrap);
+    });
+
+    // Added for this site (not Osmo; after dennissnellenberg.com): the round View follows the mouse a little faster than
+    // the preview, so the two move in layers.
+    document.addEventListener("DOMContentLoaded", () => {
+      const view = document.querySelector('[data-follower-wrap] [data-follower-view]');
+      if (!view || !window.matchMedia('(hover: hover) and (min-width: 992px)').matches) return;
+      gsap.set(view, { xPercent: -50, yPercent: -50 });
+      const vx = gsap.quickTo(view, 'x', { duration: 0.3, ease: 'power3' });
+      const vy = gsap.quickTo(view, 'y', { duration: 0.3, ease: 'power3' });
+      window.addEventListener('mousemove', e => { vx(e.clientX); vy(e.clientY); });
+    });
+  }
+
+  // rdWorkArchiveView — was: /work, List/Grid embed in #archive
+  function rdWorkArchiveView() {
+    (function () {
+      function init() {
+        var sec = document.getElementById('archive'); if (!sec) return;
+        var btns = [].slice.call(sec.querySelectorAll('[data-wa-view]'));
+        function set(view, byHand) {
+          sec.setAttribute('data-view', view);
+          btns.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-wa-view') === view ? 'true' : 'false'); });
+          if (view === 'grid') [].forEach.call(sec.querySelectorAll('[data-wa-cards] img'), function (img) { img.loading = 'eager'; });
+          // the section changes height: tell the scroll (Lenis) and the scroll animations
+          if (byHand) { if (window.lenis && window.lenis.resize) window.lenis.resize(); if (window.ScrollTrigger) window.ScrollTrigger.refresh(); }
+        }
+        btns.forEach(function (b) {
+          b.setAttribute('role', 'button'); b.setAttribute('data-barba-prevent', 'self');
+          // Webflow publishes these as "#" links: a click must only switch the view, never jump or start a page transition
+          b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); set(b.getAttribute('data-wa-view'), true); }, true);
+        });
+        // phones open on the grid (their only view), everything else on the list
+        set(window.matchMedia('(max-width: 767px)').matches ? 'grid' : 'list', false);
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+    })();
+  }
+
+  // rdCasePage — was: embed in .cs_page: the new project pages (Echo, DFS, Charlie's, Anapana, Dieronesie, InnerGym, OZO)
+  function rdCasePage() {
+    document.addEventListener('DOMContentLoaded', function () {
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      var hasIO = 'IntersectionObserver' in window;
+      var ready = window.gsap && window.Draggable;
+      if (ready) { gsap.registerPlugin(Draggable); if (window.InertiaPlugin) gsap.registerPlugin(InertiaPlugin); }
+      var pad = function (n) { return String(n).padStart(2, '0'); };
+      var all = function (sel, root) { return [].slice.call(root.querySelectorAll(sel)); };
+
+      all('[data-pp-page]', document).forEach(function (page) {
+        if (page.__pp) return;
+        page.__pp = true;
+        page.setAttribute('data-pp-on', '');
+
+        // reveal blocks as they come into view
+        var blocks = all('[data-pp-reveal]', page);
+        if (!hasIO) blocks.forEach(function (b) { b.classList.add('is-in'); });
+        else {
+          var show = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-in'); show.unobserve(e.target); } });
+          }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+          blocks.forEach(function (b) { show.observe(b); });
+        }
+
+        // clips play only while on screen. data-pp-from = the second a clip opens on the first time
+        var clips = all('[data-pp-clip]', page);
+        clips.forEach(function (c) {
+          c.muted = true;
+          var from = parseFloat(c.getAttribute('data-pp-from'));
+          if (!from) return;
+          var set = function () { try { c.currentTime = from; } catch (e) {} };
+          if (c.readyState >= 1) set(); else c.addEventListener('loadedmetadata', set, { once: true });
+        });
+        if (!still && hasIO) {
+          var run = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) {
+              if (e.isIntersecting) { var p = e.target.play(); if (p && p.catch) p.catch(function () {}); }
+              else e.target.pause();
+            });
+          }, { threshold: 0.15 });
+          clips.forEach(function (c) { run.observe(c); });
+        }
+
+        // the rows you drag: drag or throw, snap to the item on the page gutter, sideways trackpad swipe,
+        // counter next to the row. A row that fits the screen does not move.
+        all('[data-pp-gallery]', page).forEach(function (gallery) {
+          var track = gallery.querySelector('[data-pp-track]');
+          var items = all('[data-pp-item]', gallery);
+          if (!track || !items.length) return;
+          // Webflow marks the screens lazy; off to the right they would only load mid-drag and pop in
+          all('img', gallery).forEach(function (img) { img.loading = 'eager'; });
+          if (!ready) { gallery.classList.add('is-native'); return; }
+          var counter = gallery.parentElement.querySelector('[data-pp-count]');
+          var snapDuration = 0.8, snapEase = 'expo.out';
+          var minX = 0, snapPoints = [0], draggable;
+          var closestSnap = function (x) { return gsap.utils.snap(snapPoints, x); };
+          function updateActive() {
+            var x = gsap.getProperty(track, 'x'), index = 0, best = Infinity;
+            items.forEach(function (item, i) { var d = Math.abs(snapPoints[i] - x); if (d < best - 0.5) { best = d; index = i; } });
+            if (minX < 0 && x <= minX + 1) index = items.length - 1;
+            items.forEach(function (item, i) { item.classList.toggle('is-active', i === index); });
+            if (counter) counter.textContent = pad(index + 1) + ' / ' + pad(items.length);
+          }
+          function measure() {
+            if (!gallery.isConnected) return;
+            var padLeft = parseFloat(getComputedStyle(track).paddingLeft) || 0;
+            minX = Math.min(0, gallery.clientWidth - track.offsetWidth);
+            snapPoints = items.map(function (item) { return gsap.utils.clamp(minX, 0, -(item.offsetLeft - padLeft)); });
+            snapPoints.push(minX);
+            draggable.applyBounds({ minX: minX, maxX: 0 });
+            gsap.set(track, { x: gsap.utils.clamp(minX, 0, gsap.getProperty(track, 'x')) });
+            draggable.update();
+            updateActive();
+          }
+          draggable = Draggable.create(track, {
+            type: 'x', trigger: gallery, inertia: !!window.InertiaPlugin, edgeResistance: 0.85,
+            cursor: 'grab', activeCursor: 'grabbing', snap: { x: closestSnap },
+            onDrag: updateActive, onThrowUpdate: updateActive, onDragEnd: updateActive, onThrowComplete: updateActive
+          })[0];
+          var wheelTimer;
+          gallery.addEventListener('wheel', function (e) {
+            if (minX >= 0 || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+            e.preventDefault();
+            gsap.killTweensOf(track);
+            gsap.set(track, { x: gsap.utils.clamp(minX, 0, gsap.getProperty(track, 'x') - e.deltaX) });
+            draggable.update(); updateActive();
+            clearTimeout(wheelTimer);
+            wheelTimer = setTimeout(function () {
+              gsap.to(track, { x: closestSnap(gsap.getProperty(track, 'x')), duration: snapDuration, ease: snapEase, onUpdate: function () { draggable.update(); updateActive(); } });
+            }, 150);
+          }, { passive: false });
+          measure();
+          window.addEventListener('resize', measure);
+          window.addEventListener('load', measure);
+        });
+
+        // the cursor over the row: a small card with the row's word running through it, like the Echo site.
+        // Computers only; the pointer itself stays visible.
+        var cursor = page.querySelector('[data-pp-cursor]');
+        if (cursor && fine && window.gsap) {
+          var texts = all('[data-pp-cursor-target]', cursor);
+          var xTo = gsap.quickTo(cursor, 'x', { duration: 0.4, ease: 'power3' });
+          var yTo = gsap.quickTo(cursor, 'y', { duration: 0.4, ease: 'power3' });
+          var lastX = -100, lastY = -100, current = null;
+          var check = function () {
+            if (!cursor.isConnected) return;
+            var el = document.elementFromPoint(lastX, lastY);
+            var hit = el && el.closest('[data-pp-cursor-text]');
+            if (hit === current) return;
+            current = hit;
+            if (hit) {
+              var word = hit.getAttribute('data-pp-cursor-text') + ' · ';
+              texts.forEach(function (t) { t.textContent = word; });
+              cursor.setAttribute('data-state', 'on');
+            } else cursor.setAttribute('data-state', 'off');
+          };
+          window.addEventListener('pointermove', function (e) { lastX = e.clientX; lastY = e.clientY; xTo(lastX); yTo(lastY); check(); }, { passive: true });
+          window.addEventListener('scroll', check, { passive: true });
+          window.addEventListener('pointerdown', function () { if (current) cursor.setAttribute('data-press', ''); });
+          window.addEventListener('pointerup', function () { cursor.removeAttribute('data-press'); });
+        }
+      });
+
+      if (!window.gsap || !window.ScrollTrigger || still) return;
+      gsap.registerPlugin(ScrollTrigger);
+
+      // the light sheet slides up over the row: while it comes up, the row sinks back a little and fades.
+      // It starts where the sheet first shows (the bottom of the screen, or where it already sits when the page
+      // opens, as on phones), so the row never starts out pushed down.
+      (function () {
+        var row = document.querySelector('.cs_rowwrap'), sheet = document.querySelector('.cs_sheet');
+        if (!row || !sheet || row.__pp) return;
+        row.__pp = true;
+        var sheetTop0 = sheet.getBoundingClientRect().top + window.scrollY;
+        gsap.fromTo(row, { yPercent: 0, opacity: 1 }, { yPercent: 18, opacity: 0.45, ease: 'none', scrollTrigger: {
+          trigger: sheet, scrub: true, end: 'top 25%',
+          start: function () { return 'top ' + Math.round(Math.min(window.innerHeight, sheetTop0 - 1)) + 'px'; }
+        } });
+      })();
+
+      // the ticket: out from under the dark part, from above down to the middle and out of the shadow; then, while
+      // More work slides up over it, it sinks back a little and darkens. Same numbers as on /work.
+      (function () {
+        var pass = document.querySelector('.hx_pass'), arch = document.querySelector('.cs_more');
+        if (!pass || !arch || pass.__pp) return;
+        pass.__pp = true;
+        var inner = [].filter.call(pass.children, function (c) { return !c.classList.contains('grain') && !c.classList.contains('hx_dim'); })[0];
+        if (!inner) return;
+        var dim = pass.querySelector(':scope > .hx_dim');
+        if (!dim) { dim = document.createElement('div'); dim.className = 'hx_dim'; dim.setAttribute('aria-hidden', 'true'); pass.appendChild(dim); }
+        var a = { y: -40, dim: 0.55 }, b = { y: 0, dim: 0 };
+        var setY = gsap.quickSetter(inner, 'yPercent'), setDim = gsap.quickSetter(dim, 'opacity');
+        function draw() { setY(a.y + b.y); setDim(a.dim + b.dim); }
+        gsap.to(a, { y: 0, dim: 0, ease: 'none', onUpdate: draw, scrollTrigger: { trigger: pass, start: 'top bottom', end: 'center center', scrub: true } });
+        gsap.to(b, { y: 24, dim: 0.55, ease: 'none', onUpdate: draw, scrollTrigger: { trigger: arch, start: 'top bottom', end: 'top 10%', scrub: true } });
+        draw();
+      })();
+    });
+  }
+
+  // rdCaseDrum — was: embed in .loc_show: the drum on the old project pages
+  function rdCaseDrum() {
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!window.gsap) return;
+      var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var rnd = gsap.utils.random;
+      [].slice.call(document.querySelectorAll('.loc_show')).forEach(function (sec) {
+        var cursor = sec.querySelector('[data-rw-cursor]');
+        var zone = sec.querySelector('.loc_show-stage') || sec.querySelector('[data-spatial-slider-init]');
+        var link = sec.querySelector('[data-rw-link]');
+        if (!cursor || !zone || cursor.__rw) return;
+        cursor.__rw = true;
+
+        // a click on the drum (not a drag) opens /work
+        var down = null;
+        zone.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY, t: performance.now() }; if (fine) cursor.setAttribute('data-press', ''); }, true);
+        window.addEventListener('pointerup', function (e) {
+          cursor.removeAttribute('data-press');
+          if (!down) return;
+          var moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), quick = performance.now() - down.t < 450;
+          var onDrum = zone.contains(document.elementFromPoint(e.clientX, e.clientY));
+          down = null;
+          if (moved < 6 && quick && onDrum && link && link.getAttribute('href')) link.click();
+        });
+        if (!fine) return;
+
+        // a transformed parent would carry a fixed card along with it: then the card goes to the body while the drum is on the page
+        for (var p = cursor.parentElement; p && p !== document.body; p = p.parentElement) {
+          var cs = getComputedStyle(p);
+          if (cs.transform !== 'none' || cs.filter !== 'none' || cs.perspective !== 'none') { document.body.appendChild(cursor); break; }
+        }
+
+        // the letters, each its own box with three hand-placed poses (the boil)
+        var text = cursor.querySelector('[data-rw-text]');
+        var word = text.textContent; text.textContent = '';
+        var chars = Array.from(word).map(function (ch) { var s = document.createElement('span'); s.className = 'rw_ch'; s.textContent = ch; text.appendChild(s); return s; });
+        var poses = chars.map(function () { return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.8, 0.8), rotation: rnd(-4, 4) }; }); });
+        var tilt = [rnd(-1.6, -0.6), rnd(-0.3, 0.3), rnd(0.6, 1.6)];
+        gsap.set(chars, { transformOrigin: '50% 55%' });
+        var FPS = 9, t0 = 0, last = -1, running = false;
+        function tick() {
+          var f = Math.floor((gsap.ticker.time - t0) * FPS);
+          if (f === last) return;
+          last = f;
+          chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
+          gsap.set(text, { rotation: tilt[f % 3] });
+        }
+        function boil(on) {
+          if (still || on === running) return;
+          running = on;
+          if (on) { t0 = gsap.ticker.time; last = -1; gsap.ticker.add(tick); }
+          else { gsap.ticker.remove(tick); gsap.to(chars.concat(text), { x: 0, y: 0, rotation: 0, duration: 0.3, ease: 'power3.out', overwrite: 'auto' }); }
+        }
+
+        var xTo = gsap.quickTo(cursor, 'x', { duration: 0.35, ease: 'power3' });
+        var yTo = gsap.quickTo(cursor, 'y', { duration: 0.35, ease: 'power3' });
+        var lastX = -200, lastY = -200, on = false;
+        function check() {
+          if (!sec.isConnected) { if (cursor.parentNode) cursor.parentNode.removeChild(cursor); boil(false); return; }
+          var el = document.elementFromPoint(lastX, lastY);
+          var hit = !!(el && zone.contains(el));
+          if (hit === on) return;
+          on = hit;
+          cursor.setAttribute('data-state', on ? 'on' : 'off');
+          boil(on);
+        }
+        window.addEventListener('pointermove', function (e) { if (e.pointerType !== 'mouse') return; lastX = e.clientX; lastY = e.clientY; xTo(lastX); yTo(lastY); check(); }, { passive: true });
+        window.addEventListener('scroll', check, { passive: true });
+        document.documentElement.addEventListener('pointerleave', function () { lastX = lastY = -200; check(); });
+      });
+    });
+  }
+
+  // rdBlogCardLinks — was: site footer code ("BLOG CARDS" stopgap): links + dates of the article cards
+  function rdBlogCardLinks() {
+    (function(){
+      var map=null,queued=false;
+      function load(){
+        if(map) return map;
+        var nl=/^\/nl(\/|$)/.test(location.pathname);
+        map=fetch((nl?'/nl':'')+'/resources',{credentials:'same-origin'}).then(function(r){return r.text();}).then(function(t){
+          var d=new DOMParser().parseFromString(t,'text/html'),m={},list=[];
+          d.querySelectorAll('.ac_card').forEach(function(a){var ti=a.querySelector('.ac_title'),da=a.querySelector('.ac_date');if(!ti)return;var e={title:ti.textContent.trim(),href:a.getAttribute('href'),date:da?da.textContent.trim():'',node:a};m[e.title]=e;list.push(e);});
+          return {m:m,list:list};
+        }).catch(function(){map=null;return {m:{},list:[]};});
+        return map;
+      }
+      function norm(p){return (p||'').replace(/[?#].*$/,'').replace(/\/$/,'');}
+      function fix(){
+        queued=false;
+        var cards=[].slice.call(document.querySelectorAll('.tk_section .ac_card:not([data-ac-done])'));
+        if(!cards.length) return;
+        load().then(function(r){
+          var here=norm(location.pathname),shown={};
+          cards.forEach(function(a){var ti=a.querySelector('.ac_title'),e=ti&&r.m[ti.textContent.trim()];
+            if(e&&a.getAttribute('href')==='#'){a.setAttribute('href',e.href);var da=a.querySelector('.ac_date');if(da&&e.date)da.textContent=e.date;}
+            a.setAttribute('data-ac-done','');});
+          if(!/\/post\//.test(here))return;
+          var live=[].slice.call(document.querySelectorAll('.tk_section .ac_card'));
+          live.forEach(function(a){shown[norm(a.getAttribute('href'))]=1;});
+          live.forEach(function(a){
+            if(!a.parentNode||norm(a.getAttribute('href'))!==here)return;
+            var pick=r.list.filter(function(e){var h=norm(e.href);return h!==here&&!shown[h];})[0];
+            if(!pick)return;
+            var c=document.importNode(pick.node,true);c.setAttribute('data-ac-done','');shown[norm(pick.href)]=1;
+            a.parentNode.replaceChild(c,a);
+          });
+        });
+      }
+      function soon(){if(!queued){queued=true;requestAnimationFrame(fix);}}
+      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',soon);else soon();
+      new MutationObserver(soon).observe(document.body,{childList:true,subtree:true});
+    })();
+  }
+
+  // rdSvcHero — was: /service, page footer code
+  function rdSvcHero() {
+    /* SERVICE HERO (hero chat, lab prototype/service-hero-2, Rimbo's pick: Frame + Track + outline build).
+       The look is in the Designer (svh_title, svh_g, svh_gv, svh_dim, svh_lab); this code only moves it:
+       the letters come in from wide, drawn as white outlines and filled (the footer logo's build), the guides and measure lines
+       draw in, and the labels show the title's real width and cap height.
+       - The letters slide with transforms, one SVG letter each, not with letter-spacing: letter-spacing snaps them to whole
+         pixels and they clicked into place in the slow end (Rimbo, 2026-11-10).
+       - The drawn SVG letters STAY as the visible title; the HTML title stays in the page for search and screen readers but is
+         see-through. Any swap back to the HTML text flickered (SVG and HTML text are smoothed differently); Rimbo is fine with
+         a title that isn't selectable text. On resize the letters are placed again.
+       - Browsers put this font's baseline in different places (Firefox/Safari ~23 px higher than Chrome), so the baseline is
+         measured here and handed to the classes as --svh-base and --svh-cap (their em values are only the Designer fallback).
+       - After a page transition it starts when the cube has rolled over. */
+    (function () {
+      var root = document.documentElement;
+      var hero = document.querySelector('.sv_hero'), box = hero && hero.querySelector('[data-svh="title"]');
+      if (!box || !window.gsap) { root.classList.remove('svh-pre'); return; }
+      var text = box.querySelector('[data-svh="text"]'), dims = box.querySelector('[data-svh="dims"]');
+      var labW = box.querySelector('[data-svh="w"]'), labH = box.querySelector('[data-svh="h"]');
+      var kicker = hero.querySelector('.sv_kicker'), ruler = hero.querySelector('.sv_ruler');
+      var ctx = document.createElement('canvas').getContext('2d');
+      var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var ease = window.CustomEase ? CustomEase.create('svhOsmo', '0.625, 0.05, 0, 1') : 'expo.inOut';
+      var STROKE = '#f8f5ee', BEIGE = '248, 245, 238', NS = 'http://www.w3.org/2000/svg', WIDE = 0.14; // em between the letters at the start
+      var running = false, kept = null;
+      // the SVG letters on the HTML title's places: x from the advance (incl. kerning with the letter before), y on the baseline
+      function layoutLetters(m) {
+        if (!kept) return;
+        ctx.letterSpacing = '0px';
+        kept.letters.forEach(function (L) {
+          var ch = kept.txt[L.i], x = ctx.measureText(kept.txt.slice(0, L.i + 1)).width - ctx.measureText(ch).width;
+          L.el.setAttribute('x', x.toFixed(2)); L.el.setAttribute('y', m.base.toFixed(2));
+          L.el.style.font = m.cs.fontWeight + ' ' + m.fs + 'px ' + m.cs.fontFamily;
+        });
+      }
+
+      // the title's ink width and cap height, measured with the real font (cap height = H to the baseline)
+      function metrics() {
+        var cs = getComputedStyle(text);
+        ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        ctx.letterSpacing = '0px';
+        var m = ctx.measureText(text.textContent.toUpperCase());
+        return { cs: cs, fs: parseFloat(cs.fontSize), w: m.actualBoundingBoxLeft + m.actualBoundingBoxRight, cap: ctx.measureText('H').actualBoundingBoxAscent };
+      }
+      // where this browser really draws the baseline: a 0 x 0 box sitting on it (screen distance divided by the scale, so a cube
+      // still settling can't skew it, and no rounding to whole pixels)
+      function place() {
+        var m = metrics(), pr = document.createElement('span');
+        pr.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+        text.appendChild(pr);
+        var br = box.getBoundingClientRect(), k = box.offsetHeight ? br.height / box.offsetHeight : 1;
+        m.base = k > 0.2 ? (pr.getBoundingClientRect().top - br.top) / k : pr.offsetTop;
+        pr.remove();
+        box.style.setProperty('--svh-base', m.base.toFixed(2) + 'px');
+        box.style.setProperty('--svh-cap', (m.base - m.cap).toFixed(2) + 'px');
+        return m;
+      }
+      function labels() { var m = metrics(); labW.textContent = Math.round(m.w) + ' PX'; labH.textContent = Math.round(m.cap) + ' PX'; return m; }
+
+      function play() {
+        root.classList.remove('svh-pre');
+        var m = place();
+        labels();
+        hero.dispatchEvent(new CustomEvent('svh:play')); // the ball (script below) starts with the title
+        if (reduce) return;
+        running = true;
+
+        // one SVG letter per glyph, placed where the HTML title has it (advance incl. kerning with the letter before)
+        var txt = text.textContent.toUpperCase(), D = Math.round(m.fs * 8), letters = [], o = { settle: 0 }, sp = { s: WIDE * m.fs };
+        var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'svh_out'); svg.setAttribute('aria-hidden', 'true');
+        txt.split('').forEach(function (ch, i) {
+          if (ch === ' ') return;
+          var t = document.createElementNS(NS, 'text'); t.textContent = ch;
+          t.style.stroke = STROKE; t.style.strokeWidth = '1px'; t.style.fill = 'rgba(' + BEIGE + ',0)'; t.style.strokeDasharray = '0 ' + D;
+          svg.appendChild(t); letters.push({ el: t, i: i, o: 0, f: 0 });
+        });
+        kept = { svg: svg, letters: letters, txt: txt };
+        layoutLetters(m);
+        box.appendChild(svg);
+        text.style.color = 'transparent';
+
+        var g = dims.querySelectorAll('.svh_g'), gv = dims.querySelectorAll('.svh_gv'), gvR = dims.querySelector('.svh_gv.is-right');
+        var dw = dims.querySelector('.svh_dim.is-w'), dh = dims.querySelector('.svh_dim.is-h');
+        var n = txt.length - 1;
+        function paint() {
+          letters.forEach(function (L) {
+            L.el.style.strokeDasharray = (L.o * D).toFixed(1) + ' ' + D;
+            L.el.style.fill = 'rgba(' + BEIGE + ',' + L.f.toFixed(3) + ')';
+            L.el.style.strokeOpacity = (1 - o.settle).toFixed(3);
+          });
+        }
+        // the spread: letters, right guide, height line and the width line's right end all move by transforms, smoothly
+        function spread() {
+          var extra = n * sp.s;
+          letters.forEach(function (L) { L.el.setAttribute('transform', 'translate(' + (L.i * sp.s).toFixed(3) + ' 0)'); });
+          // through GSAP, so the move adds up with the guide's own draw-in (scaleY); a hand-set transform was overwritten by it
+          // every frame and the guide sat still while the E moved (Rimbo, 2026-11-10)
+          gsap.set([gvR, dh], { x: extra });
+          dw.style.right = 'calc(0.015em - ' + extra.toFixed(3) + 'px)';
+          labW.textContent = Math.round(m.w + extra) + ' PX';
+        }
+        function done() {
+          // the drawn letters stay: no stroke left, full fill, no transform
+          letters.forEach(function (L) { L.el.style.stroke = 'none'; L.el.style.strokeDasharray = ''; L.el.style.fill = 'rgb(' + BEIGE + ')'; L.el.removeAttribute('transform'); });
+          gsap.set([dw, dh, gvR], { clearProps: 'clipPath,transform,right' });
+          labels(); running = false;
+        }
+
+        // the guides draw from the frame line on the left, the side guides from under the ruler
+        var under = ruler ? ruler.offsetTop + ruler.offsetHeight : 12;
+        gsap.set(g, { transformOrigin: (-g[0].offsetLeft - box.offsetLeft) + 'px 50%' });
+        gsap.set(gv, { transformOrigin: '50% ' + (-gv[0].offsetTop - box.offsetTop + under) + 'px' });
+        spread(); paint();
+
+        var tl = gsap.timeline({ onComplete: done });
+        tl.from(kicker, { autoAlpha: 0, y: 8, duration: 0.9, ease: ease }, 0);
+        tl.to(sp, { s: 0, duration: 2, ease: ease, onUpdate: spread }, 0);
+        letters.forEach(function (L, i) {
+          tl.to(L, { o: 1, duration: 0.9, ease: 'power2.inOut', onUpdate: paint }, 0.05 + i * 0.05);
+          tl.to(L, { f: 1, duration: 0.45, ease: 'power1.inOut', onUpdate: paint }, 0.75 + i * 0.045);
+        });
+        tl.to(o, { settle: 1, duration: 0.5, ease: 'power1.inOut', onUpdate: paint }, 1.55);
+        g.forEach(function (el, i) { tl.from(el, { scaleX: 0, duration: 1.4, ease: ease }, -0.05 + i * 0.08); });
+        gv.forEach(function (el, i) { tl.from(el, { scaleY: 0, duration: 1.2, ease: ease }, 0.05 + i * 0.08); });
+        // the measure lines are revealed (clipped), not scaled, so their labels keep their shape
+        tl.fromTo(dw, { clipPath: 'inset(-12px 100% -12px 0px)' }, { clipPath: 'inset(-12px 0% -12px 0px)', duration: 1.1, ease: ease }, 0.05);
+        tl.from(labW, { autoAlpha: 0, duration: 0.3 }, 0.15);
+        var hc = { v: 0 };
+        tl.fromTo(dh, { clipPath: 'inset(100% -300px 0% -12px)' }, { clipPath: 'inset(0% -300px 0% -12px)', duration: 0.9, ease: ease }, 0.35);
+        tl.from(labH, { autoAlpha: 0, duration: 0.25 }, 0.5);
+        tl.to(hc, { v: m.cap, duration: 0.8, ease: ease, onUpdate: function () { labH.textContent = Math.round(hc.v) + ' PX'; } }, 0.5);
+      }
+
+      function start() {
+        place();
+        // on a page transition the page is on the cube's face by the next frame: wait until it has rolled over
+        requestAnimationFrame(function () {
+          if (document.querySelector('.page-transition__stage')) gsap.delayedCall(1.25, play);
+          else gsap.delayedCall(0.15, play);
+        });
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(start); else start();
+      window.addEventListener('resize', function () { if (!running) { var m = place(); labels(); layoutLetters(m); } });
+    })();
+  }
+
+  // rdSvcBall — was: /service, page footer code
+  function rdSvcBall() {
+    /* SERVICE HERO BALL (hero chat, lab prototype/service-hero-2 ball.js, Rimbo's pick 2026-11-10: "E x ruler", Bloom, L).
+       The brand's living ball (the site's ball shader, as main.js rdLocBalls) centred where the E's guide line meets the ruler,
+       so the ruler cuts off its top half (Designer: svh_ball_clip starts under the ruler, svh_ball holds the canvas, size is
+       the class's width). It arrives as a measured drawing: a cross on the ruler line, the radius out down-left with the
+       number counting (svh_lab is-ball), the dashed ring sweeping round from there with ticks at the quarters, then the colour
+       blooms in from the middle. After that only the number fades; ring and ticks stay. The pointer warms the colour. */
+    (function () {
+      var hero = document.querySelector('.sv_hero');
+      var clip = hero && hero.querySelector('[data-svh="ball-clip"]'), ball = hero && hero.querySelector('[data-svh="ball"]');
+      var cv = hero && hero.querySelector('[data-svh="ball-cv"]'), marks = hero && hero.querySelector('[data-svh="ball-marks"]');
+      var label = hero && hero.querySelector('[data-svh="ball-lab"]'), ruler = hero && hero.querySelector('.sv_ruler');
+      var guide = hero && hero.querySelector('.svh_gv.is-right'), title = hero && hero.querySelector('[data-svh="title"]');
+      if (!ball || !cv || !marks || !label || !guide || !title || !window.gsap) return;
+      var gl = document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+      var NS = 'http://www.w3.org/2000/svg', DEG = 135, calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var bloom = window.CustomEase ? CustomEase.create('svhBloom', '0.32, 0, 0.12, 1') : 'power3.out';
+      var ease = window.CustomEase ? CustomEase.create('svhOsmo2', '0.625, 0.05, 0, 1') : 'expo.inOut';
+      var fx = { reveal: 0, grow: 1 }, b = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 }, time = 0, last = 0, lastDraw = 0, raf = 0, on = false, D = 0, parts = null, U = {};
+      if (!gl) { clip.style.display = marks.style.display = 'none'; return; }
+
+      var FRAG = "#version 300 es\nprecision highp float;\n" +
+        "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
+        "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3]; uniform float reveal; uniform int mode;\nout vec4 outColor;\n" +
+        "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
+        "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
+        "  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n" +
+        "float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n" +
+        "float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n" +
+        "vec3 fromLab(vec3 c) {\n" +
+        "  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n" +
+        "  l = l * l * l; m = m * m * m; s = s * s * s;\n" +
+        "  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n}\n" +
+        "vec3 ramp(float v) { vec3 c = stops[0]; for (int i = 0; i < 3; i++) c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); return fromLab(c); }\n" +
+        "void main() {\n  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n  vec2 l = (p - center) / R;\n" +
+        "  float r = length(l), aa = 1.2 / R;\n  if (r > 1.0 + aa) { outColor = vec4(0.0); return; }\n" +
+        "  vec2 gp = floor(p / grainScale);\n  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
+        "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n  float h = hash(vec2(seed));\n" +
+        "  float ang = h * 6.2831 + t * 0.16;\n  float g = 0.53 + 0.14 * dot(l, vec2(cos(ang), sin(ang)));\n" +
+        "  vec2 drift = vec2(sin(t * 0.34 + h * 6.2831), cos(t * 0.27 + h * 12.566)) * 0.62;\n" +
+        "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
+        "  float f = fbm(l * 1.0 + w * 1.3 + h * 90.0);\n  float v = g + (f - 0.5) * 1.5 + bias - heat * 0.45;\n" +
+        "  float dp = length(p - ptr) / max(ptrR, 1.0);\n  v -= ptrAmt * 0.6 * exp(-dp * dp);\n" +
+        "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
+        // how the colour comes in (round 5): 0 iris (a clean circle from the middle), 1 bloom (an organic edge that grows from
+        // the middle and settles), 2 sweep (round, after the ring, from the left), 3 rise (fills up from below with a soft wave)
+        "  float m = 1.0;\n" +
+        "  if (mode == 0) m = smoothstep(reveal * 1.03, reveal * 1.03 - 0.02, r);\n" +
+        "  else if (mode == 1) { float e = reveal * 1.35; float wob = (fbm(l * 2.2 + h * 30.0 + t * 0.15) - 0.5) * 0.55 * (1.0 - reveal * 0.6); m = smoothstep(e, e - 0.18, r + wob) * smoothstep(0.0, 0.06, reveal); }\n" +
+        "  else if (mode == 2) { float fr = mod(atan(l.y, l.x) - 3.14159265, 6.2831853) / 6.2831853; float e = reveal * 1.12; m = smoothstep(e, e - 0.1, fr); }\n" +
+        "  else { float lev = 1.08 - reveal * 2.3; float wave = sin(l.x * 5.0 + t * 1.6) * 0.05 + sin(l.x * 9.0 - t * 1.1) * 0.025; m = smoothstep(lev - 0.03, lev + 0.03, l.y + wave); }\n" +
+        "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r) * m);\n}";
+      function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; }
+      var prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { clip.style.display = marks.style.display = 'none'; return; }
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      ['res', 'center', 'R', 'seed', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'stops', 'edges', 'reveal', 'mode'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+      function oklab(hex) {
+        var c = [0, 2, 4].map(function (i) { var v = parseInt(hex.substr(i, 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+        var l = Math.cbrt(0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]);
+        var m = Math.cbrt(0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]);
+        var s = Math.cbrt(0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]);
+        return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+      }
+      gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
+      gl.uniform2fv(U.edges, new Float32Array([0.12, 0.28, 0.26, 0.46, 0.5, 0.84]));
+      gl.uniform1f(U.heat, 0); gl.uniform1i(U.mode, 1); // 1 = bloom
+
+      function draw() {
+        if (!D) return;
+        var dpr = Math.min(window.devicePixelRatio || 1, 1.5), W = Math.round(D * dpr);
+        if (cv.width !== W) { cv.width = W; cv.height = W; }
+        if (gl.canvas.width !== W) { gl.canvas.width = W; gl.canvas.height = W; }
+        gl.viewport(0, 0, W, W);
+        var f = time, R = (D / 2 - 9) * fx.grow * (calm ? 1 : 1 + Math.sin(f * 0.37) * 0.015);
+        gl.uniform1f(U.reveal, fx.reveal); gl.uniform2f(U.res, W, W); gl.uniform2f(U.center, W / 2, W / 2);
+        gl.uniform1f(U.R, R * dpr); gl.uniform1f(U.seed, 23); gl.uniform1f(U.bias, -0.12); gl.uniform1f(U.grainScale, dpr * 0.75); gl.uniform1f(U.t, f);
+        gl.uniform2f(U.ptr, b.x * dpr, b.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(R * 0.4, 60), 160) * dpr); gl.uniform1f(U.ptrAmt, b.amt);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
+        var c2 = cv.getContext('2d'); c2.clearRect(0, 0, W, W); c2.drawImage(gl.canvas, 0, 0);
+      }
+      // runs only while the hero is on screen, and stops for good once the page has been left (page transitions)
+      function frame(now) {
+        if (!hero.isConnected) return;
+        if (!on || document.hidden) { raf = 0; return; }
+        raf = requestAnimationFrame(frame);
+        var dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now; time += dt;
+        b.x += (b.tx - b.x) * 0.12; b.y += (b.ty - b.y) * 0.12; b.amt += (b.target - b.amt) * 0.06;
+        if (fx.reveal >= 1 && fx.grow >= 1 && now - lastDraw < 33) return; // 30 frames a second for slow colours, every frame while it blooms
+        lastDraw = now; draw();
+      }
+      function run() { if (!raf && !calm && on) { last = 0; raf = requestAnimationFrame(frame); } }
+      new IntersectionObserver(function (es) { on = es[0].isIntersecting; if (on) run(); }).observe(hero);
+      document.addEventListener('visibilitychange', run);
+
+      // place it: centre on the E's line (the guide's resting place) where it meets the ruler; draw the ring, ticks and marks
+      function layout() {
+        D = ball.offsetWidth;
+        var under = ruler ? ruler.offsetTop + ruler.offsetHeight : 92, ex = title.offsetLeft + guide.offsetLeft;
+        clip.style.top = under + 'px';
+        ball.style.left = marks.style.left = (ex - D / 2).toFixed(1) + 'px';
+        ball.style.top = (-D / 2) + 'px'; marks.style.top = (under - D / 2) + 'px';
+        var c = D / 2, r = c - 0.5, C = 2 * Math.PI * r, k = 5, ra = DEG * Math.PI / 180, ticks = '';
+        [0, 90, 180, 270].forEach(function (d) {
+          var t = d * Math.PI / 180;
+          ticks += '<line data-deg="' + d + '" x1="' + (c + Math.cos(t) * (r + 3)).toFixed(1) + '" y1="' + (c + Math.sin(t) * (r + 3)).toFixed(1) +
+            '" x2="' + (c + Math.cos(t) * (r + 10)).toFixed(1) + '" y2="' + (c + Math.sin(t) * (r + 10)).toFixed(1) + '"/>';
+        });
+        var old = ball.querySelector('svg'); if (old) old.remove();
+        var oldM = marks.querySelector('svg'); if (oldM) oldM.remove();
+        var st = 'position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none';
+        ball.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 ' + D + ' ' + D + '" style="' + st + '">' +
+          '<defs><mask id="svhBallMask" maskUnits="userSpaceOnUse" x="-20" y="-20" width="' + (D + 40) + '" height="' + (D + 40) + '"><circle cx="' + c + '" cy="' + c + '" r="' + r +
+          '" fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="' + C + '" stroke-dashoffset="' + C + '" transform="rotate(' + DEG + ' ' + c + ' ' + c + ')"/></mask></defs>' +
+          '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="none" stroke="rgba(248,245,238,.35)" stroke-width="1" stroke-dasharray="4 4" mask="url(#svhBallMask)"/>' +
+          '<g stroke="rgba(248,245,238,.45)" stroke-width="1">' + ticks + '</g></svg>');
+        var ex2 = c + Math.cos(ra) * r, ey2 = c + Math.sin(ra) * r;
+        marks.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 ' + D + ' ' + D + '" style="' + st + '"><g stroke="rgba(248,245,238,.45)" stroke-width="1">' +
+          '<line data-rad x1="' + c + '" y1="' + c + '" x2="' + ex2.toFixed(1) + '" y2="' + ey2.toFixed(1) + '" pathLength="1" stroke-dasharray="1 1"/>' +
+          '<g data-cross><line x1="' + (c - k) + '" y1="' + c + '" x2="' + (c + k) + '" y2="' + c + '"/><line x1="' + c + '" y1="' + (c - k) + '" x2="' + c + '" y2="' + (c + k) + '"/></g></g></svg>');
+        label.style.left = (c + Math.cos(ra) * (r + 16)).toFixed(1) + 'px'; label.style.top = (c + Math.sin(ra) * (r + 16)).toFixed(1) + 'px';
+        label.style.transform = 'translate(-100%, 0)';
+        parts = { mask: ball.querySelector('mask circle'), C: C, rad: marks.querySelector('[data-rad]'), cross: marks.querySelector('[data-cross]'),
+          ticks: [0, 90, 180, 270].sort(function (p, q) { return ((p - DEG + 360) % 360) - ((q - DEG + 360) % 360); })
+            .map(function (d) { return ball.querySelector('line[data-deg="' + d + '"]'); }) };
+      }
+
+      if (!calm) {
+        ball.addEventListener('pointermove', function (e) {
+          if (e.pointerType === 'touch') return;
+          var rr = ball.getBoundingClientRect(), kk = rr.width / D; b.tx = (e.clientX - rr.left) / kk; b.ty = (e.clientY - rr.top) / kk;
+          if (!b.target) { b.x = b.tx; b.y = b.ty; }
+          b.target = 1;
+        });
+        ball.addEventListener('pointerleave', function () { b.target = 0; });
+      }
+
+      var played = false;
+      hero.addEventListener('svh:play', function () {
+        layout(); played = true;
+        if (calm) { fx.reveal = 1; parts.mask.setAttribute('stroke-dashoffset', 0); gsap.set([parts.rad, parts.cross, label], { autoAlpha: 0 }); draw(); return; }
+        var bc = { v: 0 }, at = 0.5;
+        var tl = gsap.timeline();
+        tl.fromTo(parts.cross, { scale: 0, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.5, ease: 'back.out(2)' }, at);
+        tl.fromTo(parts.rad, { attr: { 'stroke-dashoffset': 1 } }, { attr: { 'stroke-dashoffset': 0 }, duration: 0.7, ease: ease }, at + 0.25);
+        tl.fromTo(label, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, at + 0.35);
+        tl.fromTo(bc, { v: 0 }, { v: D, duration: 0.9, ease: ease, onUpdate: function () { label.textContent = 'Ø ' + Math.round(bc.v) + ' PX'; } }, at + 0.3);
+        tl.fromTo(parts.mask, { attr: { 'stroke-dashoffset': parts.C } }, { attr: { 'stroke-dashoffset': 0 }, duration: 1.4, ease: 'power2.inOut' }, at + 0.8);
+        parts.ticks.forEach(function (t, i) { tl.fromTo(t, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 }, at + 0.8 + i * 0.33); });
+        tl.fromTo(fx, { reveal: 0 }, { reveal: 1, duration: 1.9, ease: bloom }, at + 2);
+        tl.fromTo(fx, { grow: 0.88 }, { grow: 1, duration: 2.3, ease: bloom }, at + 2);
+        tl.to([parts.cross, parts.rad], { autoAlpha: 0, duration: 0.6 }, at + 2.3);
+        tl.to(label, { autoAlpha: 0, duration: 0.9, ease: 'power1.inOut' }, at + 3.9); // only the number goes; ring and ticks stay
+        run();
+      });
+      window.addEventListener('resize', function () {
+        if (!played) return;
+        var keepTicks = parts && parts.ticks.map(function (t) { return t && getComputedStyle(t).opacity; });
+        layout();
+        // after a resize everything is in its end state: ring whole, ticks shown, marks gone
+        parts.mask.setAttribute('stroke-dashoffset', 0); gsap.set([parts.rad, parts.cross, label], { autoAlpha: 0 });
+        draw();
+      });
+    })();
+  }
+
+  // rdContactCopy — was: /contact, page footer code
+  function rdContactCopy() {
+    (function () {
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest ? e.target.closest('[data-ct-copy]') : null;
+        if (!a || !navigator.clipboard || !navigator.clipboard.writeText) return;
+        e.preventDefault();
+        navigator.clipboard.writeText(a.getAttribute('data-ct-copy')).then(function () {
+          var t = a.parentElement ? a.parentElement.querySelector('[data-ct-toast]') : null;
+          if (!t) return;
+          clearTimeout(t.rdCtT);
+          if (window.gsap) {
+            gsap.killTweensOf(t);
+            gsap.fromTo(t, { autoAlpha: 0, y: -6 }, { autoAlpha: 1, y: 0, duration: 0.35, ease: 'expo.out' });
+            t.rdCtT = setTimeout(function () { gsap.to(t, { autoAlpha: 0, y: -4, duration: 0.4, ease: 'power2.in' }); }, 1800);
+          } else {
+            t.style.opacity = 1;
+            t.rdCtT = setTimeout(function () { t.style.opacity = 0; }, 1800);
+          }
+        }, function () { window.location.href = a.href; });
+      });
+    })();
+  }
+
+  // The 404 game and the /proposal calculator are their own files, loaded by their pages after this one: their start
+  // waits for them (on a first load they only arrive after this file; after a page transition they are already there)
+  function rdBotsStart() { if(window.rdBotsScreen)rdBotsScreen();if(window.rdBots)rdBots(); }
+  function rdCalcMount() { window.rdCalc && rdCalc.mount(); }
+  function afterPageFiles(name, fn) {
+    var go = inZone(function () { run(name, fn); });
+    if (document.readyState === 'loading') EventTarget.prototype.addEventListener.call(document, 'DOMContentLoaded', go);
+    else go();
+  }
+
+  // Is this script still in the page's own HTML (Webflow not cleaned yet)? Then that copy runs, not ours
+  function stillInWebflow(source, signs) {
+    return qsa('script:not([src])', source).some(function (el) {
+      return signs.some(function (s) { return el.textContent.indexOf(s) >= 0; });
+    });
+  }
+
+  // source = the page's HTML: the document on a first load, the fetched page after a transition
+  function fromWebflow(source) {
+    var path = pagePath();
+    var list = [
+      [path === '/service' && has('.svh_hold'), 'rdSvcPlaces', rdSvcPlaces, ['SERVICE HERO: THE FIRST BAND']],
+      [path === '/service' && has('.svh_hold'), 'rdSvcPin', rdSvcPin, ['SERVICE HERO: PINNED + SHRINK']],
+      [path === '/service' && has('#map'), 'rdSvcMap', rdSvcMap, ['THE MAP: the one effect']],
+      [path === '/service' && has('#map'), 'rdSvcMapLive', rdSvcMapLive, ['THE MAP: contour lines that move']],
+      [path === '/service' && has('#map'), 'rdSvcMapHold', rdSvcMapHold, ['THE MAP holds still while the next section']],
+      [path === '/service' && has('#how'), 'rdHowItGoes', rdHowItGoes, ['03 HOW IT GOES']],
+      [path === '/service', 'rdSvcLayers', rdSvcLayers, ['How it goes holds still at its end']],
+      [has('[data-fold="faq"]'), 'rdFoldFaq', rdFoldFaq, ['all questions start closed; one open at a time', 'all questions start closed and only one is open']],
+      [has('[data-ex]'), 'rdPostEnd', rdPostEnd, ["querySelectorAll('[data-ex]:not([data-ex-on])')"]],
+      [path === '/work' && has('.wh'), 'rdWorkHeroLoad', rdWorkHeroLoad, ['load Tinko, then the hero']],
+      [path === '/work' && has('.ws_wrap'), 'rdWorkSplit', rdWorkSplit, ["var wrap = document.querySelector('.ws_wrap'); if (!wrap) return;"]],
+      [path === '/work', 'rdWorkLayers', rdWorkLayers, ["var pass = document.querySelector('.hx_pass'), arch = document.getElementById('archive');"]],
+      [path === '/work' && has('[data-follower-wrap]'), 'rdWorkFollower', rdWorkFollower, ['function initPreviewFollower()']],
+      [path === '/work', 'rdWorkArchiveView', rdWorkArchiveView, ["var sec = document.getElementById('archive'); if (!sec) return;"]],
+      [has('.cs_page'), 'rdCasePage', rdCasePage, ['var ready = window.gsap && window.Draggable;']],
+      [has('.loc_show [data-rw-cursor]'), 'rdCaseDrum', rdCaseDrum, ["var cursor = sec.querySelector('[data-rw-cursor]');"]],
+      [true, 'rdBlogCardLinks', rdBlogCardLinks, ["querySelectorAll('.tk_section .ac_card:not([data-ac-done])')"]],
+      [path === '/service', 'rdSvcHero', rdSvcHero, ['SERVICE HERO (hero chat']],
+      [path === '/service', 'rdSvcBall', rdSvcBall, ['SERVICE HERO BALL']],
+      [path === '/contact', 'rdContactCopy', rdContactCopy, ['window.rdCtCopy = true;']]
+    ];
+    var waiting = [];
+    [window, document].forEach(function (target) {
+      target.addEventListener = function (type, fn, options) {
+        if (type === 'DOMContentLoaded' || type === 'load') { waiting.push(fn); return; }
+        EventTarget.prototype.addEventListener.call(target, type, fn, options);
+        rdUndo(function () { EventTarget.prototype.removeEventListener.call(target, type, fn, options); });
+      };
+    });
+    try {
+      list.forEach(function (row) {
+        if (row[0] && !stillInWebflow(source, row[3])) run(row[1], row[2]);
+      });
+      waiting.forEach(function (fn) { run('from webflow', fn, new Event('DOMContentLoaded')); });
+    } finally {
+      delete window.addEventListener;
+      delete document.addEventListener;
+    }
+    // the open graph address: the same as the old snippet in the head of /resources and the old project pages
+    if ((path === '/resources' || /^\/work\/(catherine-hamilton|grow-guide-tripsitters|henry-byrne-artist-portfolio-website|nathan-rajac|muzammil-hussain|pooh-balance|psychedelic-passage|mushroomtao)$/.test(path)) && !stillInWebflow(source, ['Find or create the Open Graph URL meta tag'])) run('og url', rdOgUrl);
+    if (qs('script[src*="/prototype/404/bots"]', source) && !stillInWebflow(source, ['if(window.rdBotsScreen)rdBotsScreen();'])) afterPageFiles('404 game', rdBotsStart);
+    if (qs('script[src*="/prototype/calculator/"]', source) && !stillInWebflow(source, ['window.rdCalc && rdCalc.mount();'])) afterPageFiles('calculator', rdCalcMount);
   }
 
   // What runs on which page. Runs on every page, first load or swap
