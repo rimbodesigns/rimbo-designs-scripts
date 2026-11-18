@@ -643,6 +643,36 @@
       });
     }
 
+    // What a browser gives a layer of its own (a 3D-turned element and what sits in it, a canvas, a video still), with
+    // its place on screen. Every block gets a whole copy of the page but shows only its own piece of it, and these
+    // layers came along in every copy: on a phone the home page's fifteen dial cards made over 1100 layers during the
+    // cut, where the page itself has 120 (Rimbo, on his iPhone: "it breaks the site... like it's too much or it
+    // crashes"). snapCopy() switches off the ones a block doesn't show
+    function markHeavy(el, clone) {
+      var a = [el].concat(Array.prototype.slice.call(el.querySelectorAll('*'))), b = [clone].concat(Array.prototype.slice.call(clone.querySelectorAll('*')));
+      if (a.length !== b.length) return;
+      var styles = a.map(function (n) { return window.getComputedStyle(n); }), where = new Map(), ext = [], i;
+      // the room an element takes on screen, together with everything inside it: a 3D wrapper often has no size of its
+      // own, and hiding it hides its cards too (the home dial lost them all in the first try)
+      for (i = 0; i < a.length; i++) {
+        where.set(a[i], i);
+        var q = a[i].getBoundingClientRect();
+        ext.push(q.width || q.height ? [q.left, q.top, q.right, q.bottom] : null);
+      }
+      for (i = a.length - 1; i > 0; i--) {
+        var p = where.get(a[i].parentElement), e = ext[i];
+        if (p === undefined || !e) continue;
+        ext[p] = ext[p] ? [Math.min(ext[p][0], e[0]), Math.min(ext[p][1], e[1]), Math.max(ext[p][2], e[2]), Math.max(ext[p][3], e[3])] : e.slice();
+      }
+      for (i = 0; i < a.length; i++) {
+        var n = a[i], cs = styles[i], up = where.get(n.parentElement);
+        if (!ext[i] || cs.visibility !== 'visible') continue;
+        var heavy = /^(CANVAS|VIDEO|IFRAME)$/.test(n.tagName) || cs.transform.indexOf('matrix3d') === 0 || cs.backfaceVisibility === 'hidden' ||
+          (up !== undefined && styles[up].transformStyle === 'preserve-3d');
+        if (heavy) b[i].setAttribute('data-rd-in', Math.floor(ext[i][0]) + ' ' + Math.floor(ext[i][1]) + ' ' + Math.ceil(ext[i][2]) + ' ' + Math.ceil(ext[i][3]));
+      }
+    }
+
     function walk(el, parent, base) {
       if (el.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(el.tagName)) return;
       var cs = getComputedStyle(el);
@@ -652,7 +682,7 @@
       if (!onScreen(r)) return;
       var open = r.height > H * 1.2 && el.children.length > 0 && cs.transform === 'none' && !/^(VIDEO|CANVAS|IMG|IFRAME|PICTURE|svg)$/i.test(el.tagName);
       var clone = el.cloneNode(!open);
-      if (!open) pinPictures(el, clone);
+      if (!open) { markHeavy(el, clone); pinPictures(el, clone); } // markHeavy first: it pairs the copy's elements with the page's by their order
       place(clone, el, r, base, cs);
       hoverLook(el, clone, !open);
       parent.appendChild(clone);
@@ -700,6 +730,7 @@
             still = pic;
           } catch (err) {} // a video from another site without permission: it stays a canvas
         }
+        if (c.hasAttribute('data-rd-in')) still.setAttribute('data-rd-in', c.getAttribute('data-rd-in'));
         c.parentNode.replaceChild(still, c);
       });
     }
@@ -713,9 +744,20 @@
   }
 
   // a copy of a snapshot for one block (canvases are copied empty, so they get their picture again)
-  function snapCopy(snap) {
+  // view = the block's piece of the screen [left, top, right, bottom]: the heavy pieces outside it (markHeavy) are
+  // switched off in this copy. Hidden, not removed, so nothing else in the copy moves
+  function snapCopy(snap, view) {
     var c = snap.cloneNode(true), from = snap.querySelectorAll('canvas'), to = c.querySelectorAll('canvas');
-    for (var i = 0; i < to.length; i++) { try { to[i].getContext('2d').drawImage(from[i], 0, 0); } catch (err) {} }
+    if (view) Array.prototype.forEach.call(c.querySelectorAll('[data-rd-in]'), function (n) {
+      var p = n.getAttribute('data-rd-in').split(' ');
+      if (+p[2] >= view[0] && +p[0] <= view[2] && +p[3] >= view[1] && +p[1] <= view[3]) return;
+      n.style.setProperty('visibility', 'hidden', 'important');
+      n.setAttribute('data-rd-off', '');
+    });
+    for (var i = 0; i < to.length; i++) {
+      if (to[i].hasAttribute('data-rd-off')) { to[i].width = to[i].height = 1; continue; } // no picture to keep in memory either
+      try { to[i].getContext('2d').drawImage(from[i], 0, 0); } catch (err) {}
+    }
     return c;
   }
 
@@ -789,7 +831,7 @@
     stage.style.background = CUBE_VOID; layer.root.style.perspective = W + 'px';
     grain.style.backgroundImage = CUBE_GRAIN;
     layer.root.appendChild(grain); layer.root.appendChild(scene);
-    var show = function (f, snap, c, r) { var copy = snapCopy(snap); copy.style.left = (-c * w) + 'px'; copy.style.top = (-r * h) + 'px'; f.appendChild(copy); };
+    var show = function (f, snap, c, r) { var copy = snapCopy(snap, [c * w - 8, r * h - 8, (c + 1) * w + 8, (r + 1) * h + 8]); copy.style.left = (-c * w) + 'px'; copy.style.top = (-r * h) + 'px'; f.appendChild(copy); };
     var face = function (box, css, side) {
       var f = document.createElement('div');
       f.className = 'rd-impact__face' + (side ? ' rd-impact__side' : '');
@@ -811,6 +853,17 @@
       gsap.set(box, { z: -depth, transformOrigin: '50% 50%', force3D: true });
       var vx = (c + 0.5) * w - point.x, vy = (r + 0.5) * h - point.y;
       blocks.push({ piece: piece, box: box, up: up, r: r, c: c, vx: vx, vy: vy, dist: Math.hypot(vx, vy) || 1 });
+    }
+
+    // Safari takes a shadow tree's style sheets into use a moment after they are handed over, and may paint a frame
+    // before that: every block then shows its piece of the page without any of the site's CSS, plain text on white, which
+    // on a phone reads as the site breaking (Rimbo, on his iPhone: "it breaks the site... like it's too much or it
+    // crashes"; seen in the iPhone Simulator, not on every run). Asking for a computed style inside the tree makes the
+    // browser take the sheets into use now. Called once the layer is on the page, and again when the next page's copy
+    // has gone on the blocks
+    function settle() {
+      var probe = scene.querySelector('.rd-snap') || scene;
+      try { void window.getComputedStyle(probe).position; } catch (err) {}
     }
 
     // The cut. The lines appearing all at once read as the site breaking (Rimbo: "the first fraction of a second feels a
@@ -867,7 +920,8 @@
     });
     return {
       stage: stage, tl: tl,
-      fill: function (newSnap) { layer.restyle(); blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); },
+      fill: function (newSnap) { layer.restyle(); blocks.forEach(function (b) { show(b.up, newSnap, b.c, b.r); }); settle(); },
+      settle: settle,
       // the cut's own animations hand the parted blocks to the timeline, in one frame
       burst: function () {
         moves.forEach(function (m) { m.cancel(); });
@@ -893,6 +947,7 @@
     if (rdNavFull.handOver) rdNavFull.handOver(oldSnap); // an open menu is cut up with the page
     var blocks = impactBlocks(oldSnap, W, H, point);
     document.body.appendChild(blocks.stage);
+    blocks.settle();
     if (window.lenis) window.lenis.stop();
     impactPending = { blocks: blocks, W: W, H: H, at: performance.now() };
     // the next page never came (Barba then loads it the plain way, or the visitor is offline): don't leave the cut standing
