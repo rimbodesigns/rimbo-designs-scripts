@@ -8394,7 +8394,7 @@
   // rdSvcPin — was: /service, embed in .svh_hold
   function rdSvcPin() {
     /* SERVICE HERO: PINNED + SHRINK. It only changes --svh-p, the hero's height (100svh, down to 80svh).
-       - Nobody scrolls: 5.8 s after the hero's 'svh:play' the hero eases down in 1.3 s, so the next section looks in.
+       - Nobody scrolls: 4.9 s after the hero's 'svh:play' (half a second after the ball has filled, 2026-11-18) the hero eases down in 1.3 s.
        - Somebody scrolls first: the scroll itself takes the hero down, 1 svh for every svh scrolled, until it is at 80svh.
          Nothing moves that the visitor did not move (before 2026-11-14 a scroll started a timed 0.9 s shrink: a 50 px
          scroll threw the next section 26svh up, Rimbo's "it jumps there"). It never grows back: scrolling up again
@@ -8410,7 +8410,7 @@
       var hero = document.querySelector('.sv_hero'), wrap = hero && hero.closest('.sv_wrap'), hold = hero && hero.closest('.svh_hold'), pin = hero && hero.closest('.svh_pin');
       if (!hero || !wrap || !hold || !pin || hero.dataset.pin) return; hero.dataset.pin = '1';
 
-      var FULL = 100, GIVE = 20, WAIT = 5.8;
+      var FULL = 100, GIVE = 20, WAIT = 4.9;
       var given = 0, waited = false, tween = null, idle = 0, onLenis = null;
       var calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
       var touch = matchMedia('(hover: none) and (pointer: coarse)').matches;
