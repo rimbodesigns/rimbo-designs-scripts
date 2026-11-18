@@ -5967,16 +5967,31 @@
       }
       paths[0].setAttribute('d', small); paths[1].setAttribute('d', big);
     }
+    // the boxes the grid lines run along. On a phone the Designer lays rdf-base-l out as a little grid of its own (display: grid
+    // at the phone breakpoint: the e-mail row, the two rdf-egg links as cells like the socials, the © line; Rimbo, 2026-11-19):
+    // then each of its full-width rows is a box and the two links are cells, instead of rdf-base-l as one box
+    function lineBoxes() {
+      var els = qsa('.rdf-cell, .rdf-soc', foot), bl = qs('.rdf-base-l', foot);
+      if (!bl) return els;
+      if (getComputedStyle(bl).display !== 'grid') { els.push(bl); return els; }
+      var full = bl.getBoundingClientRect().width * 0.9;
+      Array.prototype.forEach.call(bl.children, function (k) {
+        if (k.classList.contains('rdf-egg')) qsa('a', k).forEach(function (a) { if (a.getBoundingClientRect().width > 2) els.push(a); });
+        else if (k.getBoundingClientRect().width >= full) els.push(k); // the language switch sits inside the e-mail row: not a box
+      });
+      return els;
+    }
     function layout() {
       var xs = [], ys = [];
       var addU = function (arr, val) { val = Math.round(val); if (!arr.some(function (a) { return Math.abs(a - val) < 3; })) arr.push(val); };
-      qsa('.rdf-cell, .rdf-base, .rdf-base-l, .rdf-soc', foot).forEach(function (el) {
+      var lined = lineBoxes();
+      qsa('.rdf-base', foot).concat(lined).forEach(function (el) {
         var r = boxIn(el, inner);
         addU(xs, r.l); addU(xs, r.r - 1); addU(ys, r.t); addU(ys, r.b - 1);
       });
       guideWrap.textContent = ''; vs = []; hs = [];
       var W = inner.clientWidth, H = inner.clientHeight;
-      var rects = qsa('.rdf-cell, .rdf-base-l, .rdf-soc', foot).map(function (el) { return boxIn(el, inner); });
+      var rects = lined.map(function (el) { return boxIn(el, inner); });
       var segs = function (from, to, blocks) {
         var out = [[from, to]];
         blocks.forEach(function (bl) {
@@ -5986,7 +6001,7 @@
             return acc;
           }, []);
         });
-        return blocks.length ? out.filter(function (sg) { return sg[1] - sg[0] > 48; }) : out; // no little stubs where a line is cut
+        return blocks.length ? out.filter(function (sg) { return sg[1] - sg[0] > 40; }) : out; // no little stubs where a line is cut (40: a one-row cell is 43 px high on a phone, its divider is a line, not a stub)
       };
       xs.sort(function (a, b) { return a - b; }).forEach(function (x) {
         segs(0, H, rects.filter(function (c) { return x > c.l + 2 && x < c.r - 3; }).map(function (c) { return [c.t, c.b]; })).forEach(function (sg) {
