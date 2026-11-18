@@ -3728,6 +3728,25 @@
         paintOne(m, c);
       });
     }
+    // a clip decodes while one of its panels (its own or a copy) is to be seen, and rests when none is
+    function showOrRest(m) {
+      var shown = (m.__vis !== false ? 1 : 0) + (m.__canvases || []).filter(function (c) { return c.__vis !== false; }).length;
+      m.__off = shown === 0;
+      if (m.__off) { if (!m.paused) m.pause(); }
+      else if (m.paused && !hidden && m.__tuned && !m.__wait) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
+    }
+    var ringLooking = false;
+    function ringLook() {
+      if (hidden || document.hidden) return;
+      var W = window.innerWidth, H = window.innerHeight, pad = W * 0.6, seen = [];
+      qsa('.band_panel-media', hero).forEach(function (media) {
+        var r = media.getBoundingClientRect();
+        media.__vis = media.__face !== false && r.right > -pad && r.left < W + pad && r.bottom > 0 && r.top < H;
+        var m = media.__master || media;
+        if (seen.indexOf(m) < 0) seen.push(m);
+      });
+      seen.forEach(showOrRest);
+    }
     function dedupeClips() {
       var masters = {};
       qsa('video', hero).forEach(function (v) {
@@ -3746,7 +3765,15 @@
       // ---- only what is on screen costs anything: a clip decodes while one of its panels (master or clone)
       // is near the viewport, and a clone is repainted only while it is on screen and only when the master
       // presents a new frame (requestVideoFrameCallback), not on every display refresh
-      if ('IntersectionObserver' in window) {
+      if (ringApi) {
+        // the dial looks for itself. Safari's IntersectionObserver gets cards on a 3D drum wrong: after the first turn it
+        // called the cards in front "off screen", so their clips were paused and never started again, and iOS draws a
+        // paused clip as an empty card (Rimbo's phone test, 2026-11-18: "not all fields in the spinning wheel are loaded").
+        // So: a few times a second, each card's real box against the screen; a card counts while it faces you and its box
+        // is on the screen or within 0.6 of a screen width beside it (the next one in is already running)
+        if (!ringLooking) { ringLooking = true; setInterval(ringLook, 300); }
+        ringLook();
+      } else if ('IntersectionObserver' in window) {
         if (!clipIO) clipIO = new IntersectionObserver(function (entries) {
           var touched = [];
           entries.forEach(function (en) {
@@ -3756,12 +3783,7 @@
             var m = media.__master || media;
             if (touched.indexOf(m) < 0) touched.push(m);
           });
-          touched.forEach(function (m) {
-            var shown = (m.__vis !== false ? 1 : 0) + (m.__canvases || []).filter(function (c) { return c.__vis !== false; }).length;
-            m.__off = shown === 0;
-            if (m.__off) { if (!m.paused) m.pause(); }
-            else if (m.paused && !hidden && m.__tuned && !m.__wait) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
-          });
+          touched.forEach(showOrRest);
         }, { rootMargin: '5% 10%', threshold: 0 }); // a panel resumes ~150 px before its edge enters: 1.5 s of lead at the band's pace
         qsa('.band_panel', hero).forEach(function (p) { if (p.__clipIO) return; p.__clipIO = true; clipIO.observe(p); });
       }
