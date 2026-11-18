@@ -3439,6 +3439,61 @@
   // =========================================================
 
   // =========================================================
+  // CLIPS — which file a band clip is served as: AV1 or H.264, 640 or 480 wide. The one place that knows the address.
+  // A video names its clip in the Designer (data-clip="echo", or the file name at the end of its data-src). A clip that
+  // is not in CLIPS, and every clip under ?clips=0 on staging, keeps the address in its data-src.
+  // =========================================================
+  var CLIP_BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@clips-v1/media/c/'; // the move to Bunny: this line
+  var CLIPS = { 'dfs-home-test': 1, 'echo': 1, 'tinko': 1, 'charlies-angels': 1, 'dfs-home': 1, 'dieronesie': 1, 'echo-tour': 1 }; // clip: the version of its files (a new encode = new files with the next number)
+  var CLIP_AV1 = 'video/mp4; codecs="av01.0.04M.08"';
+  var clipLab = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname); // staging and local only: ?clips=0 the old files, ?av1=0 the H.264 ones
+  var clipOff = clipLab && /[?&]clips=0\b/.test(location.search), clipNoAv1 = clipLab && /[?&]av1=0\b/.test(location.search);
+  var clipPick = null; // '640-av1', '480-h264'…: decided once per visit, so a clip never comes in two sizes or formats
+  function clipChoice() {
+    if (clipPick) return clipPick;
+    var c = navigator.connection, s = window.screen || {}, can = false, chip = null;
+    var phone = Math.min(s.width || 9999, s.height || 9999) < 600; // the screen, not the window: a narrow window on a computer keeps the 640 files
+    var hand = phone || !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches); // tablets too
+    var lean = phone || !!(c && c.saveData); // the 480 files: a phone, or a visitor who asked for less data
+    try { can = !clipNoAv1 && document.createElement('video').canPlayType(CLIP_AV1) === 'probably'; } catch (e) {}
+    try { chip = localStorage.getItem('rdClipChip'); } catch (e) {}
+    // a computer: AV1 whenever the browser plays it. A phone or tablet: only when its chip decodes it (the answer of an
+    // earlier page, below), so five software decoders never land on a phone. Safari only says yes when the chip is there
+    var av1 = can && (!hand || chip === '1' || /Apple/.test(navigator.vendor || ''));
+    return (clipPick = (lean ? '480' : '640') + '-' + (av1 ? 'av1' : 'h264'));
+  }
+  function clipFile(name) { return !clipOff && CLIPS.hasOwnProperty(name) ? CLIP_BASE + name + '-' + clipChoice() + '-v' + CLIPS[name] + '.mp4' : ''; }
+  function clipUrl(v) {
+    var given = v.getAttribute('data-src') || '';
+    return clipFile(v.getAttribute('data-clip') || (/\/media\/([\w-]+)\.mp4$/.exec(given) || [])[1] || '') || given;
+  }
+  // an AV1 file that will not play (a decoder that gives up, a missing file): the H.264 one in its place, once, and H.264 for the clips still to come
+  function clipGuard(v) {
+    if (v.__guard) return;
+    v.__guard = true;
+    v.addEventListener('error', function () {
+      var at = v.getAttribute('src') || '', rate = v.playbackRate, going = !v.paused;
+      if (at.indexOf('-av1-') < 0) return;
+      clipPick = clipChoice().replace('av1', 'h264');
+      console.warn('[rimbo-designs] clips: AV1 failed, H.264 instead: ' + at);
+      if (rate !== 1) v.addEventListener('loadedmetadata', function () { v.playbackRate = rate; }, { once: true });
+      v.setAttribute('src', at.replace('-av1-', '-h264-'));
+      if (going) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+    });
+  }
+  // does the chip decode AV1? Asked on every page; the answer is for the next page and the next visit
+  (function () {
+    var mc = navigator.mediaCapabilities;
+    try {
+      if (!mc || !mc.decodingInfo) return;
+      mc.decodingInfo({ type: 'file', video: { contentType: CLIP_AV1, width: 480, height: 472, bitrate: 200000, framerate: 30 } }).then(function (r) {
+        try { localStorage.setItem('rdClipChip', r && r.supported && r.powerEfficient ? '1' : '0'); } catch (e) {}
+      }, function () {});
+    } catch (e) {}
+  })();
+  window.rdClipUrl = clipFile; // for the end-of-page embed: rdClipUrl('echo'), '' = keep your own address
+
+  // =========================================================
   // BAND — the home's hero, section [data-band]: the dial ([data-ring], the home since 9 Nov) or home V4's drum
   // (Osmo's spatial slider). Everything visible lives in the Designer: the stage with the cards and their real
   // <video> elements, the copy, the scroll line, the loader. Styles, breakpoints and hover states are Webflow
@@ -3451,6 +3506,7 @@
     var hero = qs('[data-band]');
     var stage = hero && qs('.band_stage', hero);
     if (!hero) return;
+    qsa('video.band_panel-media', hero).forEach(function (v) { if (v.getAttribute('src')) return; var url = clipUrl(v); if (url) { v.setAttribute('src', url); clipGuard(v); } }); // CLIPS: every clip has its file before a card is copied or a clip is asked to load
     // Home V4's hero carries Osmo's spatial slider: it lays the cards out and clones them; everything else here (clips,
     // loader, opening, fades) is shared with the dial.
     var osmoInit = function () {
@@ -5537,7 +5593,7 @@
         entries.forEach(function (en) {
           var v = en.target;
           if (en.isIntersecting && !reduced && (awake || v === lead)) {
-            var src = v.getAttribute('data-src'); // a clip only downloads once its card is on screen
+            var src = clipUrl(v); clipGuard(v); // a clip only downloads once its card is on screen; CLIPS picks its file
             if (src && v.getAttribute('src') !== src) v.setAttribute('src', src);
             v.playbackRate = parseFloat(v.getAttribute('data-rate')) || 1;
             var p = v.play();
