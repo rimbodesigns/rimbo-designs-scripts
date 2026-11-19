@@ -291,3 +291,17 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
   .calc_rec { display: none; }
   .calc_tip_line.is-phone { display: block; }
 }
+
+/* Timeline (under the price), payment terms (bottom of the card) and running costs (a quiet block under the card).
+   Same quiet capitals as Excl. VAT, so the card keeps its calm. Added 2026-11-20 */
+.calc_time { display: block; margin: -2px 0 14px; }
+.calc_pay { margin: 14px 0 0; font-size: 12px; line-height: 1.45; color: var(--muted); text-align: center; }
+.calc_run { margin-top: 16px; padding: 16px 24px 18px; border: 1px dashed var(--line); border-radius: var(--r); background: var(--glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
+.calc_run .calc_eyebrow::before { display: none; }
+.calc_run[hidden] { display: none; }
+.calc_run .calc_eyebrow { margin-bottom: 8px; }
+.calc_run_list { margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.35; }
+.calc_run_list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; color: var(--text); }
+.calc_run_list li span:first-child { color: var(--muted); }
+.calc_run_list li span:last-child { font: 12px/1.45 var(--mono); white-space: nowrap; text-align: right; }
+.calc_run_note { margin: 8px 0 0; font-size: 12px; color: var(--muted); opacity: .75; }

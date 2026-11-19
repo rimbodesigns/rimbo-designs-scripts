@@ -20,6 +20,10 @@
     previewLead: { v: 1, n: "Sample project", m: "", d: "2026-11-09", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     copy: {
       underMinimum: "You haven't met the {min} minimum yet.",
+      timeline: "About {n} weeks, kickoff to launch",
+      payment: "50% to start, 50% at launch. Payment plans possible.",
+      runningTitle: "Running costs",
+      runningNote: "Paid to the platforms, not to me. Excl. VAT.",
 
       // Personal links (?make = Rimbo's maker view, #for=… = the link a lead gets)
       makeEyebrow: "Personal link · only you see this view",
@@ -59,6 +63,31 @@
     // so they sit inside the page prices (the old €2,000 base, spread over the pages, then trimmed to €400 / €800 / €2,000). The minimum
     // covers the fixed part of a small project.
     minimum: 3000,           // no project goes below this; under it the card says "Projects start at"
+
+    // TIMELINE (Rimbo, 2026-11-20): hidden weeks per item, added up for what's on and rounded to whole weeks.
+    // Shown as one quiet line under the price. A typical site (identity + logo, 2 simple, 4 medium, 2 complex) is ~9 weeks.
+    // Pages count per page. Not listed = 0 (runs alongside, after launch, or planned together). All DRAFT
+    weeks: {
+      base: 1,                                   // QA and launch, every project
+      foundation: 1,                             // kickoff, workshop, direction call
+      identity: 2, logo: 0.5, guide: 0.5, illustrations: 1, social: 0.2, print: 0.3,
+      simple: 0.2, medium: 0.4, complex: 1, cms: 0.6,
+      loader: 0.5, transition: 0.5, theme: 0.5,
+      legal: 0.2, a11y: 0.5, leads: 0.3, chatbot: 0.3, system: 0.5,
+      mbase: 1.5, onboard: 0.5, course: 1.5,
+      shopbase: 1.5, catalog: 1, subs: 0.5,
+      seo: 0.5, analytics: 0.2, consent: 0.2, training: 0.2, i18n: 1,
+      migration: { 2: 0.1, 4: 0.3, 8: 0.5 }      // by the amount they pick (hours)
+    },
+    // RUNNING COSTS: what the platforms charge every month, paid to them, not to Rimbo. Only what applies shows.
+    // Checked 2026-11-20 (Webflow's May 2026 plans); platforms change these, so check now and then
+    running: [
+      { label: "Webflow site plan",      cost: "about $25 / month",   when: null },  // Premium, billed yearly
+      { label: "Webflow e-commerce",     cost: "from $29 / month",    when: "shop" },
+      { label: "Members (Memberstack)",  cost: "from $29 / month",    when: "members" },
+      { label: "Each extra language",    cost: "about $9 / month",    when: "i18n" },
+      { label: "Video hosting",          cost: "a few euros / month", when: "course" }
+    ],
     priorityPct: 0.25,       // priority start: jump the queue
     totalLabel: { below: "Your estimate", reached: "Your estimate" }, // the number starts at the Brand foundation; the bar shows the minimum
     included: {
@@ -229,6 +258,7 @@
           '<aside class="calc_result" aria-live="polite">' +
             '<div class="calc_est_row"><p class="calc_eyebrow" id="calc-total-label">Your estimate</p><span class="calc_vat calc_date" id="calc-date" hidden></span></div>' +
             '<div class="calc_price_row"><p class="calc_range"><span id="calc-total" data-odometer-element>&nbsp;</span></p><span class="calc_vat">Excl. VAT</span></div>' +
+            '<p class="calc_vat calc_time" id="calc-time"></p>' +
             '<div class="calc_meter" id="calc-meter" hidden><div class="calc_meter_bar"><span id="calc-meter-fill"></span></div><p class="calc_meter_text" id="calc-meter-text"></p></div>' +
             '<ul class="calc_lines" id="calc-lines"></ul>' +
             '<button class="calc_cta" id="calc-cta" type="button"></button>' +
@@ -240,6 +270,12 @@
             '<button class="calc_cta is-secondary" id="calc-reset" type="button" hidden></button>' +
             '<button class="calc_cta is-secondary" id="calc-start-over" type="button" hidden></button>' +
             '<button class="calc_cta is-secondary" id="calc-undo" type="button" hidden></button>' +
+            '<p class="calc_pay" id="calc-pay"></p>' +
+          '</aside>' +
+          '<aside class="calc_run" id="calc-run" aria-labelledby="calc-run-title" hidden>' +
+            '<p class="calc_eyebrow" id="calc-run-title"></p>' +
+            '<ul class="calc_run_list" id="calc-run-list"></ul>' +
+            '<p class="calc_run_note" id="calc-run-note"></p>' +
           '</aside>' +
           // Tip card: filled by the (i) buttons; hover previews, click pins
           '<aside class="calc_tip" id="calc-tip" aria-live="polite" aria-labelledby="calc-tip-title" data-lenis-prevent hidden>' +
@@ -488,6 +524,30 @@
       // What has no price yet goes last, as words, and stays out of the number
       quotesOn().forEach(function (label) { out.push([label, CONFIG.quoteText]); });
       return { lines: out, scope: scope, shown: scope * (1 + pr) };
+    }
+
+    // The rough timeline: the hidden weeks of everything that's on, rounded to whole weeks (CONFIG.weeks)
+    function weeksTotal() {
+      var W = CONFIG.weeks || {}, w = (W.base || 0) + (W.foundation || 0);
+      CONFIG.pages.forEach(function (p) { w += state.pages[p.id] * (W[p.id] || 0); });
+      if (state.brandOn) CONFIG.brand.items.forEach(function (t) { if (state.toggles[t.id]) w += W[t.id] || 0; });
+      CONFIG.toggles.forEach(function (t) {
+        if (!state.toggles[t.id]) return;
+        if (t.parts) t.parts.forEach(function (p) { if (p.fixed || state.toggles[p.id]) w += W[p.id] || 0; });
+        else if (t.hourly) w += (W[t.id] && W[t.id][state.hours[t.id]]) || 0;
+        else if (typeof W[t.id] === "number") w += W[t.id];
+      });
+      return Math.max(1, Math.round(w));
+    }
+
+    // Running costs: the platforms' monthly costs for what's on (always the site plan)
+    function fillRunning() {
+      var list = $("run-list"); list.textContent = "";
+      (CONFIG.running || []).forEach(function (r) {
+        if (r.when && !state.toggles[r.when]) return;
+        var li = el("li"); li.appendChild(el("span", "", r.label)); li.appendChild(el("span", "", r.cost));
+        list.appendChild(li);
+      });
     }
 
     function brandSum() {
@@ -868,6 +928,8 @@
       $("total-label").textContent = reached ? CONFIG.totalLabel.reached : CONFIG.totalLabel.below;
       setTotal(eur(r.shown), instant === true);
       if (ball) ball.set(r.shown, CONFIG.minimum);
+      $("time").textContent = CONFIG.copy.timeline.replace("{n}", weeksTotal());
+      fillRunning();
 
       // Under the minimum: a bar that fills as the scope grows, gone once the minimum is reached
       reveal($("meter"), !reached);
@@ -972,6 +1034,10 @@
 
     function setupShare() {
       var C = CONFIG.copy, cta = $("cta");
+      $("pay").textContent = C.payment;
+      $("run-title").textContent = C.runningTitle;
+      $("run-note").textContent = C.runningNote;
+      $("run").hidden = false;
       $("eyebrow").textContent = mode === "make" ? C.makeEyebrow : C.clientEyebrow;
       // The day the link was made, quietly next to Your estimate. In Rimbo's view: today, as the lead will see it
       var made = mode === "make" ? today() : share.d;
