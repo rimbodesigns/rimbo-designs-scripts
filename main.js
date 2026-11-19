@@ -8980,9 +8980,16 @@
           root.setAttribute('data-ex-on','');
           var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches,NB=String.fromCharCode(160);
           var clips=['https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.2/media/echo.mp4','https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.2/media/dfs-home-test.mp4','https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.2/media/dieronesie.mp4','https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.21/media/tinko.mp4'];
+          clips=clips.map(function(u){return clipFile((/\/media\/([\w-]+)\.mp4$/.exec(u)||[])[1]||'')||u;}); // CLIPS: the light file for this device
           var names=['Echo','Digital Feng Shui','Dieronesie','Tinko'],hold={dieronesie:3.2},i=0;
-          var v=root.querySelector('.ex_clip');
-          function limit(){var k=Object.keys(hold).filter(function(n){return v.src.indexOf(n)>-1;})[0];v.dataset.limit=k?hold[k]:'';}
+          var v=root.querySelector('.ex_clip'),seen=false;
+          if(v){ // the card's clip only downloads and plays while it is on (or near) the screen
+            v.muted=true;v.removeAttribute('autoplay');v.removeAttribute('src');v.removeAttribute('data-src');v.load();clipGuard(v);
+            if('IntersectionObserver' in window)new IntersectionObserver(function(es){seen=es[es.length-1].isIntersecting;
+              if(seen){if(!v.getAttribute('src'))v.setAttribute('src',clips[i]);var pr=v.play();if(pr&&pr.catch)pr.catch(function(){});}else v.pause();},{rootMargin:'200px 0px'}).observe(v);
+            else{seen=true;v.setAttribute('src',clips[i]);}
+          }
+          function limit(){var k=Object.keys(hold).filter(function(n){return (v.getAttribute('src')||'').indexOf(n)>-1;})[0];v.dataset.limit=k?hold[k]:'';}
           if(v){v.addEventListener('timeupdate',function(){if(v.dataset.limit&&v.currentTime>+v.dataset.limit)v.pause();});limit();}
           function scramble(el,to){if(!el||el.textContent===to)return;clearInterval(el._sc);var len=Math.max(el.textContent.length,to.length),f=0,F=16,G='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/+';
             el._sc=setInterval(function(){f++;var out='';for(var c=0;c<len;c++){out+=f>=F*(c+1)/len?(to[c]||''):(to[c]===' '?' ':G[Math.floor(Math.random()*G.length)]);}el.textContent=out;if(f>=F){clearInterval(el._sc);el.textContent=to;}},40);}
@@ -8993,7 +9000,7 @@
             scramble(root.querySelector('[data-ex-name]'),names[i]);
           }
           light();
-          if(v&&!reduce)setInterval(function(){i=(i+1)%clips.length;v.classList.add('is-swap');
+          if(v&&!reduce)setInterval(function(){if(!seen)return;i=(i+1)%clips.length;v.classList.add('is-swap');
             setTimeout(function(){v.src=clips[i];limit();var go=function(){v.removeEventListener('loadeddata',go);v.play&&v.play().catch(function(){});requestAnimationFrame(function(){v.classList.remove('is-swap');});};v.addEventListener('loadeddata',go);light();},450);},6000);
           var t0=Date.now();setInterval(function(){var t=Math.floor((Date.now()-t0)/1000),m=Math.floor(t/60),s=t%60;[].forEach.call(root.querySelectorAll('[data-ex-tc]'),function(e){e.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;});},500);
           function clk(){var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Amsterdam'}));var t=(d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes()+' CET';[].forEach.call(root.querySelectorAll('[data-ex-clock]'),function(e){e.textContent=t;});}clk();setInterval(clk,15000);
