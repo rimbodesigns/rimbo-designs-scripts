@@ -9352,7 +9352,17 @@
         var giveClip = function (c) { // its light file, once
           if (c.getAttribute('src') || !c.getAttribute('data-src')) return;
           c.setAttribute('src', clipUrl(c)); clipGuard(c); c.preload = 'auto';
+          chainRow(c);
         };
+        // the clips in a drag row start off to the right, where no scroll brings them near: once one can play, the next
+        // one in its row loads, so the row is ready before anyone drags it
+        var chainRow = function (c) {
+          var row = c.closest('[data-pp-gallery]');
+          if (!row) return;
+          var next = function () { var n = clips.filter(function (x) { return row.contains(x) && !x.getAttribute('src') && x.getAttribute('data-src'); })[0]; if (n) giveClip(n); };
+          if (c.readyState >= 4) next(); else rdOn(c, 'canplaythrough', next, { once: true });
+        };
+        clips.forEach(function (c) { if (c.getAttribute('src')) chainRow(c); }); // a clip that keeps its own address (the shared Work dive) starts its row too
         clips.forEach(function (c) {
           c.muted = true;
           // a clip with its address in data-src (no src) loads nothing by itself: it gets the light file for this device
