@@ -5544,9 +5544,10 @@
   // once its card is on screen, and a hidden Next button steps the drum every 5 s while it is in view.
   // =========================================================
   // City pages: the FAQ's closing line in the CMS is a plain link. It becomes the site's button here, before rdButtons
-  // runs, so it gets the same hover as every other .btn (the FAQ script in the template then moves the line under the list)
+  // runs, so it gets the same hover as every other .btn. rdLocFaq runs first and has already moved the line under the list
+  // (.loc_faq-tail), so the line is looked for there; the rich text is the fallback for a page where rdLocFaq did nothing.
   function rdLocFaqBtn() {
-    var rich = qs('.loc_faq .w-richtext'), line = rich && rich.lastElementChild;
+    var rich = qs('.loc_faq .loc_faq-tail') || qs('.loc_faq .w-richtext'), line = rich && rich.lastElementChild;
     var a = line && line.tagName === 'P' && line.children.length === 1 && line.firstElementChild;
     if (!a || a.tagName !== 'A' || line.textContent.trim() !== a.textContent.trim()) return;
     var label = a.textContent.trim();
