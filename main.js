@@ -5149,7 +5149,10 @@
         }
         used[h.id] = true;
         var a = document.createElement('a');
-        a.href = '#' + h.id;
+        // the full address of this page + #section (what a bare "#section" resolves to anyway): Webflow's links script
+        // skips links with a colon in them. A bare "#section" it measures on every scroll frame (jQuery offset, height and
+        // :visible for every section, a sixth of the scrolling work in a profile) only to toggle w--current, which nothing styles
+        a.href = location.href.split('#')[0] + '#' + h.id;
         var label = document.createElement('span');
         label.textContent = text.replace(/^\d+[:.)]\s+/, '').split(/:\s/)[0]; // the whole heading, up to a colon: there is room for it here
         a.appendChild(label);
@@ -6730,7 +6733,7 @@
     // o: cx, cy, R in the canvas's css pixels; t, seed, bias; px, py, pr, amt for the warm spot under the mouse
     function drawBall(cv, o) {
       if (!gl) return;
-      const boxW = cv.clientWidth, boxH = cv.clientHeight; // its own size: on the page transition's cube the size on screen shrinks to nothing
+      const boxW = o.w, boxH = o.h; // its own size (measured on resize): on the page transition's cube the size on screen shrinks to nothing
       if (!boxW || !boxH) return;
       const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(boxW * dpr), H = Math.round(boxH * dpr);
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
@@ -6852,15 +6855,17 @@
       b.s = b.canvas.getBoundingClientRect().width;  // .wall_ball's size in the Designer sets the ball
       b.r = b.s - 12;     // the box leaves room for the ball to float
       b.cx = b.s + b.dx; b.cy = b.s + b.dy;
+      b.w = b.canvas.clientWidth; b.h = b.canvas.clientHeight; // the canvas's own size, read here once instead of on every paint
     }
     function paint(b) {
       // it floats and breathes a little, never far enough to reach the text
       var fx = calm ? 0 : Math.sin(b.float * .47) * 4 + Math.sin(b.float * .19) * 2, fy = calm ? 0 : Math.cos(b.float * .37) * 5;
       var breath = calm ? 1 : 1 + Math.sin(b.float * .55) * .025;
-      drawBall(b.canvas, { cx: b.cx + fx, cy: b.cy + fy, R: b.r * breath, t: b.t, seed: b.seed, bias: b.bias, px: b.px, py: b.py, pr: b.r * .45, amt: b.amt });
+      drawBall(b.canvas, { w: b.w, h: b.h, cx: b.cx + fx, cy: b.cy + fy, R: b.r * breath, t: b.t, seed: b.seed, bias: b.bias, px: b.px, py: b.py, pr: b.r * .45, amt: b.amt });
     }
     balls.forEach(function (b) { measure(b); paint(b); });
-    new ResizeObserver(function () { balls.forEach(function (b) { measure(b); paint(b); }); }).observe(balls[0].canvas);
+    var sized = new ResizeObserver(function () { balls.forEach(function (b) { measure(b); paint(b); }); });
+    balls.forEach(function (b) { sized.observe(b.canvas); });
 
     // hover: only straight on the ball, the spot under the mouse warms up
     addEventListener('pointermove', function (e) {
@@ -6877,23 +6882,42 @@
     var seen = true, last = 0, running = false;
     function start() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
     new IntersectionObserver(function (e) { seen = e[0].isIntersecting; if (seen) start(); }).observe(document.querySelector('.wall_section'));
+    // each card's fade and corners read where the card really is, but a card only moves when the slider writes its slide's
+    // transform (drag, throw, arrows, autoplay) or the page changes size: so it is measured on those frames, and at rest the
+    // loop only paints the balls. Once a second it looks anyway, for whatever else could shift the wall (a page transition)
+    var moved = true, lastPos = '', sinceLook = 0;
+    function shifted() { moved = true; }
+    addEventListener('resize', shifted);
+    var shifts = new ResizeObserver(shifted);
+    shifts.observe(row); balls.forEach(function (b) { shifts.observe(b.card); });
     function loop(now) {
       var dt = Math.min((now - last) / 1000, .05); last = now;
       if (!seen) { running = false; return; }
       requestAnimationFrame(loop);
       if (document.hidden) return;
-      var mid = row.getBoundingClientRect().left + row.clientWidth / 2;
+      var pos = '';
+      balls.forEach(function (b) { pos += b.slide.style.transform; }); // GSAP's own inline style: reading it costs no layout
+      sinceLook += dt;
+      var look = moved || pos !== lastPos || sinceLook > 1;
+      if (look) {
+        moved = false; lastPos = pos; sinceLook = 0;
+        var mid = row.getBoundingClientRect().left + row.clientWidth / 2;
+      }
       balls.forEach(function (b) {
-        var box = b.card.getBoundingClientRect(), off = Math.abs(box.left + box.width / 2 - mid) / box.width;
-        b.card.style.setProperty('--k', smooth(1 - off / .45).toFixed(3));     // corners: only in the last stretch of the landing
-        b.slide.style.opacity = (.45 + .55 * smooth(1 - off / .9)).toFixed(3);  // the card itself: over the whole way
+        if (look) {
+          var box = b.card.getBoundingClientRect(), off = Math.abs(box.left + box.width / 2 - mid) / box.width;
+          b.left = box.left; b.right = box.right;
+          var k = smooth(1 - off / .45).toFixed(3), op = (.45 + .55 * smooth(1 - off / .9)).toFixed(3);
+          if (k !== b.k) { b.k = k; b.card.style.setProperty('--k', k); }   // corners: only in the last stretch of the landing
+          if (op !== b.op) { b.op = op; b.slide.style.opacity = op; }        // the card itself: over the whole way
+        }
         if (calm) return;
         b.stir *= Math.pow(.97, dt * 60);
         b.t += dt * FLOW * (1 + b.stir * 5);
         b.float += dt;
         b.amt += (b.want - b.amt) * (1 - Math.exp(-dt * 3.5));
         b.px += (b.tx - b.px) * (1 - Math.exp(-dt * 7)); b.py += (b.ty - b.py) * (1 - Math.exp(-dt * 7));
-        if (box.right > 0 && box.left < innerWidth) paint(b);
+        if (b.right > 0 && b.left < innerWidth) paint(b);
       });
     }
     start();
