@@ -6704,6 +6704,9 @@
 
     /* ---------- faces ---------- */
     var list = qs('.centered-slider-bullet__list', wrapper), host = qs('.wall_faces-in', wrapper);
+    // the faces list is a tablist, so its <li> wrappers step aside for screen readers (role none): each tab then sits
+    // straight in its tablist, as the accessibility checks require (Lighthouse flagged the list items and the tabs' parent)
+    if (list) qsa('.centered-slider-bullet__item', list).forEach(function (li) { li.setAttribute('role', 'none'); });
     var row = qs('.centered-slider-row', wrapper);
     var bullets = qsa('[data-centered-slider="bullet"]', wrapper);
     var LIFT = parseFloat(wrapper.getAttribute('data-wall-lift')) || 1.15, GAP = parseFloat(wrapper.getAttribute('data-wall-gap'));
@@ -7277,21 +7280,8 @@
     qsa('[data-loc-city]').forEach(function (t) { t.textContent = city.toUpperCase(); });
   }
 
-  // Breadcrumbs for search results: Home, Locations, this city. Built from the canonical link, so the Dutch page gets its
-  // own addresses.
-  function rdLocCrumbs() {
-    var city = locCity(), c = qs('link[rel="canonical"]');
-    if (city === null || !c) return;
-    var nl = document.documentElement.lang === 'nl', base = 'https://www.rimbodesigns.com' + (nl ? '/nl' : '');
-    var s = document.createElement('script');
-    s.type = 'application/ld+json';
-    s.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: base || 'https://www.rimbodesigns.com' },
-      { '@type': 'ListItem', position: 2, name: nl ? 'Locaties' : 'Locations', item: base + '/locations' },
-      { '@type': 'ListItem', position: 3, name: city, item: c.href }
-    ] });
-    rdHead(s);
-  }
+  // City breadcrumbs: no script any more. Since 2026-11-19 the Locations template's Schema markup (one per language)
+  // carries WebPage + Service + BreadcrumbList from the CMS, so the old rdLocCrumbs is retired.
 
   // Osmo's Accelerating Globe on Scroll ([data-accelerating-globe] with eight [data-accelerating-globe-circle]): the
   // meridians keep turning, and turn faster while you scroll.
@@ -10014,7 +10004,6 @@
     run('location faq', rdLocFaq);
     run('location city', rdLocCity);
     run('globe', rdGlobe);
-    soon('location breadcrumbs', rdLocCrumbs);
     if (path === '/locations') {
       soon('location card lean', rdLocLean);
       soon('og url', rdOgUrl);
