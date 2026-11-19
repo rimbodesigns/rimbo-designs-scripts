@@ -524,40 +524,10 @@
   var cubeAsked = /[?&]cube=1/.test(location.search), impactAsked = /[?&]impact=1/.test(location.search);
   var touchDevice = window.matchMedia ? window.matchMedia('(hover: none) and (pointer: coarse)') : { matches: false };
   function useCube() { return cubeAsked || (touchDevice.matches && !impactAsked); }
-  var impactStyle = null;
   var pageVisits = 0; // 1 on the page you arrived on, more after every page transition
 
-  var IMPACT_CSS =
-    '.rd-impact{position:fixed;inset:0;z-index:999;overflow:hidden;pointer-events:none}' +
-    '.rd-impact__root{position:absolute;inset:0}' +
-    '.rd-impact__grain{position:absolute;inset:0;opacity:.22}' +
-    '.rd-impact__scene,.rd-impact__piece,.rd-impact__box{position:absolute;transform-style:preserve-3d}' +
-    '.rd-impact__scene,.rd-impact__box{inset:0}' +
-    // will-change: each face is drawn once and moved as a picture, not redrawn at every size on its way into the depth
-    '.rd-impact__face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}' +
-    '.rd-impact__side{background:var(--color--black,#131313);box-shadow:inset 0 0 0 1px rgba(248,245,238,.2)}' +
-    '.rd-impact__cuts{position:absolute;inset:0}' +
-    // one seam: a line of its own, laid along the seam from the edge where the stroke comes in
-    '.rd-impact__seam{position:absolute;left:0;top:0;height:0;transform-origin:0 0}' +
-    '.rd-impact__stroke{position:absolute;left:0;top:0;height:1px;will-change:transform;background:linear-gradient(90deg,rgba(228,68,28,0),#E4441C 70%)}' + // Deep Orange, docs/brand.md
-    // the hairline: half a pixel in the void's colour with a faint ink edge. __scar is a window on the seam; in it a strip
-    // twice the seam's length whose first half fades in (__line) slides along: first with the stroke's tip, so the line
-    // appears behind it, then on (__trail), so the faded half comes in and the line trails out from where it began
-    '.rd-impact__scar{position:absolute;left:0;top:-.25px;width:100%;height:1px;overflow:hidden}' +
-    '.rd-impact__trail{position:absolute;inset:0;will-change:transform}' +
-    '.rd-impact__line{position:absolute;left:0;top:0;width:200%;height:100%;will-change:transform;' +
-      'background:linear-gradient(180deg,rgba(19,19,19,.28) 0 .25px,#DACCAE .25px .75px,rgba(19,19,19,.28) .75px 1px);' +
-      '-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 50%);mask-image:linear-gradient(90deg,transparent 0,#000 50%)}' +
-    '.rd-snap{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}' +
-    // a copy is a still: anything that keeps moving or asks for its own layer would be redrawn in every block, every frame
-    '.rd-snap *{animation:none!important;transition:none!important;will-change:auto!important}';
+  // The Impact transition: its CSS lives in Webflow since 2026-11-19 (site head code), main.js only builds and moves it
 
-  function impactCss() {
-    if (impactStyle) return;
-    impactStyle = document.createElement('style');
-    impactStyle.textContent = IMPACT_CSS;
-    document.head.appendChild(impactStyle);
-  }
 
   // The copies live in a shadow tree, so nothing on the page can find them: page code looks for its elements in the
   // whole document, and a copy of the home hero once got the hero's code run on it, which hid the menu bar for an
@@ -565,7 +535,6 @@
   // document's style sheets, made once per sheet. A browser without this keeps the copies in the page, as before
   var impactShadow = !!(document.body.attachShadow && typeof CSSStyleSheet === 'function' && 'adoptedStyleSheets' in Document.prototype && typeof WeakMap === 'function');
   var sheetCopies = impactShadow ? new WeakMap() : null;
-  var impactSheet = null;
 
   function shadowSheets() {
     var out = [];
@@ -584,8 +553,7 @@
       }
       out.push(copy.sheet);
     });
-    if (!impactSheet) { impactSheet = new CSSStyleSheet(); impactSheet.replaceSync(IMPACT_CSS); }
-    out.push(impactSheet);
+    // the transition's own rules (.rd-impact, .rd-snap) are in the site head code, so they are among the copies above
     return out;
   }
 
@@ -594,7 +562,6 @@
   // later (its embeds, what its code adds). Without them its copy flew in half styled: the post's hero is hidden until
   // its opening, and the copy showed the bare eyebrow and section list on an empty page (Rimbo's screenshot)
   function impactStage() {
-    impactCss();
     var host = document.createElement('div');
     host.className = 'rd-impact';
     if (impactShadow) {
@@ -1078,7 +1045,6 @@
   // -----------------------------------------
   var TEAR_PRESS = 0.14, TEAR_RIP = 0.56, TEAR_FLY = 1.0, TEAR_PAPER = '#F8F5EE';
   var tearReturn = null; // { from, to, y, ground } while you are on the page the ticket tore open
-  var tearStyle = null;
 
   function tearRule(data) {
     var t = data.trigger;
@@ -1093,22 +1059,7 @@
     return x.pathname.replace(/\/$/, '') === y.pathname.replace(/\/$/, '') && x.search === y.search;
   }
 
-  function tearCss() {
-    if (tearStyle) return;
-    tearStyle = document.createElement('style');
-    tearStyle.textContent =
-      '.tear_layer{position:fixed;inset:0;overflow:hidden}' +
-      '.tear_stage{position:fixed;inset:0;z-index:999;overflow:hidden;perspective:1600px}' +
-      '.tear_part{position:absolute;will-change:transform}' +
-      '.tear_shadow{position:absolute;opacity:0;box-shadow:0 1.5rem 3rem rgba(19,19,19,.3),0 .25rem .75rem rgba(19,19,19,.2)}' +
-      '.tear_clone{position:absolute!important;left:0;top:0;margin:0!important;pointer-events:none}' +
-      '.tear_clone .pass_stub{transition:none!important}' +
-      '.tear_clone.is-main .pass_stub,.tear_clone.is-stub .pass_main{visibility:hidden}' +
-      '.tear_shade{position:absolute;inset:0;z-index:50;opacity:0;pointer-events:none;background:linear-gradient(180deg,rgba(19,19,19,.55),rgba(19,19,19,.15))}' +
-      '.tear_fibre{position:absolute;z-index:60;overflow:visible;pointer-events:none}' +
-      '.tear_fleck{position:absolute;left:0;top:0;z-index:70;background:' + TEAR_PAPER + ';opacity:0;pointer-events:none}';
-    document.head.appendChild(tearStyle);
-  }
+  // The ticket tear: its CSS lives in Webflow since 2026-11-19 (site head code), main.js only builds and moves it
 
   function tearRand(a, b) { return a + Math.random() * (b - a); }
   function tearEl(cls, parent) {
@@ -1332,7 +1283,6 @@
         window.requestAnimationFrame(function () {
           if (rdNavFull.close) rdNavFull.close(true);
           if (window.lenis) window.lenis.stop();
-          tearCss();
           var pass = back ? null : data.trigger.closest('.pass');
           var m = pass ? tearMeasure(pass) : null;
           var y = back ? memory.y : window.scrollY;
@@ -4478,71 +4428,7 @@
       '</div>' +
     '</nav>';
 
-  // Osmo's CSS, with RM Mono in place of Haffer Mono. The site's theme comes after it.
-  var SCROLL_RULER_CSS = [
-    '.scroll-ruler { --scroll-ruler-color: #f2f2f2; --scroll-ruler-accent: #e4441c; z-index: 50; color: var(--scroll-ruler-color); padding-left: 1.25em; padding-right: 2.5em; position: fixed; top: 20svh; bottom: 20svh; left: 0; cursor: pointer; touch-action: manipulation; user-select: none; transition: opacity 0.6s ease; }',
-    '.scroll-ruler[data-scroll-ruler-status="idle"] { opacity: 0.4; }',
-    '.scroll-ruler__list { flex-direction: column; justify-content: space-between; align-items: flex-start; height: 100%; display: flex; }',
-    '.scroll-ruler__tick { opacity: 0.3; transform-origin: 0%; background-color: currentColor; width: 0.75em; height: 1px; }',
-    '.scroll-ruler__tick[data-scroll-ruler-size="mid"] { width: 1.125em; }',
-    '.scroll-ruler__tick[data-scroll-ruler-size="major"] { width: 1.5em; }',
-    '.scroll-ruler__tick[data-scroll-ruler-status="passed"] { opacity: 0.9; }',
-    '.scroll-ruler__tick[data-scroll-ruler-status="current"] { opacity: 1; background-color: var(--scroll-ruler-accent); }',
-    '.scroll-ruler__labels { pointer-events: none; position: absolute; inset: 0%; }',
-    '.scroll-ruler__label { pointer-events: auto; opacity: 0.45; color: inherit; white-space: nowrap; background-color: transparent; border-style: none; padding: 0.375em 0.5em; font-family: var(--font--rm-mono, "Rm Mono", monospace); font-size: 0.6875em; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; position: absolute; top: 0; left: 4.25em; cursor: pointer; }',
-    '.scroll-ruler__label:hover { opacity: 1; }',
-    '.scroll-ruler__label:focus-visible { opacity: 1; outline: 1px solid currentColor; outline-offset: 0.125em; }',
-    '.scroll-ruler__label[data-scroll-ruler-status="active"] { opacity: 1; color: var(--scroll-ruler-accent); }',
-    '@media (max-width: 767px) { .scroll-ruler__labels { display: none; } }',
-
-    // ---- the site's theme
-    // Like the fixed nav (.mix_blend), the ruler is white with mix-blend-mode: difference, so it reads
-    // dark on the beige page and light over a dark screenshot. Difference also turns the accent around:
-    // #2cb9d6 over the beige (#f8f5ee) comes out as the link orange (#cc3c18); over black it shows as itself.
-    '.scroll-ruler { --scroll-ruler-color: #fff; --scroll-ruler-accent: #2cb9d6; mix-blend-mode: difference; }',
-    // a bit taller and tighter labels, so short sections (a list under an H2) still get their label:
-    // Osmo hides a label that would touch the one above it
-    '.scroll-ruler { top: 15svh; bottom: 15svh; }',
-    '.scroll-ruler__label { padding-top: 0.25em; padding-bottom: 0.25em; }',
-    // labels: only the section you're in shows; the others appear while the mouse is on the ruler or
-    // its labels (or a label has keyboard focus). A hidden label still answers the mouse, so moving from
-    // the ticks to a label never drops the reveal on the way.
-    '.scroll-ruler__label { opacity: 0; transition: opacity 0.35s ease, color 0.35s ease; }',
-    // a label on its way out waits a moment, so a diagonal move from the ticks to a label doesn't flicker
-    '.scroll-ruler__label:not([data-scroll-ruler-status="active"]) { transition-delay: 0.2s, 0s; }',
-    '.scroll-ruler:hover .scroll-ruler__label, .scroll-ruler:has(.scroll-ruler__label:focus-visible) .scroll-ruler__label { transition-delay: 0s; }',
-    '.scroll-ruler:hover .scroll-ruler__label:not([data-scroll-ruler-status="active"]):not(:hover):not(:focus-visible),' +
-    '.scroll-ruler:has(.scroll-ruler__label:focus-visible) .scroll-ruler__label:not([data-scroll-ruler-status="active"]):not(:hover):not(:focus-visible) { opacity: 0.45; }',
-    // a label Osmo left out because its section is short still shows (fading in) while you're in that
-    // section, and a neighbour it would touch fades aside. Not during a reveal: then Osmo's own tidy
-    // layout shows, so a label never vanishes from under the mouse or the keyboard focus.
-    '.scroll-ruler:not(:hover):not(:has(.scroll-ruler__label:focus)) .scroll-ruler__label[hidden][data-scroll-ruler-status="active"] { display: block; }',
-    '@starting-style { .scroll-ruler__label[hidden][data-scroll-ruler-status="active"] { opacity: 0; } }',
-    '.scroll-ruler:not(:hover):not(:has(.scroll-ruler__label:focus)) .scroll-ruler__label.is-yielding { opacity: 0 !important; pointer-events: none; }',
-    // the end mark's label: the mark only gives the last section its length on the ruler
-    '.scroll-ruler__label:last-child { display: none !important; }',
-    // too narrow for the labels next to the text: ticks only (they stay in the layout, so Osmo can still measure them)
-    '.scroll-ruler.is-compact .scroll-ruler__labels { visibility: hidden; }',
-    // phones: the text starts 5vw (about 19px) from the edge, so the ticks get small enough to stay in
-    // that gutter, also when the wave stretches them (Osmo sizes everything in em)
-    '@media (max-width: 767px) { .scroll-ruler { font-size: 4.5px; padding-left: 4px; padding-right: 0; } }',
-    // on touch screens and narrow windows the ruler sits over the text, so it only shows, it doesn't take taps
-    '@media (hover: none), (max-width: 991px) { .scroll-ruler, .scroll-ruler__label { pointer-events: none; } }',
-    // before and after the article (the intro, the newsletter, the footer) it is gone, also for the
-    // keyboard (rdScrollRuler makes it inert meanwhile)
-    '.scroll-ruler.is-out { opacity: 0; pointer-events: none; }',
-    '.scroll-ruler.is-out .scroll-ruler__label { pointer-events: none; }',
-    // the ruler takes over from the old red progress bar along the top
-    '.scroll_progress_indicatror { display: none; }',
-    // one language for the tick lengths: long = an H2 (Osmo), medium = an H3 (.is-sub, set by rdScrollRuler),
-    // short = the rest (Osmo's every-5th medium tick meant nothing in an article); the current tick is 2px
-    '.scroll-ruler__tick[data-scroll-ruler-size="mid"] { width: .75em; }',
-    '.scroll-ruler__tick.is-sub:not([data-scroll-ruler-size="major"]) { width: 1.125em; }',
-    '.scroll-ruler__tick[data-scroll-ruler-status="current"] { height: 2px; }',
-    // where the labels don't fit next to the text, and on tablets and phones, no ruler (the hero has the sections list)
-    '.scroll-ruler.is-compact { display: none; }',
-    '@media (max-width: 991px) { .scroll-ruler { display: none; } }'
-  ].join('\n');
+  // The scroll ruler: its CSS lives in Webflow since 2026-11-19 (the Blog posts template head code), main.js only builds and moves it
 
   // Short labels from the H2s: "Webflow vs WordPress: the comparison" → "Webflow vs WordPress",
   // "Which one should you choose?" → "Which one", "So, is Webflow good for SEO?" → "Is Webflow good for SEO"
@@ -4612,12 +4498,6 @@
     box.parentNode.insertBefore(endMark, box.nextSibling);
     var parts = headings.concat(endMark);
 
-    if (!qs('#rd-scroll-ruler-css')) {
-      var style = document.createElement('style');
-      style.id = 'rd-scroll-ruler-css';
-      style.textContent = SCROLL_RULER_CSS;
-      rdHead(style);
-    }
     var root = qs('[data-scroll-ruler-init]');
     if (!root) {
       document.body.insertAdjacentHTML('beforeend', SCROLL_RULER_HTML);
@@ -4881,175 +4761,7 @@
   // once approved, the structure moves into the Blog posts template.
   // Runs before the buttons and the ruler: they pick up what it builds.
   // =========================================================
-  var POST_REFRESH_CSS = [
-    '.rf { --rf-ink: #131313; --rf-ink-60: rgba(19, 19, 19, .6); --rf-red: #e4441c; --rf-red-text: #cc3c18; --rf-coral: #e4441c; --rf-dark: #0c0c0c; --rf-col: 40rem; --rf-mono: var(--font--rm-mono, "Rm Mono", monospace); }',
-
-    // grain: the site's own GRAIN_EFFECT style, under the content, half the home's strength
-    '.rf .rf-grain { opacity: .03; z-index: -1; }',
-
-    // hero: two columns, a little narrower than the cover so the cover is the widest thing on screen
-    '.rf .blog_intro { margin-top: 0; padding-top: 168px; }',
-    '.rf .blog_intro .container-20 { display: block; width: min(58rem, 100vw - 20rem); max-width: none; }',
-    '.rf .blog_catagory, .rf .blog_intro .divider { display: none !important; }',
-    '.rf-hero { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; column-gap: 3rem; align-items: start; }',
-    '.rf-hero__main { min-width: 0; }',
-    '.rf-eyebrow { display: flex; align-items: center; gap: 10px; font-family: var(--rf-mono); font-size: 12px; line-height: 1; letter-spacing: .08em; text-transform: uppercase; color: var(--rf-ink-60); }',
-    '.rf-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rf-coral); flex: none; }',
-    '.rf .h1_small { text-align: left; max-width: 32rem; width: auto; margin: 28px 0 0; font-size: 2.75rem; line-height: 1.04; color: var(--rf-ink); text-wrap: balance; }',
-    '.rf .summary.padding-section-medium.custom { padding: 0; margin: 32px 0 0; max-width: 36rem; width: 100%; line-height: normal; display: block; }',
-    '.rf .sumary { font-family: var(--font--body-font); font-weight: 400; font-size: 1.3125rem; line-height: 1.5; color: var(--rf-ink); text-align: left; width: 100%; margin: 0; }',
-
-    // right column: the author on one row (square photo, name and date, LinkedIn and X on the right), then the sections
-    '.rf-hero__side { padding-top: 2px; }',
-    '.rf .rl_blogpost1_content-top { max-width: none; width: 100%; margin: 0; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }',
-    '.rf .rl_blogpost1_content-top .author-wrapper { margin: 0; gap: 14px; }',
-    '.rf .rl_blogpost1_date-wrapper, .rf .rl_blogpost1_date-wrapper > *, .rf .rl_blogpost1_author-text { white-space: nowrap; }',
-    '.rf .rl_blogpost1_share { display: flex; align-items: center; gap: 12px; margin: 0; }',
-    '.rf .rl_blogpost1_social-link { display: flex; }',
-    '.rf .rl_blogpost1_social-icon { margin: 0; width: 20px; height: 20px; }',
-    '.rf .rl_blogpost1_social-icon svg { width: 20px; height: 20px; display: block; }',
-    '.rf-toc { margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(19, 19, 19, .12); }',
-    '.rf-toc summary { display: flex; list-style: none; cursor: pointer; margin-bottom: 14px; }',
-    '.rf-toc summary::-webkit-details-marker { display: none; }',
-    '.rf-toc ol { list-style: none; margin: 0; padding: 0; counter-reset: rftoc; }',
-    '.rf-toc li { counter-increment: rftoc; margin: 0; }',
-    '.rf-toc a { display: flex; gap: 12px; padding: 5px 0; font-size: 15px; line-height: 1.35; color: var(--rf-ink); text-decoration: none; }',
-    '.rf-toc a::before { content: counter(rftoc, decimal-leading-zero); flex: none; padding-top: 2px; font-family: var(--rf-mono); font-size: 12px; color: var(--rf-red-text); }',
-    '.rf-toc a:hover span { text-decoration: underline; text-decoration-color: var(--rf-red); text-underline-offset: .2em; }',
-    '@media (min-width: 1200px) { .rf-toc summary { cursor: default; } }',
-
-    '.rf .cover_holder { margin-top: 64px; }',
-    '.rf .cover_image { width: min(64rem, 100vw - 16rem); height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: .25rem; }',
-    '.rf .richtextbox { margin-top: 72px; }',
-
-    '@media (max-width: 1199px) {' +
-      ' .rf-hero { grid-template-columns: 1fr; }' +
-      ' .rf-hero__side { margin-top: 32px; max-width: 28rem; }' +
-      ' .rf .h1_small { max-width: 40rem; }' +
-      // below 1200px the sections fold away under one line; the whole row is the tap target
-      ' .rf-toc { margin-top: 20px; padding: 0; border-bottom: 1px solid rgba(19, 19, 19, .12); }' +
-      ' .rf-toc summary { margin: 0; padding: 14px 0; justify-content: space-between; }' +
-      ' .rf-toc summary::after { content: "+"; font-size: 16px; color: var(--rf-ink); }' +
-      ' .rf-toc[open] summary::after { content: "–"; }' +
-      ' .rf-toc[open] ol { margin: -2px 0 14px; }' +
-    ' }',
-    '@media (max-width: 991px) {' +
-      ' .rf .blog_intro .container-20 { width: 90vw; }' +
-      ' .rf .cover_image { width: 90vw; }' +
-    ' }',
-    '@media (max-width: 767px) {' +
-      ' .rf .blog_intro { padding-top: 104px; }' +
-      ' .rf .h1_small { font-size: 2rem; line-height: 1.05; margin-top: 20px; }' +
-      ' .rf .summary.padding-section-medium.custom { margin-top: 24px; }' +
-      ' .rf .sumary { font-size: 1.125rem; line-height: 1.5; }' +
-      ' .rf-hero__side { margin-top: 28px; max-width: none; }' +
-      ' .rf .cover_holder { margin-top: 32px; }' +
-      ' .rf .cover_image { width: 100vw; border-radius: 0; }' +
-      ' .rf .richtextbox { margin-top: 48px; }' +
-    ' }',
-
-    // reading: dark links with a red underline, a calmer type scale
-    '.rf .richtextstyling a { color: var(--rf-ink); text-decoration: underline; text-decoration-color: var(--rf-red); text-decoration-thickness: 1px; text-underline-offset: .2em; }',
-    '.rf .richtextstyling a:hover { color: var(--rf-ink); text-decoration-thickness: 2px; }',
-    '.rf .richtextstyling h2, .rf .richtextstyling h3 { color: var(--rf-ink); text-wrap: balance; }',
-    '.rf .richtextstyling h2 { font-size: 2.25rem; line-height: 1.15; margin-top: 4rem; margin-bottom: 1rem; }',
-    '.rf .richtextstyling h3 { font-size: 1.5rem; line-height: 1.2; margin-top: 2.5rem; margin-bottom: .5rem; }',
-    '.rf .richtextstyling h4 { font-family: var(--rf-mono); font-size: .8125rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 400; color: var(--rf-ink); margin-top: 2rem; margin-bottom: .5rem; display: flex; align-items: center; gap: 10px; }',
-    '.rf .richtextstyling h4::before { content: ""; width: 6px; height: 6px; background: var(--rf-coral); flex: none; }',
-    '.rf .richtextstyling p { line-height: 1.6; }',
-    '.rf .richtextstyling li { line-height: 1.6; margin-bottom: .5rem; }',
-    '.rf .richtextstyling ul, .rf .richtextstyling ol { padding-left: 1.5rem; }',
-    '.rf .richtextstyling ul li::marker { color: var(--rf-red); }',
-    '.rf .richtextstyling ol { list-style: decimal-leading-zero; padding-left: 2.25rem; overflow: visible; }',
-    '.rf .richtextstyling ol li::marker { font-family: var(--rf-mono); color: var(--rf-red-text); font-size: .9em; }',
-    '.rf .richtextstyling figure img { outline: 1px solid rgba(19, 19, 19, .08); outline-offset: -1px; }',
-    '.rf .richtextstyling figcaption { text-align: left; font-size: .875rem; line-height: 1.45; color: #6b6b6b; margin-top: .75rem; }',
-    '.rf .richtextstyling figcaption a { color: inherit; }',
-    '@media (min-width: 1280px) { .rf .richtextstyling img { max-width: 52rem; } }',
-    '@media (min-width: 992px) and (max-width: 1279px) { .rf .richtextstyling img { max-width: var(--rf-col); } }',
-    '@media (max-width: 767px) {' +
-      ' .rf .richtextstyling p, .rf .richtextstyling li { font-size: 1.125rem; }' +
-      ' .rf .richtextstyling h2 { font-size: 1.625rem; margin-top: 3.5rem; margin-bottom: .75rem; }' +
-      ' .rf .richtextstyling h3 { font-size: 1.25rem; line-height: 1.25; margin-top: 2.5rem; }' +
-      ' .rf .richtextstyling img { max-width: 100vw; }' +
-      ' .rf .richtextstyling figcaption { padding: 0 5vw; }' +
-    ' }',
-
-    // no back-to-top button
-    '.rf .back-to-top { display: none !important; }',
-    '.rf .richtextstyling h2[tabindex="-1"]:focus { outline: none; }',
-
-    // end of the page: one project block, then keep reading (the dark post cards from rdPostCards)
-    '.rf .lead_mag { display: none; }',
-    '.rf [data-component]:has(> .cta_container) { display: none; }',
-    // the closing CTA (CTA_explore, on the Blog posts template)
-    '.rf .duo_section { margin-top: 6rem; }',
-    '@media (max-width: 767px) { .rf .duo_section { margin-top: 4rem; } }',
-    // the page lifts off the new footer like a card: it needs its own background (the grain sits on it)
-    '.rf .main-wrapper { background-color: var(--color--rimbobage, #f8f5ee); }',
-    '.rf .blog_section .padding-section-large { padding-top: 8rem; }',
-    '.rf .blog_section .padding-global { padding-left: 0; padding-right: 0; }',
-    '.rf .blog_section .container-large { width: 90vw; max-width: none; }',
-    '.rf .blog_section .blog_wrapper { display: block; }',
-    '.rf .blog_section .blog_list { width: 100%; }',
-    '.rf .blog_section .blog_highlight { align-items: stretch; }',
-    '.rf .blog_section .blog_text { display: block; margin-bottom: 2rem; }',
-    '.rf-kr-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }',
-    '.rf-kr-title { font-family: var(--font--display-font); font-size: 2.25rem; line-height: 1.15; margin: .75rem 0 0; color: var(--rf-ink); }',
-    '.rf .btn.rf-kr-all { flex: none; background-color: var(--rf-ink); border-color: var(--rf-ink); color: #f8f5ee; box-shadow: none; }',
-    '.rf .btn.rf-kr-all:hover { color: #f8f5ee; }',
-    '.rf .btn.rf-kr-all.is-hover { box-shadow: 0 .5rem 1.4rem rgba(19, 19, 19, .28); }',
-    '.rf .rf-hide { display: none !important; }',
-    '.rf .blog_section .blog_list.rf-two .blog_container { width: 100%; }',
-    '@media (min-width: 992px) { .rf .blog_section .blog_list.rf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }',
-    '.rf .blog_section .btn-animate-chars { display: none; }', // "See All Resources": the header row has "All articles"
-    // ---- the opening (Rimbo's pick from the lab in prototype/post-entrance, round 2): one CSS sequence of about 1.4 s.
-    // It waits for html.rf-go, which rdPostRefresh sets once the page is on screen (after a page transition has landed),
-    // and until then the hero, cover and article stay hidden, so the transition's copy of this page shows them empty.
-    // Webflow's own page-load fades on the title, lead, author and cover still run: rf-rest (first in each list, so the
-    // opening's own keyframes win) holds them at rest
-    '.rf:not(.rf-go) .rf-hero, .rf:not(.rf-go) .cover_holder, .rf:not(.rf-go) .richtextbox { visibility: hidden; }',
-    '.rf-go .rf-dot { animation: rf-pop .55s cubic-bezier(.16, 1, .3, 1) .04s both; }',
-    '.rf-eb { display: inline-block; }',
-    '.rf-go .rf-eb { animation: rf-wipe .75s cubic-bezier(.625, .05, 0, 1) .09s both; }',
-    '.rf-go .rf-hero .h1_small { animation: rf-rest-t 1ms both; }',
-    '.rf-w { display: inline-block; overflow: clip; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }',
-    '.rf-w > span { display: inline-block; transform-origin: 0 0; }',
-    '.rf-go .rf-w > span { animation: rf-rise .95s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(90ms + var(--i, 0) * 45ms); }',
-    '.rf-go .rf-hero .sumary { animation: rf-rest 1ms both, rf-soft .9s cubic-bezier(.16, 1, .3, 1) .26s both; }',
-    '.rf-go .rf-hero .rl_blogpost1_content-top { animation: rf-rest 1ms both, rf-up .8s cubic-bezier(.16, 1, .3, 1) .32s both; }',
-    '.rf-go .rf-hero .rl_blogpost1_author-image { animation: rf-photo .9s cubic-bezier(.16, 1, .3, 1) .32s both; }',
-    '.rf-go .rf-toc summary { animation: rf-up .7s cubic-bezier(.16, 1, .3, 1) .44s both; }',
-    '.rf-go .rf-toc li { animation: rf-in .7s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(500ms + var(--n, 0) * 40ms); }',
-    // below 1200px the sections are folded into one row with a line above and below: that whole row comes up at once
-    '@media (max-width: 1199px) { .rf-go .rf-toc { animation: rf-up .7s cubic-bezier(.16, 1, .3, 1) .44s both; } }',
-    '@media (min-width: 1200px) {' +
-      ' .rf-go .rf-toc { position: relative; border-top-color: transparent; }' +
-      ' .rf-go .rf-toc::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: rgba(19, 19, 19, .12); transform-origin: 0 50%; animation: rf-line 1s cubic-bezier(.625, .05, 0, 1) .38s both; }' +
-    ' }',
-    '.rf-go .cover_holder { animation: rf-rest 1ms both, rf-open 1.4s cubic-bezier(.625, .05, 0, 1) .32s both; }',
-    '.rf-go .cover_image { animation: rf-zoom 2s cubic-bezier(.16, 1, .3, 1) .32s both; }',
-    '.rf-go .richtextbox { animation: rf-soft 1s cubic-bezier(.16, 1, .3, 1) .7s both; }',
-    '@keyframes rf-rest { from, to { opacity: 1; filter: none; } }',
-    '@keyframes rf-rest-t { from, to { opacity: 1; filter: none; transform: none; } }',
-    '@keyframes rf-pop { from { transform: scale(0); } 60% { transform: scale(1.35); } to { transform: scale(1); } }',
-    '@keyframes rf-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }',
-    '@keyframes rf-rise { from { transform: translateY(125%) rotate(4deg); } to { transform: none; } }',
-    '@keyframes rf-soft { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }',
-    '@keyframes rf-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }',
-    '@keyframes rf-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }',
-    '@keyframes rf-photo { from { transform: scale(.82); filter: grayscale(1); } to { transform: none; filter: none; } }',
-    '@keyframes rf-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }',
-    '@keyframes rf-open { from { clip-path: inset(100% 14% 0 14% round 6px); transform: translateY(48px); } to { clip-path: inset(0 0 0 0 round 4px); transform: none; } }',
-    '@keyframes rf-zoom { from { transform: scale(1.22); } to { transform: none; } }',
-    // reduced motion: everything at its resting place at once
-    '@media (prefers-reduced-motion: reduce) { .rf-go .rf-hero *, .rf-go .rf-toc::before, .rf-go .cover_holder, .rf-go .cover_image, .rf-go .richtextbox { animation-duration: 1ms !important; animation-delay: 0s !important; } }',
-    '@media (max-width: 767px) {' +
-      ' .rf .blog_section .padding-section-large { padding-top: 5rem; }' +
-      ' .rf-kr-head { flex-direction: column; align-items: flex-start; }' +
-      ' .rf-kr-title { font-size: 1.625rem; }' +
-    ' }'
-  ].join('\n');
+  // The new post page: its CSS lives in Webflow since 2026-11-19 (the Blog posts template head code), main.js only builds and moves it
 
   // Scrolls to a section heading from the "In this article" list
   function postJumpTo(h) {
@@ -5082,10 +4794,6 @@
     document.documentElement.classList.add('rf');
     var nl = /^\/nl(\/|$)/.test(location.pathname); // Dutch posts: the reading words in Dutch, the rest of the design the same
 
-    var style = document.createElement('style');
-    style.id = 'rd-post-refresh-css';
-    style.textContent = POST_REFRESH_CSS;
-    rdHead(style);
 
     var grain = document.createElement('div');
     grain.className = 'grain rf-grain';
@@ -5249,36 +4957,11 @@
   // This replaces the Webflow hover that slid the panel by a fixed amount.
   // =========================================================
   var POST_CARD_SCOPES = ['.blog_highlight', '.is-resources'];
-  var POST_CARDS_CSS = (function () {
-    function rules(x) {
-      return [
-        x + ' .blog_list { align-items: stretch; }',
-        x + ' .post { height: auto; }',
-        x + ' .image-318 { filter: none !important; }', // Rimbo: no hue shift on hover (the Webflow interaction still writes it)
-        x + ' .blog_container { height: 100%; }',
-        // centred, so a card next to a longer title keeps as much space above as below
-        x + ' .blog_content { position: relative; top: auto; height: auto; flex: 1 1 auto; justify-content: center; padding: 1.25rem; transform: none !important; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }',
-        x + ' .blog_title { height: auto; margin-bottom: 0; }',
-        x + ' .paragraph-46 { position: absolute; left: 1.25rem; right: 1.25rem; top: var(--rd-sub-top, calc(100% - .75rem)); margin: 0; opacity: 0; transition: opacity .35s ease; pointer-events: none; }',
-        x + ' .post:hover .blog_content, ' + x + ' .blog_container:focus-visible .blog_content { transform: translateY(calc(-1 * var(--rd-sub, 0px))) !important; }',
-        x + ' .post:hover .paragraph-46, ' + x + ' .blog_container:focus-visible .paragraph-46 { opacity: 1; transition: opacity .35s ease .1s; }',
-        '@media (hover: none) { ' + x + ' .post:hover .blog_content { transform: none !important; } ' + x + ' .post:hover .paragraph-46 { opacity: 0; } }',
-        '@media (prefers-reduced-motion: reduce) { ' + x + ' .blog_content { transition: none; } }'
-      ];
-    }
-    return POST_CARD_SCOPES.map(rules).reduce(function (all, r) { return all.concat(r); }, [])
-      .concat(['@media (max-width: 479px) { .blog_highlight .blog_list { row-gap: 1.5rem; } }']).join('\n');
-  })();
+  // The blog cards: its CSS lives in Webflow since 2026-11-19 (site head code), main.js only builds and moves it
 
   function rdPostCards() {
     var selector = POST_CARD_SCOPES.map(function (x) { return x + ' .post'; }).join(', ');
     if (!qs(selector)) return;
-    if (!qs('#rd-post-cards-css')) {
-      var style = document.createElement('style');
-      style.id = 'rd-post-cards-css';
-      style.textContent = POST_CARDS_CSS;
-      rdHead(style);
-    }
     // Per card: the subtext starts 8px under its own title (--rd-sub-top), and on hover the panel slides up
     // just far enough to leave 20px under the subtext (--rd-sub). Measured, because a card next to a longer
     // title has its text centred, not at the bottom.
@@ -5310,15 +4993,6 @@
     });
     var cover = qs('.cover_image');
     if (!on || !cover) return;
-    if (!qs('#rd-hue-drift-css')) {
-      var style = document.createElement('style');
-      style.id = 'rd-hue-drift-css';
-      style.textContent =
-        '@keyframes rdHueDrift { 0%, 100% { filter: hue-rotate(0deg); } 25% { filter: hue-rotate(45deg); } 75% { filter: hue-rotate(-45deg); } }\n' +
-        '.cover_image.is-hue-drift { animation: rdHueDrift 8s ease-in-out infinite; }\n' +
-        '@media (prefers-reduced-motion: reduce) { .cover_image.is-hue-drift { animation: none; } }';
-      rdHead(style);
-    }
     cover.classList.add('is-hue-drift');
   }
 
@@ -6306,20 +5980,7 @@
 
     if (location.hostname.indexOf('webflow.io') === -1) qsa('[data-wall-open]', wrapper).forEach(function (s) { s.parentNode.removeChild(s); });
 
-    // only what the Designer can't hold: the moving parts
-    var style = document.createElement('style');
-    style.textContent = `
-      .wall_col { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; clip-path: circle(0% at 50% 50%); }
-      .wall_ball canvas { display: block; width: 100%; height: 100%; }
-      .wall_cc { opacity: var(--k, 0); --out: calc((1 - var(--k, 0)) * 16px); }
-      .wall_cc-c.is--tl { transform: translate(calc(var(--out) * -1), calc(var(--out) * -1)); }
-      .wall_cc-c.is--tr { transform: translate(var(--out), calc(var(--out) * -1)); }
-      .wall_cc-c.is--bl { transform: translate(calc(var(--out) * -1), var(--out)); }
-      .wall_cc-c.is--br { transform: translate(var(--out), var(--out)); }
-      .centered-slider-bullet.active .wall_face-open { color: var(--_wall-of-love---wall-text); }
-      .centered-slider-bullet:focus-visible, .centered-slider-button:focus-visible { outline: 1px solid var(--color--brand); outline-offset: 2px; }
-    `;
-    rdHead(style); // through rdHead: it goes again when the page leaves, so a Barba return does not stack another copy
+    // the moving parts' CSS (colour circle, ball canvas, closing corners) lives in the site head code since 2026-11-19
 
     function el(cls, html) { var d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
     // a copy of the wall without faces or arrows in the Designer: built from its slides, with the Designer's classes
