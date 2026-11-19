@@ -5795,16 +5795,15 @@
   // 1 when it fills the screen; scrolling back plays it in reverse. Page by page until Rimbo's go.
   // =========================================================
   var FOOTER_SCRIPT = (document.currentScript && document.currentScript.src) || '';
-  // F Brush, Rimbo's refined logo (5 Nov): it ships next to main.min.js (same tag); on localhost it comes from /media/
+  // F Brush, Rimbo's refined logo (5 Nov): served from Bunny; on localhost it comes from /media/
   // the Webflow footer still points at the old logo file
   function rdLogoSwap() {
     var logoSrc = brushLogoSrc();
     qsa('img[src*="SVGLOGO2"]').forEach(function (img) { img.removeAttribute('srcset'); img.src = logoSrc; });
   }
 
-  function brushLogoSrc() {
-    return /\/main(\.min)?\.js/.test(FOOTER_SCRIPT) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(FOOTER_SCRIPT)
-      ? FOOTER_SCRIPT.replace(/\/main(\.min)?\.js.*$/, '/media/logo-f-brush.svg') : '/media/logo-f-brush.svg';
+  function brushLogoSrc() { // on Bunny with the clips (media no longer ships in the repo); /media/ on localhost
+    return /^https?:\/\/(localhost|127\.0\.0\.1)/.test(FOOTER_SCRIPT) ? '/media/logo-f-brush.svg' : 'https://rimbo-designs-clips.b-cdn.net/logo-f-brush.svg';
   }
   function rdFooter() {
     // the footer is the component Footer_rdf in the Designer (rdf-* classes: all of its look and text); this only animates it
