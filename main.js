@@ -3447,7 +3447,11 @@
   // is not in CLIPS, and every clip under ?clips=0 on staging, keeps the address in its data-src.
   // =========================================================
   var CLIP_BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@clips-v1/media/c/'; // the move to Bunny: this line
-  var CLIPS = { 'dfs-home-test': 1, 'echo': 1, 'tinko': 1, 'charlies-angels': 1, 'dfs-home': 1, 'dieronesie': 1, 'echo-tour': 1 }; // clip: the version of its files (a new encode = new files with the next number)
+  var CLIPS = { 'dfs-home-test': 1, 'echo': 1, 'tinko': 1, 'charlies-angels': 1, 'dfs-home': 1, 'dieronesie': 1, 'echo-tour': 1, // clip: the version of its files (a new encode = new files with the next number)
+    // the Work page (rdWorkClips): v = version, tag = the git tag that holds the files, pc / phone = their width when not 640 / 480.
+    // A clip is known by its FILE NAME: a new recording needs a new file name in data-src (or new files here with the next v)
+    'work-echo-open': { v: 1, tag: 'clips-v2' }, 'work-list-echo-wide': { v: 1, tag: 'clips-v2', pc: 1000, phone: 800 },
+    'work-list-charlies': { v: 1, tag: 'clips-v2' }, 'work-list-dieronesie': { v: 1, tag: 'clips-v2' } };
   var CLIP_AV1 = 'video/mp4; codecs="av01.0.04M.08"';
   var clipLab = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname); // staging and local only: ?clips=0 the old files, ?av1=0 the H.264 ones
   var clipOff = clipLab && /[?&]clips=0\b/.test(location.search), clipNoAv1 = clipLab && /[?&]av1=0\b/.test(location.search);
@@ -3465,7 +3469,13 @@
     var av1 = can && (!hand || chip === '1' || /Apple/.test(navigator.vendor || ''));
     return (clipPick = (lean ? '480' : '640') + '-' + (av1 ? 'av1' : 'h264'));
   }
-  function clipFile(name) { return !clipOff && CLIPS.hasOwnProperty(name) ? CLIP_BASE + name + '-' + clipChoice() + '-v' + CLIPS[name] + '.mp4' : ''; }
+  function clipFile(name) {
+    if (clipOff || !CLIPS.hasOwnProperty(name)) return '';
+    var c = CLIPS[name], pick = clipChoice().split('-'), size = pick[0]; // ['640' | '480', 'av1' | 'h264']
+    if (typeof c === 'object') size = String(c[size === '480' ? 'phone' : 'pc'] || size); // a clip with its own widths
+    var base = c.tag ? CLIP_BASE.replace('@clips-v1/', '@' + c.tag + '/') : CLIP_BASE;
+    return base + name + '-' + size + '-' + pick[1] + '-v' + (c.v || c) + '.mp4';
+  }
   function clipUrl(v) {
     var given = v.getAttribute('data-src') || '';
     return clipFile(v.getAttribute('data-clip') || (/\/media\/([\w-]+)\.mp4$/.exec(given) || [])[1] || '') || given;
@@ -3495,6 +3505,44 @@
     } catch (e) {}
   })();
   window.rdClipUrl = clipFile; // for the end-of-page embed: rdClipUrl('echo'), '' = keep your own address
+
+  // WORK CLIPS — the Work page: the hero ([data-work-hero]) and the Selected list (.ws_wrap). A clip that should come
+  // from CLIPS or load late keeps its address in data-src in the Designer (no src), so it loads nothing by itself.
+  // Every video there is muted (the published page loses the attribute, and a browser only starts a muted clip by itself).
+  // The hero's clips get their file at once (the opening waits for their stills). The list's rows 1 and 2 get theirs
+  // when the list comes near (row 1 plays the hero's DFS file, already loaded); the other rows once the hero's clips can
+  // also play through, or the moment the list's own script (rdWorkSplit) asks for one. A video with a src is left as it is.
+  function rdWorkClips() {
+    var hero = qsa('[data-work-hero] video'), list = qs('.ws_wrap'), rows = list ? qsa('video', list) : [];
+    hero.concat(rows).forEach(function (v) { v.muted = true; });
+    var give = function (v) {
+      if (v.getAttribute('src') || !v.getAttribute('data-src')) return;
+      var url = clipUrl(v);
+      if (url) { v.setAttribute('src', url); clipGuard(v); }
+    };
+    hero.forEach(give);
+    var wait = rows.filter(function (v) { return !v.getAttribute('src') && v.getAttribute('data-src'); });
+    if (!wait.length) return;
+    var near = false, heroIn = false, io = null, mo = null;
+    var step = function () {
+      if (!near) return;
+      wait.slice(0, 2).forEach(give);
+      if (heroIn) { wait.forEach(give); io.disconnect(); mo.disconnect(); }
+    };
+    var come = function () { if (!near) { near = true; step(); } };
+    io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) come(); }, { rootMargin: '100px 0px' });
+    io.observe(list);
+    rdOn(window, 'scroll', function () { if (window.scrollY > 0) come(); }, { passive: true }); // a real scroll, not the jump to the top of a page transition
+    mo = new MutationObserver(function (ms) { ms.forEach(function (m) { if (m.target.preload === 'auto') give(m.target); }); });
+    wait.slice(2).forEach(function (v) { mo.observe(v, { attributes: true, attributeFilter: ['preload'] }); }); // rdWorkSplit sets preload=auto on the row it shows and the next
+    var loading = hero.filter(function (v) { return v.readyState < 4; }), left = loading.length;
+    var one = function () { if (--left === 0) { heroIn = true; step(); } };
+    if (!left) heroIn = true;
+    loading.forEach(function (v) {
+      var fired = false, once = function () { if (!fired) { fired = true; one(); } };
+      rdOn(v, 'canplaythrough', once); rdOn(v, 'error', once);
+    });
+  }
 
   // =========================================================
   // BAND — the home's hero, section [data-band]: the dial ([data-ring], the home since 9 Nov) or home V4's drum
@@ -9906,6 +9954,7 @@
   function initPageFunctions() {
     var path = pagePath();
     run('logo', rdLogoSwap);
+    run('work clips', rdWorkClips); // before rdWorkHeroLoad / work-hero.js and rdWorkSplit read the Work page's videos
     if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
     run('band', rdBand);   // builds the home-opening rows before the marquees start
     run('global', rdGlobal);
