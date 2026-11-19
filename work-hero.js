@@ -491,16 +491,22 @@ function initOrbitTiles() {
       var dt = lastFrame == null ? deltaMs / 1000 : (frame - lastFrame) / 1000;
       lastFrame = frame;
       if (!(dt > 0)) return;                                          // same frame twice: nothing moved
-      dt = Math.min(0.05, Math.max(0.004, dt));
-      var y = window.scrollY;
+      dt = Math.min(0.1, Math.max(0.004, dt));
+      var y = Math.max(0, window.scrollY);                            // iOS rubber band above the top is not a scroll
       vel += ((y - lastY) / dt - vel) * Math.min(1, dt * 10);   // scroll speed, smoothed
       lastY = y;
       if (edgeH < 1) { measure(); return; }                             // not laid out (a hidden tab)
       if (y > window.innerHeight * 1.3 && Math.abs(bow) < 0.05) return; // the edge is long gone
       var max = edgeH * 0.46;
       var target = Math.max(-max, Math.min(max, vel * BEND));
-      bowVel += (STIFF * (target - bow) - DAMP * bowVel) * dt;
-      bow += bowVel * dt;
+      // The spring moves in steps of at most 8 ms. One step per frame flipped the bow to the other side every frame once a
+      // frame took over 25 ms (a phone at 30 fps, Low Power Mode) and made it grow past ~43 ms: the edge flapped and its
+      // belly was cut flat (Rimbo's iPhone, 2026-11-19)
+      for (var n = Math.ceil(dt / 0.008), h = dt / n; n > 0; n--) {
+        bowVel += (STIFF * (target - bow) - DAMP * bowVel) * h;
+        bow += bowVel * h;
+      }
+      if (bow > max || bow < -max) { bow = Math.max(-max, Math.min(max, bow)); bowVel = 0; } // never past the limit
       // the curve's control point sits twice as far as the bow itself; in the svg's 0-100 box
       var c = (50 + (bow / edgeH) * 200).toFixed(2);
       if (c === drawn) return;

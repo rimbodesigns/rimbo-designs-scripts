@@ -3679,6 +3679,9 @@
     };
     var stepEvery = param('step', 'step', 3.5);
     var pinScreens = ring && !reduced ? param('pin', 'pin', 2) : 0; // home-extreme: screens of scroll the hero stays pinned while the dial tips over, turns and closes
+    var pinPhone = ring && !reduced ? param('pinphone', 'pin-phone', 2.6) : 0; // on a phone the hold is 30% longer (Rimbo 2026-11-19: "it jumps up a bit fast", a little more scroll work for the hero)
+    var pinWide = pinScreens, pinNow = function () { return window.innerWidth < 768 && !/[?&]m=0\b/.test(query) ? pinPhone : pinWide; }; // read again on every refresh, so a turned phone or a resized window gets its own length
+    if (pinScreens > 0) pinScreens = pinNow();
     var ringSlots = ring ? param('slots', 'slots', 15) : 0; // home-extreme: cards on the dial; the works repeat to fill it (fifteen = the five works three times, 24° apart: a whole cylinder, so at rest it keeps going round like home-v4; ten = twice, each opposite itself, a part-cylinder that slides open)
     var ringGrow = ring ? param('grow', 'grow', 1.15) : 1; // home-extreme: how much wider the flat dial is than the drum, so the cards slide outward as it tips
     var ringOut = ring ? ((/[?&]out=(\w+)/.exec(query) || [])[1] || hero.getAttribute('data-band-out') || 'roll') : ''; // home-extreme: how the dial leaves: roll (off to the left, still spinning), shoot (the cards fly out one by one) or fade
@@ -3905,6 +3908,7 @@
       ring.addEventListener('pointerup', up); ring.addEventListener('pointercancel', up);
       var settle = function (extra) { var to = Math.round(st.steps + (extra || 0)); if (!flat()) to = Math.max(lo, Math.min(hi, to)); st.tween = gsap.to(st, { steps: to, duration: 0.8, ease: 'power3.out', onUpdate: render }); };
       var ease3 = function (q) { q = clamp01(q); return 1 - Math.pow(1 - q, 3); };
+      var easeTip = function (q) { q = clamp01(q); return phoneLab() ? q * q * (3 - 2 * q) : ease3(q); }; // on a phone the dial tips over in and out softly: ease3 gave a quarter of the tip in the first 50 px of a thumb flick
       return {
         busy: function () { return !!down; },
         refresh: render, // dedupeClips: once the copies are canvases, mark the ones facing away straight away
@@ -3919,7 +3923,7 @@
           var screens = q * pinScreens, gone = clamp01(screens / fadeFrac); // the copy goes within fadeFrac of a screen, as on home-v4
           if (copy && gone !== st.copyGone) { st.copyGone = gone; copy.style.transition = 'none'; gsap.set(copy, { opacity: 1 - gone, filter: gone ? 'blur(' + (10 * gone).toFixed(1) + 'px)' : 'none' }); } // only when it changes; a blur(0) left on the copy would keep it on its own layer for nothing
           if (scrollLine) { scrollLine.style.transition = 'none'; gsap.set(scrollLine, { opacity: 1 - clamp01(screens / 0.07) }); }
-          var e = ease3(q / 0.35), x = clamp01((q - 0.75) / 0.25); // e: the tip-over; x: the way out (a quarter of the hold: Rimbo found it too fast)
+          var e = easeTip(q / 0.35), x = clamp01((q - 0.75) / 0.25); // e: the tip-over; x: the way out (a quarter of the hold: Rimbo found it too fast)
           st.closing = x > 0;
           st.tip = 90 * e; st.open = e; st.y = st.yFlat != null ? (st.yRest || 0) * (1 - e) + st.yFlat * e : -window.innerHeight * 0.08 * e;
           st.scroll = (q > 0.35 ? Math.min(1, (q - 0.35) / 0.4) * N : 0); // one full round
@@ -4100,7 +4104,7 @@
     // drumTurn cards over the first screen, back on the way up, settling on a card at the top.
     if (window.ScrollTrigger && ringApi && pinScreens > 0) { // home-extreme: the hero holds while the ring tips over and turns, then the page goes on
       ScrollTrigger.create({
-        trigger: hero, start: 'top top', end: function () { return '+=' + Math.round(window.innerHeight * pinScreens); }, pin: true, pinSpacing: true, invalidateOnRefresh: true,
+        trigger: hero, start: 'top top', end: function () { pinScreens = pinNow(); return '+=' + Math.round(window.innerHeight * pinScreens); }, pin: true, pinSpacing: true, invalidateOnRefresh: true,
         onUpdate: function (st) { scrolled = st.progress > 0.02; ringApi.scroll(st.progress); }
       });
     }
@@ -8836,7 +8840,8 @@
           var adv = ctx.measureText(ch).width, t = mk(ch), ln = mk(ch), mt = mk(ch), mask = document.createElementNS(NS, 'mask'), mid = 'hwm' + tag + (++id);
           [t, ln, mt].forEach(function (e) { e.setAttribute('x', x); });
           mask.setAttribute('id', mid); mask.setAttribute('maskUnits', 'userSpaceOnUse');
-          mask.setAttribute('x', -200); mask.setAttribute('y', -200); mask.setAttribute('width', 2000); mask.setAttribute('height', 400);
+          // the mask covers only its own letter (it was 2000 x 400 units per letter: 26 word-wide masks redrawn every frame)
+          mask.setAttribute('x', x - 12); mask.setAttribute('y', -asc - pad - 12); mask.setAttribute('width', adv + 24); mask.setAttribute('height', asc + desc + pad * 2 + 24);
           mt.setAttribute('fill', 'none'); mt.setAttribute('stroke', '#fff'); mask.appendChild(mt); defs.appendChild(mask);
           ln.setAttribute('fill', 'none'); ln.setAttribute('stroke', 'rgb(' + LINE + ')'); ln.setAttribute('mask', 'url(#' + mid + ')');
           t.setAttribute('stroke', 'none');
@@ -8850,9 +8855,22 @@
         h3.textContent = ''; h3.appendChild(svg);
         words.push({ h3: h3, letters: letters, pad: pad, asc: asc });
       }
-      function unit(w) { return 100 / (parseFloat(getComputedStyle(w.h3).fontSize) || 100); }
+      function unit(w) { return w.u || (w.u = 100 / (parseFloat(getComputedStyle(w.h3).fontSize) || 100)); }   // measured once (and on resize)
+      var M = null;                                          // the strip's offsets, measured once (and on resize), not in every frame
+      function measure() {
+        var hs = words.map(function (w) { return w.h3; });
+        words.forEach(function (w) { w.u = 0; w.k100 = parseFloat(getComputedStyle(w.h3).fontSize) / 100; });
+        var off = hs.map(function (h) { return h.offsetLeft - hs[0].offsetLeft; });
+        M = { off: off, step: off[1] - off[0], avail: strip.parentNode.clientWidth || innerWidth };
+      }
       // ko = how much of the line is drawn, kf = fill
       function paint(w, l, ko, kf, u) {
+        // only what changed is written: a letter that is done (drawn + filled, or not started) costs nothing per frame
+        ko = Math.round(ko * 1000) / 1000; kf = Math.round(kf * 1000) / 1000;
+        if (l.ko === ko && l.kf === kf && l.u === u) return;
+        l.ko = ko; l.kf = kf; l.u = u;
+        var hide = ko <= 0 || kf >= 1;                       // the dashed outline is invisible: take it (and its mask) out of painting
+        if (l.hid !== hide) { l.hid = hide; l.ln.style.display = hide ? 'none' : ''; }
         var d = 4 * u;
         l.t.setAttribute('fill', 'rgba(' + CREAM + ',' + kf.toFixed(3) + ')');
         l.ln.setAttribute('stroke-width', u.toFixed(3));
@@ -8868,12 +8886,13 @@
         majors.forEach(function (m) { m.el.classList.toggle('is-on', p >= m.at - .001); });
         var hs = words.map(function (w) { return w.h3; });
         var f = F0 + clamp(p / .8) * (3 - F0);
-        var off = hs.map(function (h) { return h.offsetLeft - hs[0].offsetLeft; }), step = off[1] - off[0];
+        if (!M) measure();
+        var off = M.off, step = M.step;
         var i = Math.min(2, Math.floor(Math.max(0, f)));
         var x = f < 0 ? f * step : f >= 3 ? off[3] : off[i] + (off[i + 1] - off[i]) * (f - i);
         strip.style.transform = 'translate3d(' + (-x).toFixed(1) + 'px,0,0)';
         var e = sm(.8, 1, p);
-        var avail = strip.parentNode.clientWidth || innerWidth, pA = (-.15 - F0) / (3 - F0) * .8;   // pA: where the first word is fully drawn
+        var avail = M.avail, pA = (-.15 - F0) / (3 - F0) * .8;   // pA: where the first word is fully drawn
         words.forEach(function (w, k) {
           var d = f - k, u = unit(w);
           w.letters.forEach(function (l, j) {
@@ -8892,7 +8911,7 @@
           if (k === 3) {
             // fly into the last word: scale about a point in an open counter until its dark fills the screen
             // (a U: the middle of its top opening; a C, as in SCALE: in the middle of its bowl, half way up)
-            var h = w.h3, k100 = parseFloat(getComputedStyle(h).fontSize) / 100, g = Math.pow(e, 2.6), Z = null, zx = 0, zy = 0;
+            var h = w.h3, k100 = w.k100, g = Math.pow(e, 2.6), Z = null, zx = 0, zy = 0;
             w.letters.forEach(function (l) { if (!Z && (l.ch === 'U' || l.ch === 'C')) Z = l; });
             if (Z && Z.ch === 'U') { zx = Z.x + Z.adv / 2; zy = w.asc * .3; } else if (Z) { zx = Z.x + Z.adv * .6; zy = w.asc * .5; }
             h.style.transformOrigin = ((w.pad + zx) * k100).toFixed(1) + 'px ' + ((w.pad + zy) * k100).toFixed(1) + 'px';
@@ -8932,7 +8951,7 @@
         new IntersectionObserver(function (es) { seen = es[0].isIntersecting; wake(); }).observe(sec);
         window.addEventListener('scroll', wake, { passive: true });
       }
-      window.addEventListener('resize', function () { if (words.length) render(ps); });
+      window.addEventListener('resize', function () { if (words.length) { measure(); render(ps); } });
       if (document.fonts && document.fonts.load) document.fonts.load('900 100px IntegralNEW').then(start, start); else start();
     });
   }
@@ -9083,7 +9102,7 @@
   function rdWorkHeroLoad() {
     (function () {
       // the site loads GSAP at the end of the page: load Tinko, then the hero, once it is there (straight away after a page transition)
-      var BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.217/'; // work-hero.js + tinko-live.js from this release (the hero's takeover cursor, 2026-11-19)
+      var BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.225/'; // work-hero.js + tinko-live.js from this release (the edge's spring in small steps, so it no longer flaps on a 30 fps phone, 2026-11-19)
       function load() {
         ['tinko-live.js', 'work-hero.js'].forEach(function (f) {
           var s = document.createElement('script'); s.src = BASE + f; s.async = false; document.body.appendChild(s);
