@@ -15,7 +15,7 @@
   // Today's prices and texts. A personal link keeps the prices of the day it was made (x in the link), so changing a
   // price here never changes a proposal that was already sent. start() works on a copy of this, called CONFIG.
   var BASE = {
-    callUrl: "https://cal.com/rimbo-designs/45-minute-discovery-call", // the lead's one button: they don't need to send anything back, you talk it through
+    callUrl: "https://cal.com/rimbo-designs/30-minute-discovery-call", // the lead's one button: they don't need to send anything back, you talk it through
     applyUrl: "/apply",            // the page without a link: strangers apply like everyone else
     previewLead: { v: 1, n: "Sample project", m: "", d: "2026-11-09", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     copy: {
