@@ -5535,10 +5535,22 @@
     qs('.btn_t', a).textContent = label;
   }
 
-  // A button's swap line is an attribute, which Webflow doesn't translate: on /nl the Dutch line comes from data-btn-alt-nl
-  function rdLocBtnAlt() {
-    if (!/^\/nl(\/|$)/.test(location.pathname)) return;
-    qsa('[data-btn-alt-nl]').forEach(function (b) { b.setAttribute('data-btn-alt', b.getAttribute('data-btn-alt-nl')); });
+  // Dutch lines Webflow's locale can't hold: attributes (a button's swap line, placeholders, aria-labels, a form's
+  // waiting text) and a few text spans the localization skips. On /nl each comes from its own attribute on the element,
+  // set in the Designer (element settings, custom attributes): data-btn-alt-nl, data-nl-placeholder, data-nl-aria-label,
+  // data-nl-wait, and data-nl for the text itself (only the element's own text, a nested span like "Optional" keeps its
+  // own data-nl). Runs before the buttons and the apply form read them.
+  var RD_NL = /^\/nl(\/|$)/;
+  function rdLocNl() {
+    if (!RD_NL.test(location.pathname)) return;
+    [['data-btn-alt-nl', 'data-btn-alt'], ['data-nl-placeholder', 'placeholder'], ['data-nl-aria-label', 'aria-label'], ['data-nl-wait', 'data-wait']].forEach(function (p) {
+      qsa('[' + p[0] + ']').forEach(function (el) { el.setAttribute(p[1], el.getAttribute(p[0])); });
+    });
+    qsa('[data-nl]').forEach(function (el) {
+      var nl = el.getAttribute('data-nl'), own = [].filter.call(el.childNodes, function (n) { return n.nodeType === 3 && n.nodeValue.trim(); })[0];
+      if (!el.children.length) el.textContent = nl;
+      else if (own) own.nodeValue = nl + (/\s$/.test(own.nodeValue) ? ' ' : '');
+    });
   }
 
   // City pages, Zo werken we: one living ball per plain beige card, running off the edge, calm at step 1 and alive at 3.
@@ -7226,7 +7238,7 @@
   // LOCATION PAGES, the small parts — what the city template and the overview (/locations) kept in their Webflow page
   // code until 2026-11-14. The look lives in Webflow: the loc_ and accordion-css classes and the CSS in those pages' own
   // head and footer code. (The showcase drum, the balls and the button helpers of these pages are further up: rdLocShow,
-  // rdLocBalls, rdLocFaqBtn, rdLocBtnAlt.)
+  // rdLocBalls, rdLocFaqBtn, rdLocNl.)
   // =========================================================
 
   // City FAQ: the CMS rich text (h2, then h3 + answer pairs, then a closing link line) becomes the accordion, and the page
@@ -7405,6 +7417,7 @@
     if (!form || form.dataset.applyReady) return;
     form.dataset.applyReady = '1';
     var reduce = reducedMotion, G = gsap;
+    var nl = RD_NL.test(location.pathname), lang = nl ? 'nl-NL' : 'en-GB'; // /nl: €5.000, 3 december 2026, Dutch months
     var block = form.parentElement;
     var head = document.querySelector('.apf_head');
     var steps = [].slice.call(form.querySelectorAll('[data-step]'));
@@ -7537,7 +7550,7 @@
         t.style.transform = first ? 'none' : last ? 'translateX(-100%)' : 'translateX(-50%)';
         t.style.alignItems = first ? 'flex-start' : last ? 'flex-end' : 'center';
       });
-      function eur(n) { return '€' + Number(n).toLocaleString('en-GB'); }
+      function eur(n) { return '€' + Number(n).toLocaleString(lang); }
       function label(v) { return eur(v) + (v >= max ? '+' : ''); }
       var shownV = { v: +range.value };
       function draw() { var v = +range.value, top = v >= max && Math.abs(shownV.v - v) < 1; amount.textContent = eur(Math.round(shownV.v / 50) * 50) + (top ? '+' : ''); }
@@ -7568,22 +7581,23 @@
       var clr = dw.querySelector('[data-date-clear]');
       var chips = [].slice.call(dw.querySelectorAll('[data-quick]')), modes = [].slice.call(dw.querySelectorAll('[data-mode]'));
       var today = new Date(); today.setHours(0, 0, 0, 0);
-      var view = new Date(today.getFullYear(), today.getMonth(), 1), mode = 'Start', picked = null, txt = '';
-      function long(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
+      var view = new Date(today.getFullYear(), today.getMonth(), 1), mode = 'Start', picked = null, txt = '', quick = '';
+      var empty = valEl.textContent.trim() || 'Pick a date'; // the Designer's own line ("Kies een datum" on /nl, via data-nl)
+      function long(d) { return d.toLocaleDateString(lang, { day: 'numeric', month: 'long', year: 'numeric' }); }
       function write() {
-        valEl.textContent = txt || 'Pick a date';
+        valEl.textContent = txt || empty;
         on(valEl, 'is-set', !!txt);
         clr.style.display = txt ? 'flex' : '';
         dfield.value = txt ? mode + ': ' + txt : '';
-        chips.forEach(function (c) { on(c, 'is-on', c.dataset.quick === txt); });
+        chips.forEach(function (c) { on(c, 'is-on', !!quick && c.dataset.quick === quick); });
         update();
       }
       function month(first, second) {
         var box = document.createElement('div'); box.className = 'apf_month' + (second ? ' is-second' : '');
         var name = document.createElement('p'); name.className = 'apf_month_label';
-        name.textContent = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); box.appendChild(name);
+        name.textContent = first.toLocaleDateString(lang, { month: 'long', year: 'numeric' }); box.appendChild(name);
         var week = document.createElement('div'); week.className = 'apf_cal_week'; week.setAttribute('aria-hidden', 'true');
-        'MTWTFSS'.split('').forEach(function (l) { var s = document.createElement('span'); s.className = 'apf_wd'; s.textContent = l; week.appendChild(s); });
+        (nl ? 'MDWDVZZ' : 'MTWTFSS').split('').forEach(function (l) { var s = document.createElement('span'); s.className = 'apf_wd'; s.textContent = l; week.appendChild(s); });
         box.appendChild(week);
         var grid = document.createElement('div'); grid.className = 'apf_cal_grid';
         var lead = (first.getDay() + 6) % 7; // Monday first
@@ -7631,13 +7645,13 @@
       monthsEl.addEventListener('click', function (e) {
         var b = e.target.closest('.apf_day');
         if (!b || b.classList.contains('is-off')) return;
-        picked = new Date(+b.dataset.time); txt = long(picked);
+        picked = new Date(+b.dataset.time); txt = long(picked); quick = '';
         render(); write();
         setTimeout(closeCal, reduce ? 0 : 220); // let the pick be seen
       });
-      chips.forEach(function (c) { c.addEventListener('click', function () { picked = null; txt = c.dataset.quick; render(); write(); setTimeout(closeCal, reduce ? 0 : 220); }); });
+      chips.forEach(function (c) { c.addEventListener('click', function () { picked = null; quick = c.dataset.quick; txt = c.textContent.trim() || quick; render(); write(); setTimeout(closeCal, reduce ? 0 : 220); }); });
       modes.forEach(function (m) { m.addEventListener('click', function () { mode = m.dataset.mode; modes.forEach(function (x) { on(x, 'is-on', x === m); }); write(); }); });
-      clr.addEventListener('click', function () { picked = null; txt = ''; write(); closeCal(); });
+      clr.addEventListener('click', function () { picked = null; txt = ''; quick = ''; write(); closeCal(); });
       rdOn(document, 'pointerdown', function (e) { if (!dw.contains(e.target)) closeCal(); });
       rdOn(document, 'keydown', function (e) { if (e.key === 'Escape') closeCal(); });
     }
@@ -9995,6 +10009,7 @@
   function initPageFunctions() {
     var path = pagePath();
     run('logo', rdLogoSwap);
+    run('dutch lines', rdLocNl); // before the buttons and the apply form read their lines
     run('css loops rest', rdRestCssLoops);
     run('work clips', rdWorkClips); // before rdWorkHeroLoad / work-hero.js and rdWorkSplit read the Work page's videos
     if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
@@ -10002,7 +10017,6 @@
     run('global', rdGlobal);
     // from here: not needed to show the first screen, so on a first load these take their turn (soon, at the top of this file)
     soon('location faq button', rdLocFaqBtn);
-    soon('location button lines', rdLocBtnAlt);
     soon('buttons', rdButtons);
     soon('form validation', rdFormValidation);
     soon('post cards', rdPostCards);
