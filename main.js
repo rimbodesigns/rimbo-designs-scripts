@@ -3475,12 +3475,14 @@
   // A video names its clip in the Designer (data-clip="echo", or the file name at the end of its data-src). A clip that
   // is not in CLIPS, and every clip under ?clips=0 on staging, keeps the address in its data-src.
   // =========================================================
-  var CLIP_BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@clips-v1/media/c/'; // the move to Bunny: this line
+  var CLIP_BASE = 'https://rimbo-designs-clips.b-cdn.net/'; // Bunny (storage zone rimbo-designs-clips, files in its root). jsDelivr only serves the repo under 50 MB, so clips never go in git
   var CLIPS = { 'dfs-home-test': 1, 'echo': 1, 'tinko': 1, 'charlies-angels': 1, 'dfs-home': 1, 'dieronesie': 1, 'echo-tour': 1, // clip: the version of its files (a new encode = new files with the next number)
     // the Work page (rdWorkClips): v = version, tag = the git tag that holds the files, pc / phone = their width when not 640 / 480.
     // A clip is known by its FILE NAME: a new recording needs a new file name in data-src (or new files here with the next v)
     'work-echo-open': { v: 1, tag: 'clips-v2' }, 'work-list-echo-wide': { v: 1, tag: 'clips-v2', pc: 1000, phone: 800 },
-    'work-list-charlies': { v: 1, tag: 'clips-v2' }, 'work-list-dieronesie': { v: 1, tag: 'clips-v2' } };
+    'work-list-charlies': { v: 1, tag: 'clips-v2' }, 'work-list-dieronesie': { v: 1, tag: 'clips-v2' },
+    // the project detail pages (rdCasePage): named by their Webflow file (the part after the asset id)
+    'echo-opening': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'echo-collective-r2': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'echo-collage': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dfs-tinko-intro': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dfs-fundamentals': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dfs-dino': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ca-home': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ca-adopt': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ozo-opening-v2': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-story': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-cards': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-map-v2': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-nav': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dieronesie-opening': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'dieronesie-13': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ig-open': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ig-scroll': { v: 1, tag: 'clips-v3', pc: 1120, phone: 720 } };
   var CLIP_AV1 = 'video/mp4; codecs="av01.0.04M.08"';
   var clipLab = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname); // staging and local only: ?clips=0 the old files, ?av1=0 the H.264 ones
   var clipOff = clipLab && /[?&]clips=0\b/.test(location.search), clipNoAv1 = clipLab && /[?&]av1=0\b/.test(location.search);
@@ -3507,7 +3509,8 @@
   }
   function clipUrl(v) {
     var given = v.getAttribute('data-src') || '';
-    return clipFile(v.getAttribute('data-clip') || (/\/media\/([\w-]+)\.mp4$/.exec(given) || [])[1] || '') || given;
+    // the name: data-clip, else the file name (…/media/<name>.mp4 on jsDelivr, …/<24-character asset id>_<name>.mp4 on Webflow)
+    return clipFile(v.getAttribute('data-clip') || (/(?:\/media\/|\/[0-9a-f]{24}_)([\w-]+)\.mp4$/.exec(given) || [])[1] || '') || given;
   }
   // an AV1 file that will not play (a decoder that gives up, a missing file): the H.264 one in its place, once, and H.264 for the clips still to come
   function clipGuard(v) {
@@ -9346,8 +9349,15 @@
 
         // clips play only while on screen. data-pp-from = the second a clip opens on the first time
         var clips = all('[data-pp-clip]', page);
+        var giveClip = function (c) { // its light file, once
+          if (c.getAttribute('src') || !c.getAttribute('data-src')) return;
+          c.setAttribute('src', clipUrl(c)); clipGuard(c); c.preload = 'auto';
+        };
         clips.forEach(function (c) {
           c.muted = true;
+          // a clip with its address in data-src (no src) loads nothing by itself: it gets the light file for this device
+          // from CLIPS about 600 px before it comes on screen
+          if (!c.getAttribute('src') && c.getAttribute('data-src')) nearScreen(c, function (on) { if (on) giveClip(c); }, 600);
           var from = parseFloat(c.getAttribute('data-pp-from'));
           if (!from) return;
           var set = function () { try { c.currentTime = from; } catch (e) {} };
@@ -9356,7 +9366,7 @@
         if (!still && hasIO) {
           var run = new IntersectionObserver(function (entries) {
             entries.forEach(function (e) {
-              if (e.isIntersecting) { var p = e.target.play(); if (p && p.catch) p.catch(function () {}); }
+              if (e.isIntersecting) { giveClip(e.target); var p = e.target.play(); if (p && p.catch) p.catch(function () {}); }
               else e.target.pause();
             });
           }, { threshold: 0.15 });
