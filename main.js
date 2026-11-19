@@ -21,6 +21,8 @@
   // this file only). For the rest use: rdOn(window, 'resize', fn) instead of window.addEventListener('resize', fn),
   // rdTick(fn) instead of gsap.ticker.add(fn), rdHead(style) instead of document.head.appendChild(style), rdDrag(draggable)
   // around a new Draggable and rdGl(gl) around a new WebGL context.
+  // Anything that moves every frame goes through rdLoop(el, fn) (next to nearScreen below): it only runs while el is
+  // near the screen and the tab is visible, and it sleeps when fn says nothing moves any more.
   // Code that runs later without a known page (an animation's onComplete, a click) belongs to the page on screen. What has
   // to stay for the whole visit (the menu, Lenis) is started outside a page or inside stay(). Without Barba all of this
   // passes straight through.
@@ -199,6 +201,31 @@
       });
     };
     setTimeout(look, 1200); setTimeout(look, 5000); // after the page has started its own animations
+  }
+
+  // LOOPS — the one way to animate every frame. rdLoop(el, fn, margin) runs fn(time, deltaMs) on GSAP's ticker (one
+  // loop for the whole site) only while el is within margin px of the screen (default 300, so it is already moving
+  // when you scroll to it) and the tab is visible. fn returns false when nothing moves any more: the loop sleeps until
+  // .wake(), which the event that moves it again calls (a pointermove, a scroll, a click). It stops by itself when the
+  // page leaves or el is gone. Returns { wake, sleep }.
+  function rdLoop(el, fn, margin) {
+    var near = false, awake = true, on = false;
+    var tick = function (t, dt) {
+      if (!el.isConnected) { awake = false; set(); return; }
+      if (fn(t, dt) === false) { awake = false; set(); }
+    };
+    var set = function () {
+      var want = near && awake;
+      if (want === on) return;
+      on = want;
+      if (on) gsap.ticker.add(tick); else gsap.ticker.remove(tick);
+    };
+    rdUndo(function () { gsap.ticker.remove(tick); on = false; });
+    nearScreen(el, function (n) { near = n; set(); }, margin);
+    return {
+      wake: function () { if (!awake) { awake = true; set(); } },
+      sleep: function () { awake = false; set(); }
+    };
   }
 
   function onReady(fn) {
@@ -7351,6 +7378,8 @@
       circles.slice(0, 8).forEach(function (circle, i) {
         tl.fromTo(circle, { width: widths[i][0] }, { width: widths[i][1] }, i === 0 ? 0 : '<');
       });
+      // it changes the circles' width, which costs a layout pass every frame: off screen (and in a hidden tab) it waits
+      nearScreen(globe, function (on) { if (on) tl.play(); else tl.pause(); });
       var lastY = window.scrollY, lastT = performance.now(), stopTimeout;
       rdOn(window, 'scroll', function () {
         var now = performance.now(), dy = window.scrollY - lastY, dt = now - lastT;
@@ -7374,19 +7403,20 @@
     if (!card || reducedMotion || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     var TILT = 5, DEPTH = 10, tx = 0, ty = 0, x = 0, y = 0;
     var layers = qsa('[data-depth]', card).map(function (e) { return { e: e, k: +e.getAttribute('data-depth') || 0 }; });
-    rdOn(window, 'pointermove', function (e) {
-      tx = e.clientX / innerWidth * 2 - 1;
-      ty = e.clientY / innerHeight * 2 - 1;
-    }, { passive: true });
-    (function loop() {
-      if (!card.isConnected) return;
-      requestAnimationFrame(loop);
+    // rests once it has caught up with the mouse, and off screen (it redrew every frame before, also standing still)
+    var lean = rdLoop(card, function () {
       x += (tx - x) * 0.07;
       y += (ty - y) * 0.07;
       card.style.transform = 'perspective(1600px) rotateX(' + (-y * TILT).toFixed(3) + 'deg) rotateY(' + (x * TILT).toFixed(3) + 'deg)';
       var dx = x * DEPTH, dy = y * DEPTH;
       layers.forEach(function (l) { l.e.style.transform = 'translate(' + (dx * l.k).toFixed(2) + 'px,' + (dy * l.k).toFixed(2) + 'px)'; });
-    })();
+      return Math.abs(tx - x) > 0.0004 || Math.abs(ty - y) > 0.0004;
+    });
+    rdOn(window, 'pointermove', function (e) {
+      tx = e.clientX / innerWidth * 2 - 1;
+      ty = e.clientY / innerHeight * 2 - 1;
+      lean.wake();
+    }, { passive: true });
   }
 
   // /locations sets its og:url to the address it was opened on (an old snippet from the page's head code)
