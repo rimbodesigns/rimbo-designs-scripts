@@ -22,6 +22,7 @@
       underMinimum: "You haven't met the {min} minimum yet.",
       timeline: "About {n} weeks, kickoff to launch",
       payment: "50% to start, 50% at launch. Payment plans possible.",
+      knowTitle: "Good to know",
       runningTitle: "Running costs",
       runningNote: "Paid to the platforms, not to me. Excl. VAT.",
 
@@ -252,13 +253,20 @@
         '<div class="calc_form">' +
           '<fieldset class="calc_step"><legend><span class="calc_num">01</span>Branding</legend><div id="calc-branding"></div></fieldset>' +
           '<fieldset class="calc_step"><legend><span class="calc_num">02</span>Website</legend><div id="calc-pages"></div><p class="calc_included" id="calc-included"></p></fieldset>' +
-          '<div id="calc-groups"></div>' + // 03, 04, …: the add-on groups, built from CONFIG.groups
+          '<div id="calc-groups"></div>' +
+          // Good to know (Rimbo, 2026-11-20): timeline, payment and running costs as quiet extra info under 06, never in the price card
+          '<section class="calc_know" id="calc-know" aria-labelledby="calc-know-title" hidden>' +
+            '<p class="calc_eyebrow" id="calc-know-title"></p>' +
+            '<ul class="calc_know_list"><li id="calc-time"></li><li id="calc-pay"></li></ul>' +
+            '<p class="calc_know_sub" id="calc-run-title"></p>' +
+            '<ul class="calc_run_list" id="calc-run-list"></ul>' +
+            '<p class="calc_run_note" id="calc-run-note"></p>' +
+          '</section>' + // 03, 04, …: the add-on groups, built from CONFIG.groups
         '</div>' +
         '<div class="calc_side">' +
           '<aside class="calc_result" aria-live="polite">' +
             '<div class="calc_est_row"><p class="calc_eyebrow" id="calc-total-label">Your estimate</p><span class="calc_vat calc_date" id="calc-date" hidden></span></div>' +
             '<div class="calc_price_row"><p class="calc_range"><span id="calc-total" data-odometer-element>&nbsp;</span></p><span class="calc_vat">Excl. VAT</span></div>' +
-            '<p class="calc_vat calc_time" id="calc-time"></p>' +
             '<div class="calc_meter" id="calc-meter" hidden><div class="calc_meter_bar"><span id="calc-meter-fill"></span></div><p class="calc_meter_text" id="calc-meter-text"></p></div>' +
             '<ul class="calc_lines" id="calc-lines"></ul>' +
             '<button class="calc_cta" id="calc-cta" type="button"></button>' +
@@ -270,13 +278,8 @@
             '<button class="calc_cta is-secondary" id="calc-reset" type="button" hidden></button>' +
             '<button class="calc_cta is-secondary" id="calc-start-over" type="button" hidden></button>' +
             '<button class="calc_cta is-secondary" id="calc-undo" type="button" hidden></button>' +
-            '<p class="calc_pay" id="calc-pay"></p>' +
           '</aside>' +
-          '<aside class="calc_run" id="calc-run" aria-labelledby="calc-run-title" hidden>' +
-            '<p class="calc_eyebrow" id="calc-run-title"></p>' +
-            '<ul class="calc_run_list" id="calc-run-list"></ul>' +
-            '<p class="calc_run_note" id="calc-run-note"></p>' +
-          '</aside>' +
+
           // Tip card: filled by the (i) buttons; hover previews, click pins
           '<aside class="calc_tip" id="calc-tip" aria-live="polite" aria-labelledby="calc-tip-title" data-lenis-prevent hidden>' +
             '<button class="calc_tip_close" id="calc-tip-close" type="button" aria-label="Close">×</button>' +
@@ -1037,7 +1040,8 @@
       $("pay").textContent = C.payment;
       $("run-title").textContent = C.runningTitle;
       $("run-note").textContent = C.runningNote;
-      $("run").hidden = false;
+      $("know-title").textContent = C.knowTitle;
+      $("know").hidden = false;
       $("eyebrow").textContent = mode === "make" ? C.makeEyebrow : C.clientEyebrow;
       // The day the link was made, quietly next to Your estimate. In Rimbo's view: today, as the lead will see it
       var made = mode === "make" ? today() : share.d;
