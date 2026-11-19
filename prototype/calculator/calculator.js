@@ -20,7 +20,7 @@
     previewLead: { v: 1, n: "Sample project", m: "", d: "2026-11-09", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     copy: {
       underMinimum: "You haven't met the {min} minimum yet.",
-      timeline: "About {n} weeks, kickoff to launch",
+      timeline: "Based on your choices: about {n} weeks, kickoff to launch",
       payment: "50% to start, 50% at launch. Payment plans possible.",
       knowTitle: "Good to know",
       runningTitle: "Running costs",

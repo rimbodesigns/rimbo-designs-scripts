@@ -297,6 +297,7 @@ textarea.calc_edit::placeholder { color: var(--muted); opacity: .6; }
 .calc_know { margin: 0 0 24px; padding: 18px 20px 18px; border: 1px dashed var(--line); border-radius: var(--r); }
 .calc_know[hidden] { display: none; }
 .calc_know .calc_eyebrow { margin: 0 0 12px; }
+.calc_know .calc_eyebrow::before { display: none; } /* no square on the title: the squares are for the points */
 .calc_know_list { margin: 0; padding: 0; list-style: none; font-size: 14px; line-height: 1.5; }
 .calc_know_list li { position: relative; padding: 3px 0 3px 16px; }
 .calc_know_list li::before { content: ""; position: absolute; left: 0; top: .78em; width: 5px; height: 5px; background: var(--on); }
