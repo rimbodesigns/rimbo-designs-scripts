@@ -314,7 +314,7 @@
       run('lenis buttons', rdLenisButtons);
       fromWebflow(doc); // the scripts that came from Webflow, where their copies in the page used to run
       runPageScripts(doc.body);
-      restartWebflow();
+      restartWebflow(doc);
       initLateFunctions();
     });
   }
@@ -1779,8 +1779,38 @@
   // Webflow's forms, sliders and interactions only know the page they started on. Webflow.destroy() runs earlier, in
   // beforeEnter: its interaction engine checks once per frame whether it was stopped, so stopping and starting in the
   // same frame leaves the old loop running next to the new one, one more for every page visited
-  function restartWebflow() {
+  // Webflow gives pages their own bundle: /apply's carries the forms module, the other pages' don't. Restarting the
+  // bundle of the page you came from left /apply without a form handler, so Apply did a plain browser submit and the
+  // page reloaded with the answers in the address bar (Thomas, 2026-11-20). So when the next page's bundle is another
+  // one, that bundle runs: loaded the first time (it starts itself on the page that is there now), and the stopped
+  // Webflow of each bundle is kept and started again later, so no second submit handler ever joins the first
+  var WF_BUNDLE = /\/js\/webflow\.[0-9a-f]{8}\.[0-9a-f]+\.js$/, wfRuntimes = {}, wfBundle = null;
+  function webflowBundle(root) {
+    var el = qsa('script[src]', root).filter(function (s) { return WF_BUNDLE.test(s.getAttribute('src')); })[0];
+    return el ? el.getAttribute('src') : '';
+  }
+  function restartWebflow(doc) {
     if (!window.Webflow) return;
+    if (wfBundle === null) { wfBundle = webflowBundle(document); wfRuntimes[wfBundle] = window.Webflow; }
+    var want = (doc && webflowBundle(doc)) || wfBundle;
+    if (want !== wfBundle) {
+      wfRuntimes[wfBundle] = window.Webflow;
+      var prev = wfBundle;
+      wfBundle = want;
+      if (wfRuntimes[want]) window.Webflow = wfRuntimes[want];
+      else {
+        var before = window.Webflow, script = document.createElement('script');
+        window.Webflow = undefined; // as on a real load: a bundle that finds a Webflow takes it for its start-up queue
+        script.src = want;
+        script.onload = function () {
+          wfRuntimes[want] = window.Webflow;
+          run('webflow', function () { document.dispatchEvent(new Event('readystatechange')); });
+        };
+        script.onerror = function () { window.Webflow = before; wfBundle = prev; run('webflow', function () { Webflow.ready(); }); };
+        document.body.appendChild(script);
+        return;
+      }
+    }
     run('webflow', function () {
       Webflow.ready();
       var ix2 = Webflow.require('ix2');
@@ -7315,6 +7345,10 @@
     var done = block.querySelector('.w-form-done'), fail = block.querySelector('.w-form-fail');
     var gone = [], swooshEnd = 0;
     form.addEventListener('submit', function (e) {
+      // No Webflow form handler (its bundle still loading): never the browser's own submit, that reloads the page and
+      // puts every answer in the address bar
+      var wf = window.Webflow && Webflow.require && Webflow.require('forms');
+      if (!wf) { e.preventDefault(); e.stopPropagation(); return; }
       var missing = steps.filter(function (s) { return !valid(s); })[0];
       if (missing) {
         e.preventDefault(); e.stopPropagation();
