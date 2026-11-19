@@ -3579,6 +3579,23 @@
       if (url) { v.setAttribute('src', url); clipGuard(v); }
     };
     hero.forEach(give);
+    // A phone that only lets a video start inside a touch (an app browser like Arc Search, iOS "Auto-Play Video Previews"
+    // off, Low Power Mode): once a video has started inside a touch it may start by itself from then on. The list starts
+    // its clips right after a scroll, the hero on its own clock while nobody touches, so only the hero stayed still
+    // (Rimbo's iPhone in Arc Search, 2026-11-19). The first touch wakes every Work video once (play + pause at once); the
+    // hero's clock and the list play them from there. A tap that brought you here (the menu) counts too.
+    if (window.matchMedia('(pointer: coarse)').matches) { // touch screens only: computers have no such gate
+      var wake = function () {
+        hero.concat(rows).forEach(function (v) {
+          if (v.__woke || !v.paused || !v.getAttribute('src')) return;
+          var p = v.play(); v.pause();
+          if (p && p.then) p.then(function () { v.__woke = true; }, function (e) { if (!e || e.name !== 'NotAllowedError') v.__woke = true; });
+        });
+      };
+      rdOn(document, 'touchend', wake, { capture: true, passive: true });
+      rdOn(document, 'click', wake, true);
+      if (navigator.userActivation && navigator.userActivation.isActive) wake();
+    }
     var wait = rows.filter(function (v) { return !v.getAttribute('src') && v.getAttribute('data-src'); });
     if (!wait.length) return;
     var near = false, heroIn = false, io = null, mo = null;
@@ -3934,7 +3951,7 @@
     // reveal. With every clip on preload="auto" they all have frames long before the reveal, so nothing is drawn at all
     function posterInto(m, c) {
       var url = m.getAttribute('poster');
-      if (!url || m.readyState >= 2 || c.__frame || c.__face === false) return;
+      if (!url || m.readyState >= 2 || c.__frame || c.__face === false || c.__postered) return;
       if (!m.__poster) {
         // the same address as the master's poster, so it comes from the cache, not a second download; turned into a bitmap
         // once, off the main thread, so drawing it after that is a plain copy
@@ -3947,6 +3964,7 @@
         if (!img || c.__frame || m.readyState >= 2 || !c.isConnected) return; // the clip got there first: its frames take over
         if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
         c.getContext('2d').drawImage(img, 0, 0);
+        c.__postered = true;
       });
     }
     function paintClones(m) {
@@ -3962,6 +3980,9 @@
       m.__off = shown === 0;
       if (m.__off) { if (!m.paused) m.pause(); }
       else if (m.paused && !hidden && m.__tuned && !m.__wait) { paintClones(m); var p = m.play(); if (p && p.catch) p.catch(function () {}); }
+      // no frame yet (a browser that refuses play() until a touch, Low Power Mode: iOS then loads nothing): a copy that
+      // turns to the front gets the poster, like its master, instead of an empty card
+      if (!m.__off && m.readyState < 2 && m.__canvases) m.__canvases.forEach(function (c) { if (c.__vis !== false) posterInto(m, c); });
     }
     var ringLooking = false;
     function ringLook() {
@@ -9225,9 +9246,18 @@
         // the ticket: in from under Selected work (down to the middle), out under the archive. Not on phones: there the
         // ticket is as tall as the screen and would never come to rest (see PHONES at the top)
         if (!phone) layer(pass, pass.firstElementChild, -40, 'center center', arch, 24);
-        // the Wall of love: in from under the archive, out under the service sheet
+        // the Wall of love: in from under the archive, out under the service sheet. It sinks at most 16%, and never so far
+        // that its arrows go under the sheet: the room under the arrows (wk_wall's bottom padding in the Designer) sets
+        // how far. On phones the wall ends right under its arrows and 16% of it was 130px, so they were cut (2026-11-19)
         var wall = document.querySelector('.wk_wall'), wallIn = wall && wall.querySelector('.wall_section');
-        if (wallIn) layer(wall, wallIn, -16, 'top top', document.querySelector('.wk_wall ~ .im_sheet'), 16);
+        var sheet = document.querySelector('.wk_wall ~ .im_sheet');
+        var sinkRoom = function (most) { // measured before layer() moves anything
+          var arrows = wallIn.querySelector('.wall_arrows');
+          if (!arrows || !sheet || !wallIn.offsetHeight) return most;
+          var room = sheet.getBoundingClientRect().top - arrows.getBoundingClientRect().bottom - 12;
+          return Math.max(0, Math.min(most, room / wallIn.offsetHeight * 100));
+        };
+        if (wallIn) layer(wall, wallIn, -16, 'top top', sheet, sinkRoom(16));
         // the Digital Feng Shui card (hidden on this page since 2026-11-17; this still works if it is shown again): drifts in from a little higher, out of the shadow
         var dfs = document.querySelector('.wk_wall ~ .hx_dfs_sec'), card = dfs && dfs.querySelector('.hx_dfs_root');
         if (card) layer(dfs, card, -30, 'clamp(center center)', null, 0);
