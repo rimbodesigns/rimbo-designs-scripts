@@ -172,6 +172,17 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(selector));
   }
 
+  // NEAR THE SCREEN — fn(true) once el comes within `margin` of the screen (default 300 px, so it is already running
+  // when you scroll into it), fn(false) when it leaves or the tab is hidden. Animations use it to rest off screen.
+  function nearScreen(el, fn, margin) {
+    if (!el) return;
+    var inView = false, now = null;
+    var tell = function () { var on = inView && document.visibilityState !== 'hidden'; if (on !== now) { now = on; fn(on); } };
+    if (!('IntersectionObserver' in window)) { inView = true; tell(); return; }
+    new IntersectionObserver(function (es) { inView = es[es.length - 1].isIntersecting; tell(); }, { rootMargin: (margin || 300) + 'px 0px' }).observe(el);
+    rdOn(document, 'visibilitychange', tell);
+  }
+
   function onReady(fn) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
     else fn();
@@ -4737,7 +4748,7 @@
             labels.push({ element: label, partIndex: partIndex, tickIndex: 0, tickWidth: 0, setX: gsap.quickSetter(label, "x", "px") });
           });
         }
-        let rangeStart = 0; let rangeLength = 1; let partStarts = []; let lastScroll = window.scrollY; let speed = 0; let currentIndex = null; let activePart = null; let pointerPosition = 0.5; let cursorTarget = 0; let cursorStrength = 0; let lastActive = 0; let rootStatus = ""; let reduceMotion = false;
+        let rangeStart = 0; let rangeLength = 1; let partStarts = []; let lastScroll = window.scrollY; let speed = 0; let currentIndex = null; let activePart = null; let pointerPosition = 0.5; let cursorTarget = 0; let cursorStrength = 0; let lastActive = 0; let rootStatus = ""; let reduceMotion = false; let settled = false; let lastPointer = -1;
         function gaussian(distance, width) { return Math.exp(-(distance * distance) / (2 * width * width)); }
         function measure() {
           const scrollY = window.scrollY;
@@ -4759,16 +4770,20 @@
             lastLabelY = y;
             gsap.set(label.element, { y: y, yPercent: -50 });
           });
-          currentIndex = null;
+          currentIndex = null; settled = false;
         }
         function scrollToPosition(top) { window.scrollTo({ top: top, behavior: reduceMotion ? "auto" : "smooth" }); }
         function scrollToPart(partIndex) { scrollToPosition(parts[partIndex].getBoundingClientRect().top + window.scrollY); }
         function findPart(position) { let partIndex = 0; partStarts.forEach((start, index) => { if (start <= position) partIndex = index; }); return partIndex; }
-        const rulerNarrow = window.matchMedia("(max-width: 991px)"); let asleep = false; // the ruler is display: none on narrow screens and when the article leaves it no room: no frames spent on it then
+        const rulerNarrow = window.matchMedia("(max-width: 991px)"); let asleep = false; let narrowNow = rulerNarrow.matches; rdOn(rulerNarrow, "change", (e) => { narrowNow = e.matches; });
+        let scrollNow = window.scrollY; rdOn(window, "scroll", () => { scrollNow = window.scrollY; }, { passive: true }); // kept from the scroll event: reading scrollY every frame forces a layout pass // read once: .matches every frame forces a style pass // the ruler is display: none on narrow screens and when the article leaves it no room: no frames spent on it then
         function update(time) {
-          if (rulerNarrow.matches || root.classList.contains("is-compact")) { asleep = true; return; }
+          if (narrowNow || root.classList.contains("is-compact")) { asleep = true; return; }
           const frame = Math.min(gsap.ticker.deltaRatio(60), 3);
-          const scrollY = window.scrollY; if (asleep) { asleep = false; lastScroll = scrollY; } const scrollDelta = scrollY - lastScroll; lastScroll = scrollY;
+          const scrollY = scrollNow; if (asleep) { asleep = false; lastScroll = scrollY; } const scrollDelta = scrollY - lastScroll; lastScroll = scrollY;
+          // At rest (no scroll, the wave and the cursor glow settled, status already idle) there is nothing to draw
+          if (settled && scrollDelta === 0 && pointerPosition === lastPointer && Math.abs(cursorTarget - cursorStrength) < 0.001 && rootStatus === "idle") return;
+          lastPointer = pointerPosition;
           const speedNow = reduceMotion ? 0 : Math.min(Math.abs(scrollDelta) / window.innerHeight / frame / 0.04, 1);
           const speedEase = speedNow > speed ? 0.3 : 0.05;
           speed += (speedNow - speed) * Math.min(speedEase * frame, 1);
@@ -4779,9 +4794,11 @@
           const waveAmount = waveSize * (1 + speedBoost * speed);
           const waveSpread = waveWidth * (1 + speedBoost * 0.8 * speed);
           const follow = reduceMotion ? 1 : Math.min(0.2 * frame, 1);
+          let moved = 0;
           for (let i = 0; i < tickCount; i++) {
             let target = waveAmount * gaussian(tickPositions[i] - marker, waveSpread);
             if (cursorSize > 0) target += cursorSize * cursorStrength * gaussian(tickPositions[i] - pointerPosition, cursorWidth);
+            moved = Math.max(moved, Math.abs(target - values[i]));
             values[i] += (target - values[i]) * follow;
             tickSetters[i](1 + values[i]);
           }
@@ -4793,6 +4810,7 @@
           const nextPart = usingParts && insideRange ? findPart(marker) : -1;
           if (nextPart !== activePart) { activePart = nextPart; labels.forEach((label) => { label.element.setAttribute("data-scroll-ruler-status", label.partIndex === activePart ? "active" : "inactive"); }); }
           labels.forEach((label) => label.setX(values[label.tickIndex] * label.tickWidth));
+          settled = moved < 0.0005 && speed < 0.001;
           if (speed > 0.02 || cursorStrength > 0.1 || root.matches(":focus-within")) lastActive = time;
           const nextStatus = time - lastActive < idleDelay ? "active" : "idle";
           if (nextStatus !== rootStatus) { rootStatus = nextStatus; root.setAttribute("data-scroll-ruler-status", rootStatus); }
@@ -8992,8 +9010,8 @@
           light();
           if(v&&!reduce)setInterval(function(){if(!seen)return;i=(i+1)%clips.length;v.classList.add('is-swap');
             setTimeout(function(){v.src=clips[i];limit();var go=function(){v.removeEventListener('loadeddata',go);v.play&&v.play().catch(function(){});requestAnimationFrame(function(){v.classList.remove('is-swap');});};v.addEventListener('loadeddata',go);light();},450);},6000);
-          var t0=Date.now();setInterval(function(){var t=Math.floor((Date.now()-t0)/1000),m=Math.floor(t/60),s=t%60;[].forEach.call(root.querySelectorAll('[data-ex-tc]'),function(e){e.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;});},500);
-          function clk(){var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Amsterdam'}));var t=(d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes()+' CET';[].forEach.call(root.querySelectorAll('[data-ex-clock]'),function(e){e.textContent=t;});}clk();setInterval(clk,15000);
+          var t0=Date.now();setInterval(function(){if(!near)return;var t=Math.floor((Date.now()-t0)/1000),m=Math.floor(t/60),s=t%60;[].forEach.call(root.querySelectorAll('[data-ex-tc]'),function(e){e.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;});},500);
+          function clk(){var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Amsterdam'}));var t=(d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes()+' CET';[].forEach.call(root.querySelectorAll('[data-ex-clock]'),function(e){e.textContent=t;});}clk();setInterval(function(){if(near)clk();},15000);
           [].forEach.call(root.querySelectorAll('[data-ex-boil]'),function(t){
             var panel=t.closest('.ex_panel'),chars=[].map.call(t.textContent,function(ch){var c=document.createElement('span');c.style.display='inline-block';c.textContent=ch===' '?NB:ch;return c;});
             t.setAttribute('aria-label',t.textContent);t.textContent='';chars.forEach(function(c){c.setAttribute('aria-hidden','true');t.appendChild(c);});
@@ -9004,25 +9022,30 @@
           });
           /* the globes turn: the big one on My work and the small one inside the stamp */
           var globes=[].map.call(root.querySelectorAll('.ex_globe,.ex_stamp'),function(g){var es=[].slice.call(g.querySelectorAll('[data-m]'));return{es:es,R:es.length?+es[0].getAttribute('ry'):0};}).filter(function(o){return o.es.length;});
-          if(globes.length&&!reduce)(function spin(t){var ph=t/2600;globes.forEach(function(o){var N=o.es.length;o.es.forEach(function(e,k){e.setAttribute('rx',(o.R*Math.abs(Math.cos(ph+k*Math.PI/N))).toFixed(2));});});requestAnimationFrame(spin);})(0);
+          var near=false,spinning=false,spin=function(t){if(!near){spinning=false;return;}var ph=t/2600;globes.forEach(function(o){var N=o.es.length;o.es.forEach(function(e,k){e.setAttribute('rx',(o.R*Math.abs(Math.cos(ph+k*Math.PI/N))).toFixed(2));});});requestAnimationFrame(spin);};
+          nearScreen(root,function(on){near=on;if(on&&globes.length&&!reduce&&!spinning){spinning=true;requestAnimationFrame(spin);}}); // globes, map, clocks and tilt rest off screen
           var m=root.querySelector('.ex_map');
           if(m){var p=m.querySelector('.r10_prog'),pins=[].slice.call(m.querySelectorAll('.r10_pin'));
-            if(p&&pins.length){var L=p.getTotalLength(),at=pins.map(function(g){var mm=g.getAttribute('transform').match(/([\d.]+)[ ,]+([\d.]+)/),x=+mm[1],y=+mm[2],best=0,bd=1e9;for(var l=0;l<=L;l+=1.5){var q=p.getPointAtLength(l),dd=(q.x-x)*(q.x-x)+(q.y-y)*(q.y-y);if(dd<bd){bd=dd;best=l;}}return best;});
+            if(p&&pins.length){var L=p.getTotalLength(),at=null,where=function(){ // where each pin sits on the route: the path is read once (coarse), then each pin is refined close by
+                var pts=[];for(var l=0;l<=L;l+=6){var q=p.getPointAtLength(l);pts.push([l,q.x,q.y]);}
+                return pins.map(function(g){var mm=g.getAttribute('transform').match(/([\d.]+)[ ,]+([\d.]+)/),x=+mm[1],y=+mm[2],best=0,bd=1e9;
+                  pts.forEach(function(o){var dd=(o[1]-x)*(o[1]-x)+(o[2]-y)*(o[2]-y);if(dd<bd){bd=dd;best=o[0];}});
+                  for(var l2=Math.max(0,best-6);l2<=Math.min(L,best+6);l2+=1.5){var q2=p.getPointAtLength(l2),d2=(q2.x-x)*(q2.x-x)+(q2.y-y)*(q2.y-y);if(d2<bd){bd=d2;best=l2;}}return best;});};
               p.style.strokeDasharray=L;p.style.strokeDashoffset=L;var k=-1,N=pins.length-1,ease='cubic-bezier(.625,.05,0,1)',boom='cubic-bezier(.75,0,.25,1)';
-              var go=function(){k++;
+              var go=function(){if(!near){setTimeout(go,600);return;}if(!at)at=where();k++;
                 if(k>N){m.classList.add('is-reset');setTimeout(function(){p.style.transition='none';p.style.strokeDashoffset=L;p.getBoundingClientRect();p.style.transition='';k=-1;m.classList.remove('is-reset','is-top');pins.forEach(function(e){e.classList.remove('is-on','is-done');});},1100);setTimeout(go,1900);return;}
                 p.style.transition='stroke-dashoffset '+(k===N?'.85s '+boom:(k===N-1?'.7s '+ease:'1.4s '+ease));p.style.strokeDashoffset=L-at[k];
                 pins.forEach(function(e){var n=+e.getAttribute('data-k');e.classList.toggle('is-on',n===k);e.classList.toggle('is-done',n<k);});
                 if(k===N)setTimeout(function(){m.classList.add('is-top');},700);
                 setTimeout(go,k===0?800:(k===N?4200:(k===N-1?900:(k===N-2?1000:1700))));};
-              if(reduce){p.style.strokeDashoffset=0;pins.forEach(function(e){e.classList.add('is-done');});}
+              if(reduce){at=where();p.style.strokeDashoffset=0;pins.forEach(function(e){e.classList.add('is-done');});}
               else{var io=new IntersectionObserver(function(es){if(es[0].isIntersecting){io.disconnect();setTimeout(go,500);}},{threshold:.35});io.observe(m);}}}
           if(matchMedia('(hover: hover) and (pointer: fine)').matches&&!reduce){
             var T={tx:0,ty:0,x:0,y:0,raf:0},cards=[].map.call(root.querySelectorAll('.ex_panel'),function(c){return{c:c,layers:[].map.call(c.querySelectorAll('[data-depth]'),function(e){return{e:e,k:+e.getAttribute('data-depth')};}),holo:c.querySelector('.ex_holo')};});
             var tl=function(){T.raf=0;T.x+=(T.tx-T.x)*.07;T.y+=(T.ty-T.y)*.07;
               cards.forEach(function(o){o.c.style.transform='perspective(1600px) rotateX('+(-T.y*5).toFixed(3)+'deg) rotateY('+(T.x*5).toFixed(3)+'deg)';o.layers.forEach(function(l){l.e.style.translate=(T.x*10*l.k).toFixed(2)+'px '+(T.y*10*l.k).toFixed(2)+'px';});if(o.holo)o.holo.style.backgroundPosition=(50+T.x*40)+'% '+(50+T.y*40)+'%';});
               if(Math.abs(T.tx-T.x)>.0004||Math.abs(T.ty-T.y)>.0004)T.raf=requestAnimationFrame(tl);};
-            addEventListener('pointermove',function(e){T.tx=e.clientX/innerWidth*2-1;T.ty=e.clientY/innerHeight*2-1;if(!T.raf)T.raf=requestAnimationFrame(tl);},{passive:true});
+            addEventListener('pointermove',function(e){if(!near)return;T.tx=e.clientX/innerWidth*2-1;T.ty=e.clientY/innerHeight*2-1;if(!T.raf)T.raf=requestAnimationFrame(tl);},{passive:true});
           }
         });
       }
