@@ -177,12 +177,12 @@
               "Modules and progress::Lessons in order, with every member's progress saved.\n" +
               "Interactive moments::Exercises and pieces that make it more than a playlist.\n" +
               "~Subscriptions for course tools are yours, not included." },
-          { id: "mentor",  label: "Course mentoring, 5 calls", price: 2000,
-            info: "Five calls with someone who makes and sells his own course.\n" +
+          { id: "mentor",  label: "Course mentoring", price: 2000,
+            info: "Calls with someone who makes and sells his own course.\n" +
               "What goes in::Modules, lesson length, what to film and what to leave out.\n" +
               "How it lands::Recording, pacing, and keeping students to the end.\n" +
               "How it sells::The launch and the page that sells it.\n" +
-              "~About an hour each, spread over the project." }
+              "~A handful of calls, spread over the project. We set the number together." }
         ] },
       // Levels as parts, like Members (Rimbo left the levels to me, 2026-11-19). DRAFT prices
       { id: "shop",       group: "more",   label: "Webshop",
