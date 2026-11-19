@@ -183,6 +183,24 @@
     rdOn(document, 'visibilitychange', tell);
   }
 
+  // CSS LOOPS REST OFF SCREEN — Webflow's endless CSS animations (the ticker bands, the card shadows) keep the browser busy
+  // every frame even when you can't see them. Each animated element pauses while it is off screen and plays again 300 px
+  // before it comes back. Only endless loops: a one-off entrance animation is left alone.
+  function rdRestCssLoops() {
+    if (!document.getAnimations || !window.CSSAnimation) return;
+    var done = [];
+    var look = function () {
+      document.getAnimations().forEach(function (a) {
+        var t = a.effect && a.effect.target;
+        if (!(a instanceof CSSAnimation) || !t || !t.isConnected || done.indexOf(t) > -1) return;
+        if (a.effect.getTiming().iterations !== Infinity) return;
+        done.push(t);
+        nearScreen(t, function (on) { t.style.animationPlayState = on ? '' : 'paused'; });
+      });
+    };
+    setTimeout(look, 1200); setTimeout(look, 5000); // after the page has started its own animations
+  }
+
   function onReady(fn) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
     else fn();
@@ -6191,19 +6209,22 @@
     if (reduce) { curtain(1); draw(1); return; }
     curtain(0); draw(0);
     // the loop only runs while the footer is (nearly) on screen, so the rest of the page pays nothing for it
-    var on = false, raf = 0;
+    // and it stops once the footer has stood still for a few frames; a scroll starts it again (at rest it measured the
+    // footer every frame, which cost a layout pass per frame)
+    var on = false, raf = 0, still = 0;
     function tick() {
       var r = foot.getBoundingClientRect();
       var p = clamp((window.innerHeight - r.top) / r.height);
-      if (Math.abs(p - last) > 0.0005) { last = p; curtain(p); draw(p); }
-      raf = on ? requestAnimationFrame(tick) : 0;
+      if (Math.abs(p - last) > 0.0005) { last = p; curtain(p); draw(p); still = 0; } else still++;
+      raf = on && still < 12 ? requestAnimationFrame(tick) : 0;
     }
+    rdOn(window, 'scroll', function () { still = 0; if (on && !raf) raf = requestAnimationFrame(tick); }, { passive: true });
     new IntersectionObserver(function (es) {
       on = es[0].isIntersecting;
-      if (on && !raf) raf = requestAnimationFrame(tick);
+      if (on && !raf) { still = 0; raf = requestAnimationFrame(tick); }
       if (!on) { last = -1; tick(); } // one last frame, so it rests in its scrolled-away state
     }, { rootMargin: '0px 0px 10% 0px' }).observe(foot);
-    rdOn(window, 'resize', function () { last = -1; if (!raf) tick(); });
+    rdOn(window, 'resize', function () { last = -1; still = 0; if (!raf) tick(); });
   }
 
   // Wall of love (testimonials; lab: prototype/testimonials). Osmo's Centered Looping Slider with three things on top: the brand
@@ -9974,6 +9995,7 @@
   function initPageFunctions() {
     var path = pagePath();
     run('logo', rdLogoSwap);
+    run('css loops rest', rdRestCssLoops);
     run('work clips', rdWorkClips); // before rdWorkHeroLoad / work-hero.js and rdWorkSplit read the Work page's videos
     if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
     run('band', rdBand);   // builds the home-opening rows before the marquees start
