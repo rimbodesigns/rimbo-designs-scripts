@@ -264,8 +264,7 @@
   // - page code runs in swapPage(), at the moment the old page is gone, not in Barba's beforeEnter. A transition must call
   //   swapPage() while the screen is covered or empty: the page functions look in the whole document and do heavy work
   // =========================================================
-  var barbaOn = typeof barba !== 'undefined' && typeof CustomEase !== 'undefined' &&
-    /\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname) &&
+  var barbaOn = typeof barba !== 'undefined' && typeof CustomEase !== 'undefined' && // on live too since Rimbo's go, 19 Nov 2026
     !/[?&]barba=0/.test(location.search) &&
     !(window.Webflow && Webflow.env('editor') !== undefined);
 
@@ -4575,9 +4574,6 @@
   }
 
   function rdScrollRuler() {
-    // Only on staging and localhost until Rimbo gives the go: live and staging share the footer
-    // tag, so a live publish must not bring it along by accident. Remove this line to go live.
-    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
     if (window.Webflow && Webflow.env && Webflow.env('editor') !== undefined) return;
 
     var article = qs('.richtextstyling');
@@ -5079,13 +5075,12 @@
   }
 
   function rdPostRefresh() {
-    // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
-    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
     if (window.Webflow && Webflow.env && Webflow.env('editor') !== undefined) return;
     var container = qs('.blog_intro .container-20');
     var h1 = qs('.blog_intro .h1_small');
     if (!container || !h1 || document.documentElement.classList.contains('rf')) return;
     document.documentElement.classList.add('rf');
+    var nl = /^\/nl(\/|$)/.test(location.pathname); // Dutch posts: the reading words in Dutch, the rest of the design the same
 
     var style = document.createElement('style');
     style.id = 'rd-post-refresh-css';
@@ -5106,7 +5101,7 @@
     eyebrow.innerHTML = '<span class="rf-dot"></span>';
     var eyebrowText = document.createElement('span');
     eyebrowText.className = 'rf-eb';
-    eyebrowText.textContent = 'Article' + (category ? ' · ' + category : '');
+    eyebrowText.textContent = (nl ? 'Artikel' : 'Article') + (category ? ' · ' + category : '');
     eyebrow.appendChild(eyebrowText);
 
     // the summary is a lead paragraph, not a second heading above the article (one H1, then the article's H2s)
@@ -5122,7 +5117,7 @@
     var author = qs('.rl_blogpost1_content-top');
     var hero = document.createElement('div'); hero.className = 'rf-hero';
     var main = document.createElement('div'); main.className = 'rf-hero__main';
-    var side = document.createElement('aside'); side.className = 'rf-hero__side'; side.setAttribute('aria-label', 'About this article');
+    var side = document.createElement('aside'); side.className = 'rf-hero__side'; side.setAttribute('aria-label', nl ? 'Over dit artikel' : 'About this article');
     main.appendChild(eyebrow); main.appendChild(h1); if (summary) main.appendChild(summary);
     if (author) side.appendChild(author);
 
@@ -5132,7 +5127,7 @@
 
     // the closing "Questions? Let's talk" section makes way for the project block below the article
     var last = sections[sections.length - 1];
-    if (last && /^questions\?/i.test(last.textContent.trim())) {
+    if (last && /^(questions|vragen)\?/i.test(last.textContent.trim())) {
       while (last.nextSibling) last.parentNode.removeChild(last.nextSibling);
       last.parentNode.removeChild(last);
       sections.pop();
@@ -5140,7 +5135,7 @@
     if (sections.length > 1) {
       var toc = document.createElement('details');
       toc.className = 'rf-toc';
-      toc.innerHTML = '<summary class="rf-eyebrow">In this article</summary><ol></ol>';
+      toc.innerHTML = '<summary class="rf-eyebrow">' + (nl ? 'In dit artikel' : 'In this article') + '</summary><ol></ol>';
       var ol = qs('ol', toc);
       var used = {};
       sections.forEach(function (h) {
@@ -5221,8 +5216,8 @@
     // keep reading: these are the highlighted posts, not this post's category, so the heading stays general
     var text = qs('.blog_section .blog_text');
     if (text) text.innerHTML =
-      '<div class="rf-kr-head"><div><div class="rf-eyebrow">Keep reading</div><h2 class="rf-kr-title">More articles</h2></div>' +
-      '<a href="/resources" data-btn-alt="Browse them all" class="btn rf-kr-all w-inline-block"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">All articles</div><div class="btn_arrow">→</div></div></div></div></a></div>';
+      '<div class="rf-kr-head"><div><div class="rf-eyebrow">' + (nl ? 'Verder lezen' : 'Keep reading') + '</div><h2 class="rf-kr-title">' + (nl ? 'Meer artikelen' : 'More articles') + '</h2></div>' +
+      '<a href="' + (nl ? '/nl' : '') + '/resources" data-btn-alt="' + (nl ? 'Bekijk ze allemaal' : 'Browse them all') + '" class="btn rf-kr-all w-inline-block"><div class="btn_in"><div class="btn_swap"><div class="btn_line"><div class="btn_t">' + (nl ? 'Alle artikelen' : 'All articles') + '</div><div class="btn_arrow">→</div></div></div></div></a></div>';
     var current = qs('.blog_section .w--current');
     if (current && current.closest('.post')) current.closest('.post').classList.add('rf-hide');
     // two recommendations read cleaner than three, whichever post you're on
@@ -5273,8 +5268,6 @@
   })();
 
   function rdPostCards() {
-    // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
-    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
     var selector = POST_CARD_SCOPES.map(function (x) { return x + ' .post'; }).join(', ');
     if (!qs(selector)) return;
     if (!qs('#rd-post-cards-css')) {
@@ -5309,8 +5302,6 @@
   // would still apply to every post.
   // =========================================================
   function rdCoverHueDrift() {
-    // Only on staging and localhost until Rimbo gives the go for live (same gate as the scroll ruler)
-    if (!/\.webflow\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
     var on = qsa('[data-cover-hue-drift]').some(function (m) {
       return !m.classList.contains('w-condition-invisible') && getComputedStyle(m).display !== 'none';
     });
@@ -10062,7 +10053,7 @@
     run('dutch lines', rdLocNl); // before the buttons and the apply form read their lines
     run('css loops rest', rdRestCssLoops);
     run('work clips', rdWorkClips); // before rdWorkHeroLoad / work-hero.js and rdWorkSplit read the Work page's videos
-    if (path.indexOf('/post/') === 0 && !/^\/nl(\/|$)/.test(location.pathname)) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
+    if (path.indexOf('/post/') === 0) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
     run('band', rdBand);   // builds the home-opening rows before the marquees start
     run('global', rdGlobal);
     // from here: not needed to show the first screen, so on a first load these take their turn (soon, at the top of this file)
@@ -10071,9 +10062,8 @@
     soon('form validation', rdFormValidation);
     soon('post cards', rdPostCards);
     // the new Blueprint footer, page by page until Rimbo's go (home-v4: Rimbo, 5 Nov); ?footer=new tries it on any staging page
-    var stagingHost = /(\.webflow\.io|localhost|127\.0\.0\.1)$/.test(location.hostname);
-    // pages that keep the old footer for now: posts the refresh didn't touch (Dutch, live) and Resources on live
-    var oldFooter = (path.indexOf('/post/') === 0 && !document.documentElement.classList.contains('rf')) || (path === '/resources' && !stagingHost);
+    // a post the refresh didn't touch keeps its old footer
+    var oldFooter = path.indexOf('/post/') === 0 && !document.documentElement.classList.contains('rf');
     if (oldFooter) qsa('.rdf').forEach(function (el) { el.parentNode.removeChild(el); });
     else if (path === '/resources') run('old footer out', rdOldFooterOut);
     soon('footer', rdFooter);
