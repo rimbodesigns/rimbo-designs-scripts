@@ -2499,61 +2499,100 @@
     run('chip boil', rdChipBoil);
   }
 
+  // =========================================================
+  // TEXT KIT: letter boxes and the stop-motion boil
+  // One copy of the letter split and of button 06's boil, so every boil runs on the same clock. Used by rdButtons
+  // (button labels), rdChipBoil (/resources chips), rdQuiz (answers) and rdCaseDrum (the drum's cursor label); each
+  // passes its own numbers. Not here, because they work differently: the footer's glyph settle and ruler scramble
+  // (rdFooter), the end card's own little script (rdPostEnd) and the thank-you name stamp (rdApplyName).
+  // =========================================================
+
+  // One inline-block span per letter, so each letter can move on its own; returns the spans. A space becomes a
+  // no-break space (a plain space in its own span would collapse to nothing). o.cls: the letters' class; o.text: the
+  // text (default: the element's own); o.word: a class for a nowrap box around each word, so a line breaks between words
+  function rdSplitChars(el, o) {
+    var frag = document.createDocumentFragment(), chars = [];
+    function letter(ch, box) {
+      var s = document.createElement('span');
+      s.className = o.cls;
+      s.style.display = 'inline-block';
+      s.textContent = ch === ' ' ? '\u00a0' : ch;
+      box.appendChild(s);
+      chars.push(s);
+    }
+    var text = o.text != null ? o.text : el.textContent;
+    if (o.word) text.split(/\s+/).forEach(function (word, w) {
+      if (w) frag.appendChild(document.createTextNode(' '));
+      var box = document.createElement('span');
+      box.className = o.word;
+      box.style.cssText = 'display:inline-block;white-space:nowrap';
+      box.setAttribute('aria-hidden', 'true');
+      Array.from(word).forEach(function (ch) { letter(ch, box); });
+      frag.appendChild(box);
+    });
+    else Array.from(text).forEach(function (ch) { letter(ch, frag); });
+    el.textContent = '';
+    el.appendChild(frag);
+    return chars;
+  }
+
+  // Calls fn(frame) at a fixed frame rate off the GSAP ticker while started: the stop-motion clock. stop() says whether
+  // it was running. Noted once, for the page it is made on: start() runs later, from a hover or a timer, when "the page
+  // on screen" can already be the next one, and one note per hover would pile up for as long as the page stays
+  function rdStepper(fps, fn) {
+    var running = false, last = -1, t0 = 0;
+    function tick() {
+      var f = Math.floor((gsap.ticker.time - t0) * fps);
+      if (f !== last) { last = f; fn(f); }
+    }
+    rdUndo(function () { gsap.ticker.remove(tick); });
+    return {
+      start: function () { if (running) return; running = true; last = -1; t0 = gsap.ticker.time; gsap.ticker.add(tick); },
+      stop: function () { if (!running) return false; running = false; gsap.ticker.remove(tick); return true; }
+    };
+  }
+  // Three poses per letter, a small random x, y and rotation within +-o.x, +-o.y, +-o.rotation. Small moves, so it
+  // breathes instead of shaking
+  function rdBoilPoses(chars, o) {
+    var rnd = gsap.utils.random;
+    return chars.map(function () {
+      return [0, 1, 2].map(function () { return { x: rnd(-o.x, o.x), y: rnd(-o.y, o.y), rotation: rnd(-o.rotation, o.rotation) }; });
+    });
+  }
+  // Frame f: every letter is set to its next pose, each one a pose ahead of the letter before. Nothing tweens between
+  // frames: each one is set, like a drawn frame
+  function rdBoilFrame(chars, poses, f) { chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); }); }
+  // After the boil the letters ease back to where they stand
+  function rdBoilHome(els, duration) { gsap.to(els, { x: 0, y: 0, rotation: 0, duration: duration, ease: 'power3.out', overwrite: 'auto' }); }
+  // The boil on a set of letters, as {start, stop}. o: x, y, rotation (how far a pose reaches), fps (9), back (seconds
+  // to ease home, .35), frame(f) (runs after each frame), home (more elements that ease home with the letters)
+  function rdBoil(chars, o) {
+    var poses = rdBoilPoses(chars, o);
+    chars.forEach(function (c) { c.style.transformOrigin = '50% 55%'; }); // a plain style: GSAP reads every element's transform the first time it touches it, and at start-up that was the whole cost of the buttons
+    var step = rdStepper(o.fps || 9, function (f) { rdBoilFrame(chars, poses, f); if (o.frame) o.frame(f); });
+    return {
+      start: step.start,
+      stop: function () { if (step.stop()) rdBoilHome(o.home ? chars.concat(o.home) : chars, o.back || 0.35); }
+    };
+  }
+
   // The filter chips borrow button 06's stop-motion boil (rdButtons): while the mouse is on a chip, every
   // letter cycles through three hand-placed poses at 9 fps, set frame by frame like drawn frames; on leave
   // they settle back. No label swap, no magnet. Mouse only (a tap would leave it boiling), off for reduced motion.
   function rdChipBoil() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var rnd = gsap.utils.random;
-    var FPS = 9;
     qsa('.rs-chip, .rs-reset, [data-boil]').forEach(function (btn) {
       if (btn.hasAttribute('data-boil-ready')) return;
       var label = qs('span', btn) || btn;
       // every letter its own box, and every word a box around its letters: a row of loose letter boxes may wrap between
       // any two of them, which on a phone gave "ONLINE MARKETIN / G". Words stay whole, the line breaks at the space
-      var text = label.textContent.trim(), chars = [];
+      var text = label.textContent.trim();
       btn.setAttribute('aria-label', text);
-      label.textContent = '';
-      text.split(/\s+/).forEach(function (word, w) {
-        if (w) label.appendChild(document.createTextNode(' '));
-        var box = document.createElement('span');
-        box.className = 'rs-word';
-        box.style.cssText = 'display:inline-block;white-space:nowrap';
-        box.setAttribute('aria-hidden', 'true');
-        Array.from(word).forEach(function (ch) {
-          var c = document.createElement('span');
-          c.className = 'rs-ch';
-          c.style.display = 'inline-block';
-          c.textContent = ch;
-          box.appendChild(c);
-          chars.push(c);
-        });
-        label.appendChild(box);
-      });
+      var chars = rdSplitChars(label, { text: text, cls: 'rs-ch', word: 'rs-word' });
       btn.setAttribute('data-boil-ready', '');
-      var poses = chars.map(function () {
-        return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; });
-      });
-      gsap.set(chars, { transformOrigin: '50% 55%' });
-      var running = false, last = -1, t0 = 0;
-      function tick() {
-        var f = Math.floor((gsap.ticker.time - t0) * FPS);
-        if (f === last) return;
-        last = f;
-        chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
-      }
-      rdUndo(function () { gsap.ticker.remove(tick); }); // noted once: one note per hover would pile up for as long as the page stays
-      btn.addEventListener('pointerenter', function (e) {
-        if (e.pointerType !== 'mouse' || running) return;
-        running = true; last = -1; t0 = gsap.ticker.time;
-        gsap.ticker.add(tick);
-      });
-      btn.addEventListener('pointerleave', function () {
-        if (!running) return;
-        running = false;
-        gsap.ticker.remove(tick);
-        gsap.to(chars, { x: 0, y: 0, rotation: 0, duration: 0.35, ease: 'power3.out', overwrite: 'auto' });
-      });
+      var boil = rdBoil(chars, { x: 0.6, y: 0.7, rotation: 3 });
+      btn.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') boil.start(); });
+      btn.addEventListener('pointerleave', boil.stop);
     });
   }
 
@@ -2980,29 +3019,14 @@
 
     // ---- the boil: the stop-motion of the site's buttons (rdButtons), on an answer's letters. Every letter has three
     // poses and steps through them nine times a second; nothing tweens between frames, each one is set like a drawn frame ----
-    var rnd = gsap.utils.random;
+    // The pieces come from the text kit (rdBoil and friends): the letters change with every question, so one clock for
+    // the page and fresh poses for every boil
     var boiling = null;
-    rdTick(function () {
-      if (!boiling) return;
-      var frame = Math.floor((gsap.ticker.time - boiling.t0) * 9);
-      if (frame === boiling.frame) return;
-      boiling.frame = frame;
-      boiling.chars.forEach(function (c, n) { gsap.set(c, boiling.poses[n][(frame + n) % 3]); });
-    });
-    // one span per letter, so each can move on its own
-    function splitLabel(label, text) {
-      label.textContent = '';
-      Array.from(text).forEach(function (ch) {
-        var span = document.createElement('span');
-        span.className = 'qz_ch';
-        span.style.display = 'inline-block';
-        span.textContent = ch === ' ' ? '\u00a0' : ch; // a plain space in its own span would collapse to nothing
-        label.appendChild(span);
-      });
-    }
+    var boilClock = rdStepper(9, function (f) { if (boiling) rdBoilFrame(boiling.chars, boiling.poses, f); });
     function boilStop() {
+      boilClock.stop(); // also when the letters were made again (boiling cleared), so the next boil starts on its first frame
       if (!boiling) return;
-      gsap.to(boiling.chars, { x: 0, y: 0, rotation: 0, duration: 0.35, ease: 'power3.out', overwrite: 'auto' });
+      rdBoilHome(boiling.chars, 0.35);
       boiling = null;
     }
     function boilStart(i) {
@@ -3010,11 +3034,9 @@
       if (reduce) return;
       var chars = qsa('.qz_ch', labels[i]);
       if (!chars.length) return;
-      gsap.set(chars, { transformOrigin: '50% 55%' });
-      boiling = {
-        chars: chars, t0: gsap.ticker.time, frame: -1,
-        poses: chars.map(function () { return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; }); })
-      };
+      chars.forEach(function (c) { c.style.transformOrigin = '50% 55%'; });
+      boiling = { chars: chars, poses: rdBoilPoses(chars, { x: 0.6, y: 0.7, rotation: 3 }) };
+      boilClock.start();
     }
 
     function fillQuestion() {
@@ -3022,7 +3044,7 @@
       boiling = null; // the letters are made again below
       questionEl.textContent = q.text;
       answers.forEach(function (answer, i) {
-        splitLabel(labels[i], q.choices[i]);
+        rdSplitChars(labels[i], { text: q.choices[i], cls: 'qz_ch' }); // one span per letter, so each can move on its own
         answer.setAttribute('aria-label', q.choices[i]); // read as one answer, not letter by letter
         answer.classList.remove('is-picked', 'is-off', 'is-hover');
       });
@@ -4267,60 +4289,13 @@
 
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var finePointer = window.matchMedia('(pointer: fine)').matches;
-    var rnd = gsap.utils.random;
     var cap = gsap.utils.clamp(-9, 9); // never into the neighbour
     var REACH = 56;
     var FPS = 9; // the old stop-motion button ran 4 frames in .45 s
 
     function em(el, n) { return n * parseFloat(getComputedStyle(el).fontSize); }
 
-    // One span per character, so each letter can move on its own. Returns the spans.
-    function splitChars(el) {
-      var frag = document.createDocumentFragment();
-      var chars = Array.from(el.textContent).map(function (ch) {
-        var s = document.createElement('span');
-        s.className = 'btn_ch';
-        s.style.display = 'inline-block';
-        s.textContent = ch === ' ' ? ' ' : ch; // a plain space in its own span would collapse to nothing
-        frag.appendChild(s);
-        return s;
-      });
-      el.textContent = '';
-      el.appendChild(frag);
-      return chars;
-    }
-
-    // Calls fn(frame) at a fixed frame rate off the GSAP ticker: the stop-motion clock
-    function stepper(fps, fn) {
-      var running = false, last = -1, t0 = 0;
-      function tick() {
-        var f = Math.floor((gsap.ticker.time - t0) * fps);
-        if (f !== last) { last = f; fn(f); }
-      }
-      rdUndo(function () { gsap.ticker.remove(tick); }); // noted once, here, for this page: start() runs later, from a hover or a timer, when "the page on screen" can already be the next one
-      return {
-        start: function () { if (running || reduce) return; running = true; last = -1; t0 = gsap.ticker.time; gsap.ticker.add(tick); },
-        stop: function () { if (!running) return false; running = false; gsap.ticker.remove(tick); return true; }
-      };
-    }
-
-    // The boil: every letter has three poses and cycles through them. Small moves, so it breathes
-    // instead of shaking. Nothing tweens between frames: each one is set, like a drawn frame.
-    function boil(chars) {
-      var poses = chars.map(function () {
-        return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; });
-      });
-      chars.forEach(function (c) { c.style.transformOrigin = '50% 55%'; }); // a plain style: GSAP reads every element's transform the first time it touches it, and at start-up that was the whole cost of the buttons
-      var step = stepper(FPS, function (f) {
-        chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
-      });
-      return {
-        start: step.start,
-        stop: function () {
-          if (step.stop()) gsap.to(chars, { x: 0, y: 0, rotation: 0, duration: 0.35, ease: 'power3.out', overwrite: 'auto' });
-        }
-      };
-    }
+    // The letters (one span each) and the boil come from the text kit: rdSplitChars and rdBoil
 
     // The swap: line A rolls up out of the mask, line B rolls in from below (and back).
     // Line B is a copy of line A with the alt label; both get one span per character.
@@ -4330,8 +4305,8 @@
       lineB.setAttribute('aria-hidden', 'true');
       qs('.btn_t', lineB).textContent = alt;
       lineA.parentNode.appendChild(lineB);
-      var a = splitChars(qs('.btn_t', lineA)).concat(qsa('.btn_arrow', lineA));
-      var bChars = splitChars(qs('.btn_t', lineB));
+      var a = rdSplitChars(qs('.btn_t', lineA), { cls: 'btn_ch' }).concat(qsa('.btn_arrow', lineA));
+      var bChars = rdSplitChars(qs('.btn_t', lineB), { cls: 'btn_ch' });
       var b = bChars.concat(qsa('.btn_arrow', lineB));
       // line B waits below the mask. As a plain style until the first hover: handing every letter to GSAP at start-up
       // made the browser work out its styles again for each one (most of the buttons' start-up time on a phone, where
@@ -4423,7 +4398,7 @@
       var lineA = qs('.btn_line', btn);
       var alt = btn.getAttribute('data-btn-alt');
       var s = lineA && alt && qs('.btn_t', lineA) ? swap(lineA, alt) : null;
-      var b = s ? boil(s.chars) : null;
+      var b = s ? rdBoil(s.chars, { x: 0.6, y: 0.7, rotation: 3, fps: FPS }) : null;
       var arrows = qsa('.btn_arrow', btn); // after the swap built line B, so both arrows nudge
       var downs = arrows.filter(function (a) { return /\u2193/.test(a.textContent); }); // a down arrow nudges down, not right
       var sides = arrows.filter(function (a) { return downs.indexOf(a) < 0; });
@@ -4433,7 +4408,7 @@
           if (sides.length) gsap.to(sides, { x: em(btn, 0.35), duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
           if (downs.length) gsap.to(downs, { y: em(btn, 0.3), duration: 0.5, ease: 'expo.out', overwrite: 'auto' });
           if (s) s.to(true);
-          if (b) timer = gsap.delayedCall(0.4, b.start);
+          if (b && !reduce) timer = gsap.delayedCall(0.4, b.start);
         },
         release: function () {
           if (timer) timer.kill();
@@ -5599,19 +5574,21 @@
     });
   }
 
-  // City pages, Zo werken we: one living ball per plain beige card, running off the edge, calm at step 1 and alive at 3.
-  // Shader and motion come from the calculator (prototype/calculator/ball.js, the brand's ball with a see-through
-  // outside): the colours flow and turn inside it and it floats and breathes on its own; the pointer only warms the
-  // spot under it. One shared WebGL2 context, copied to a 2D canvas per card; runs only while the cards are on screen.
-  function rdLocBalls() {
-    var cards = qsa('.loc_steps .loc_step');
-    if (!cards.length) return;
+  // =========================================================
+  // THE BRAND BALL: one renderer for the grainy ball, shared by rdLocBalls (city steps), rdWall (Wall of love cards) and
+  // rdSvcBall (the /service hero), so its grain and colours are tuned in one place. Each caller gets its own WebGL2 context
+  // (given back when the page leaves, rdGl) and copies each ball onto its own 2D canvas. look 'wall' turns faster with finer
+  // clouds, for a ball you only see a quarter of; any other look is the calm city/service ball. bloom adds the /service
+  // entrance: the colour grows in from the middle as o.reveal goes 0 to 1. (The IMAGINE ball on home is its own shader.)
+  // =========================================================
+  function rdBallGL(look, bloom) {
     var gl = rdGl(document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true }));
-    if (!gl) return;
+    if (!gl) return null;
+    var k = look === 'wall' ? ['0.26', '0.5 + 0.34', '1.7', '1.0'] : ['0.16', '0.53 + 0.14', '1.0', '1.5'];
     var FRAG = "#version 300 es\n" +
       "precision highp float;\n" +
       "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
-      "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
+      "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3]; uniform float reveal;\n" +
       "out vec4 outColor;\n" +
       "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
       "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
@@ -5633,30 +5610,33 @@
       "  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
       "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n" +
       "  float h = hash(vec2(seed));\n" +
-      "  float ang = h * 6.2831 + t * 0.16;\n" +
-      "  float g = 0.53 + 0.14 * dot(l, vec2(cos(ang), sin(ang)));\n" +
+      "  float ang = h * 6.2831 + t * " + k[0] + ";\n" + // the colours turn around inside the ball
+      "  float g = " + k[1] + " * dot(l, vec2(cos(ang), sin(ang)));\n" +
       "  vec2 drift = vec2(sin(t * 0.34 + h * 6.2831), cos(t * 0.27 + h * 12.566)) * 0.62;\n" +
       "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
-      "  float f = fbm(l * 1.0 + w * 1.3 + h * 90.0);\n" +
-      "  float v = g + (f - 0.5) * 1.5 + bias - heat * 0.45;\n" +
+      "  float f = fbm(l * " + k[2] + " + w * 1.3 + h * 90.0);\n" +
+      "  float v = g + (f - 0.5) * " + k[3] + " + bias - heat * 0.45;\n" +
       "  float dp = length(p - ptr) / max(ptrR, 1.0);\n" +
       "  v -= ptrAmt * 0.6 * exp(-dp * dp);\n" +
       "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n" +
       "  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
-      "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
+      // bloom: an organic edge that grows from the middle and settles
+      (bloom ? "  float e = reveal * 1.35, wob = (fbm(l * 2.2 + h * 30.0 + t * 0.15) - 0.5) * 0.55 * (1.0 - reveal * 0.6);\n" +
+        "  float m = smoothstep(e, e - 0.18, r + wob) * smoothstep(0.0, 0.06, reveal);\n" : "") +
+      "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r)" + (bloom ? " * m" : "") + ");\n" +
       "}";
     function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; }
     var prog = gl.createProgram();
     gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
     gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
     gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
     gl.useProgram(prog);
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     var U = {};
-    ['res', 'center', 'R', 'seed', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'stops', 'edges'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+    ['res', 'center', 'R', 'seed', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'stops', 'edges', 'reveal'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
     function oklab(hex) {
       var c = [0, 2, 4].map(function (i) { var v = parseInt(hex.substr(i, 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
       var l = Math.cbrt(0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]);
@@ -5667,6 +5647,33 @@
     gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
     gl.uniform2fv(U.edges, new Float32Array([0.12, 0.28, 0.26, 0.46, 0.5, 0.84]));
     gl.uniform1f(U.heat, 0);
+    // draw one ball onto cv, w x h css pixels at dpr. o, in css pixels: cx, cy, R; t, seed, bias; px, py, pr, amt for the warm
+    // spot under the mouse; reveal for the bloom
+    return function (cv, w, h, dpr, o) {
+      var W = Math.round(w * dpr), H = Math.round(h * dpr);
+      if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+      if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
+      gl.viewport(0, 0, W, H);
+      gl.uniform2f(U.res, W, H); gl.uniform2f(U.center, o.cx * dpr, o.cy * dpr); gl.uniform1f(U.R, o.R * dpr);
+      gl.uniform1f(U.seed, o.seed); gl.uniform1f(U.bias, o.bias); gl.uniform1f(U.grainScale, dpr * 0.75); gl.uniform1f(U.t, o.t);
+      gl.uniform2f(U.ptr, o.px * dpr, o.py * dpr); gl.uniform1f(U.ptrR, o.pr * dpr); gl.uniform1f(U.ptrAmt, o.amt);
+      if (bloom) gl.uniform1f(U.reveal, o.reveal);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      var c2 = cv.getContext('2d');
+      c2.clearRect(0, 0, W, H); c2.drawImage(gl.canvas, 0, 0);
+    };
+  }
+
+  // City pages, Zo werken we: one living ball per plain beige card, running off the edge, calm at step 1 and alive at 3.
+  // Shader and motion come from the calculator (prototype/calculator/ball.js, the brand's ball with a see-through
+  // outside): the colours flow and turn inside it and it floats and breathes on its own; the pointer only warms the
+  // spot under it. One shared WebGL2 context, copied to a 2D canvas per card; runs only while the cards are on screen.
+  function rdLocBalls() {
+    var cards = qsa('.loc_steps .loc_step');
+    if (!cards.length) return;
+    var ballGL = rdBallGL('loc'); // THE BRAND BALL, above
+    if (!ballGL) return;
 
     var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // One size. The steps go from calm to alive: bias walks the ball along the fade (high = beige and steel, low = red),
@@ -5676,20 +5683,12 @@
     function draw(b) {
       var box = { width: b.card.offsetWidth, height: b.card.offsetHeight }; // its own size: on the page transition's cube the size on screen changes every frame
       if (!box.width || !box.height) return;
-      var dpr = Math.min(window.devicePixelRatio || 1, 1.5), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
-      if (b.cv.width !== W || b.cv.height !== H) { b.cv.width = W; b.cv.height = H; }
-      if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
-      gl.viewport(0, 0, W, H);
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       var f = time * b.s.flow + b.off; // it floats and breathes on its own
       var fx = calm ? 0 : Math.sin(f * 0.31) * 16 + Math.sin(f * 0.13) * 10, fy = calm ? 0 : Math.cos(f * 0.23) * 14;
       var R = 0.36 * box.height * (calm ? 1 : 1 + Math.sin(f * 0.37) * 0.022);
-      gl.uniform2f(U.res, W, H); gl.uniform2f(U.center, (box.width - R * 0.2 + fx) * dpr, (0.26 * box.height + fy) * dpr);
-      gl.uniform1f(U.R, R * dpr); gl.uniform1f(U.seed, b.s.seed); gl.uniform1f(U.bias, b.s.bias); gl.uniform1f(U.grainScale, dpr * 0.75); gl.uniform1f(U.t, f);
-      gl.uniform2f(U.ptr, b.x * dpr, b.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(R * 0.4, 80), 200) * dpr); gl.uniform1f(U.ptrAmt, b.amt);
-      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      var c2 = b.cv.getContext('2d');
-      c2.clearRect(0, 0, W, H); c2.drawImage(gl.canvas, 0, 0);
+      ballGL(b.cv, box.width, box.height, dpr, { cx: box.width - R * 0.2 + fx, cy: 0.26 * box.height + fy, R: R, seed: b.s.seed, bias: b.s.bias, t: f,
+        px: b.x, py: b.y, pr: Math.min(Math.max(R * 0.4, 80), 200), amt: b.amt });
     }
     var balls = cards.slice(0, SPEC.length).map(function (card, i) {
       var cv = document.createElement('canvas');
@@ -6684,90 +6683,12 @@
 
     }
 
-    /* ---------- the brand ball: the calculator's shader, tuned for a ball you only see a quarter of ---------- */
-    const toRgb = h => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
-    const s2l = v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
-    function oklab(h) {
-      const [r, g, b] = toRgb(h).map(s2l);
-      const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b);
-      const m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b);
-      const s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
-      return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
-    }
-    const rgb01 = h => toRgb(h).map(v => v / 255);
-
-    const FRAG = "#version 300 es\n" +
-        "precision highp float;\n" +
-        "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
-        "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3];\n" +
-        "out vec4 outColor;\n" +
-        "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
-        "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
-        "  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n" +
-        "float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n" +
-        "float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n" +
-        "vec3 fromLab(vec3 c) {\n" +
-        "  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n" +
-        "  l = l * l * l; m = m * m * m; s = s * s * s;\n" +
-        "  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n" +
-        "}\n" +
-        "vec3 ramp(float v) { vec3 c = stops[0]; for (int i = 0; i < 3; i++) c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); return fromLab(c); }\n" +
-        "void main() {\n" +
-        "  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n" +
-        "  vec2 l = (p - center) / R;\n" +
-        "  float r = length(l), aa = 1.2 / R;\n" +
-        "  if (r > 1.0 + aa) { outColor = vec4(0.0); return; }\n" +
-        "  vec2 gp = floor(p / grainScale);\n" +
-        "  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
-        "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n" +
-        "  float h = hash(vec2(seed));\n" +
-        "  float ang = h * 6.2831 + t * 0.26;\n" + // the colours turn around inside the ball, wherever it's cropped
-        "  float g = 0.5 + 0.34 * dot(l, vec2(cos(ang), sin(ang)));\n" +
-        "  vec2 drift = vec2(sin(t * 0.34 + h * 6.2831), cos(t * 0.27 + h * 12.566)) * 0.62;\n" +
-        "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
-        "  float f = fbm(l * 1.7 + w * 1.3 + h * 90.0);\n" +
-        "  float v = g + (f - 0.5) * 1.0 + bias - heat * 0.45;\n" +
-        "  float dp = length(p - ptr) / max(ptrR, 1.0);\n" +
-        "  v -= ptrAmt * 0.6 * exp(-dp * dp);\n" +
-        "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n" +
-        "  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
-        "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r));\n" +
-        "}";
-
-    const gl = rdGl(document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true }));
-    const U = {};
-    if (gl) {
-      const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
-      const prog = gl.createProgram();
-      gl.attachShader(prog, sh(gl.VERTEX_SHADER, `#version 300 es
-    in vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`));
-      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog); gl.useProgram(prog);
-      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-      ['res', 'center', 'R', 'seed', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'stops', 'edges'].forEach(k => { U[k] = gl.getUniformLocation(prog, k); });
-      gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
-      gl.uniform2fv(U.edges, new Float32Array([.12, .28, .26, .46, .5, .84]));
-    }
-
-    // o: cx, cy, R in the canvas's css pixels; t, seed, bias; px, py, pr, amt for the warm spot under the mouse
+    /* ---------- the brand ball (THE BRAND BALL, rdBallGL), tuned for a ball you only see a quarter of ---------- */
+    const ballGL = rdBallGL('wall');
+    // o: w, h, cx, cy, R in the canvas's css pixels; t, seed, bias; px, py, pr, amt for the warm spot under the mouse
     function drawBall(cv, o) {
-      if (!gl) return;
-      const boxW = o.w, boxH = o.h; // its own size (measured on resize): on the page transition's cube the size on screen shrinks to nothing
-      if (!boxW || !boxH) return;
-      const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(boxW * dpr), H = Math.round(boxH * dpr);
-      if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-      if (gl.canvas.width !== W || gl.canvas.height !== H) { gl.canvas.width = W; gl.canvas.height = H; }
-      gl.viewport(0, 0, W, H);
-      gl.uniform2f(U.res, W, H); gl.uniform2f(U.center, o.cx * dpr, o.cy * dpr); gl.uniform1f(U.R, o.R * dpr);
-      gl.uniform1f(U.seed, o.seed); gl.uniform1f(U.bias, o.bias); gl.uniform1f(U.heat, 0); gl.uniform1f(U.grainScale, dpr * .75); gl.uniform1f(U.t, o.t);
-      gl.uniform2f(U.ptr, o.px * dpr, o.py * dpr); gl.uniform1f(U.ptrR, o.pr * dpr); gl.uniform1f(U.ptrAmt, o.amt);
-      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      const c = cv.getContext('2d');
-      c.clearRect(0, 0, W, H);
-      c.drawImage(gl.canvas, 0, 0);
+      // its own size (measured on resize): on the page transition's cube the size on screen shrinks to nothing
+      if (ballGL && o.w && o.h) ballGL(cv, o.w, o.h, Math.min(devicePixelRatio || 1, 2), o);
     }
 
     initSliders();
@@ -9196,12 +9117,42 @@
       // the work nearest the middle of the screen is the one shown (the first, before you scroll into the list).
       // On a phone the preview lies across the top of the list (stacked), so the point to measure from is a third of the
       // way down the room that is left under it: the lit name is the one just below the preview, never one hidden under it.
+      // SPEED (2026-11-19): the rows, the preview and the screen height are measured once and kept (G); a scroll frame
+      // then only does sums with the scroll position, so scrolling makes no layout reads here (it was ~600 a second).
+      // G is thrown away whenever something could have moved them (see stale() below) and the next pick measures again.
+      var G = null;
+      function measure() {
+        var y = window.scrollY, g = { vh: innerHeight, tops: [], hs: [], stacked: false, pane: null };
+        rows.forEach(function (r) { var b = r.getBoundingClientRect(); g.tops.push(b.top + y); g.hs.push(b.height); });
+        if (pane) { var p = pane.getBoundingClientRect(); g.stacked = p.width > wrap.clientWidth * .9; if (g.stacked) g.pane = stickyPane(p, y); }
+        return g;
+      }
+      // On a phone the preview is sticky (the Designer's ws_pane). Where it is follows from that rule alone: in its own place
+      // until its top reaches the sticky top, held there, then pushed up once its bottom (plus its bottom margin) meets the
+      // bottom of the box it sits in (.ws_split). Any other kind of sticky: it is simply measured each time, as before.
+      function stickyPane(p, y) {
+        var cs = getComputedStyle(pane), box = pane.parentElement, T = parseFloat(cs.top);
+        if (cs.position !== 'sticky' || isNaN(T) || cs.bottom !== 'auto' || !box) return { live: true };
+        // its own place = where it would be without the rule; same spot in the flow, and put back before anything is drawn
+        var pos = pane.style.position, top = pane.style.top;
+        pane.style.position = 'relative'; pane.style.top = '0px';
+        var top0 = pane.getBoundingClientRect().top + y;
+        pane.style.position = pos; pane.style.top = top;
+        var bs = getComputedStyle(box), bottom = box.getBoundingClientRect().bottom + y - parseFloat(bs.paddingBottom) - parseFloat(bs.borderBottomWidth);
+        return { top0: top0, T: T, h: p.height, last: bottom - parseFloat(cs.marginBottom) - p.height };
+      }
+      function paneBottom(s, y) {
+        if (s.live) return pane.getBoundingClientRect().bottom;
+        return Math.max(s.top0 - y, Math.min(s.T, s.last - y)) + s.h;
+      }
+      // Lenis's own number: asking the page for its scroll position can make the browser lay the page out
+      function scrollPos() { var L = window.lenis; return L && typeof L.scroll === 'number' ? L.scroll : window.scrollY; }
       function pick() {
         if (hovering || !wrap.isConnected) return;
-        var mid = innerHeight * .5, stacked = false, best = 0, bestD = 1e9;
-        if (pane) { var p = pane.getBoundingClientRect(); stacked = p.width > wrap.clientWidth * .9; if (stacked && p.bottom < innerHeight) mid = p.bottom + (innerHeight - p.bottom) * .35; }
-        if (!stacked && rows[0].getBoundingClientRect().top > innerHeight * .2) { show(0); return; }
-        rows.forEach(function (r, k) { var b = r.getBoundingClientRect(), d = Math.abs(b.top + b.height / 2 - mid); if (d < bestD) { bestD = d; best = k; } });
+        var g = G || (G = measure()), y = scrollPos(), vh = g.vh, mid = vh * .5, best = 0, bestD = 1e9;
+        if (g.stacked) { var pb = paneBottom(g.pane, y); if (pb < vh) mid = pb + (vh - pb) * .35; }
+        if (!g.stacked && g.tops[0] - y > vh * .2) { show(0); return; }
+        rows.forEach(function (r, k) { var d = Math.abs(g.tops[k] - y + g.hs[k] / 2 - mid); if (d < bestD) { bestD = d; best = k; } });
         show(best);
       }
       // SPEED (2026-11-18): measuring the rows makes the browser lay the page out on the spot. It used to happen on every
@@ -9209,7 +9160,12 @@
       // while this section is on or near the screen, and once per frame at most.
       var near = false, queued = false;
       function onScroll() { if (!near || queued) return; queued = true; requestAnimationFrame(function () { queued = false; pick(); }); }
-      window.addEventListener('scroll', onScroll, { passive: true }); window.addEventListener('resize', onScroll);
+      // measure again after: a window resize, the page or the list changing size (images, fonts, sections opening) and
+      // ScrollTrigger's refresh (pins rebuilt; also the end of a page transition, when the page stops being moved)
+      function stale() { G = null; onScroll(); }
+      rdOn(window, 'scroll', onScroll, { passive: true }); rdOn(window, 'resize', stale);
+      var ro = new ResizeObserver(stale); ro.observe(document.body); ro.observe(wrap);
+      if (window.ScrollTrigger) { ScrollTrigger.addEventListener('refresh', stale); rdUndo(function () { ScrollTrigger.removeEventListener('refresh', stale); }); }
       if (window.matchMedia('(hover: hover)').matches) rows.forEach(function (r, k) {
         r.addEventListener('pointerenter', function () { hovering = true; show(k); });
         r.addEventListener('pointerleave', function () { hovering = false; });
@@ -9612,22 +9568,14 @@
         var text = cursor.querySelector('[data-rw-text]');
         var word = text.textContent; text.textContent = '';
         var chars = Array.from(word).map(function (ch) { var s = document.createElement('span'); s.className = 'rw_ch'; s.textContent = ch; text.appendChild(s); return s; });
-        var poses = chars.map(function () { return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.8, 0.8), rotation: rnd(-4, 4) }; }); });
-        var tilt = [rnd(-1.6, -0.6), rnd(-0.3, 0.3), rnd(0.6, 1.6)];
-        gsap.set(chars, { transformOrigin: '50% 55%' });
-        var FPS = 9, t0 = 0, last = -1, running = false;
-        function tick() {
-          var f = Math.floor((gsap.ticker.time - t0) * FPS);
-          if (f === last) return;
-          last = f;
-          chars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
-          gsap.set(text, { rotation: tilt[f % 3] });
-        }
+        // the text kit's boil, a little wider, and the whole word tilts with every frame
+        var boiler = rdBoil(chars, { x: 0.6, y: 0.8, rotation: 4, back: 0.3, home: [text], frame: function (f) { gsap.set(text, { rotation: tilt[f % 3] }); } });
+        var tilt = [rnd(-1.6, -0.6), rnd(-0.3, 0.3), rnd(0.6, 1.6)]; // after the poses, as before
+        var running = false;
         function boil(on) {
           if (still || on === running) return;
           running = on;
-          if (on) { t0 = gsap.ticker.time; last = -1; gsap.ticker.add(tick); }
-          else { gsap.ticker.remove(tick); gsap.to(chars.concat(text), { x: 0, y: 0, rotation: 0, duration: 0.3, ease: 'power3.out', overwrite: 'auto' }); }
+          if (on) boiler.start(); else boiler.stop();
         }
 
         var xTo = gsap.quickTo(cursor, 'x', { duration: 0.35, ease: 'power3' });
@@ -9841,7 +9789,7 @@
   // rdSvcBall — was: /service, page footer code
   function rdSvcBall() {
     /* SERVICE HERO BALL (hero chat, lab prototype/service-hero-2 ball.js, Rimbo's pick 2026-11-10: "E x ruler", Bloom, L).
-       The brand's living ball (the site's ball shader, as main.js rdLocBalls) centred where the E's guide line meets the ruler,
+       The brand's living ball (rdBallGL, the calm look of rdLocBalls) centred where the E's guide line meets the ruler,
        so the ruler cuts off its top half (Designer: svh_ball_clip starts under the ruler, svh_ball holds the canvas, size is
        the class's width). It arrives as a measured drawing: a cross on the ruler line, the radius out down-left with the
        number counting (svh_lab is-ball), the dashed ring sweeping round from there with ticks at the quarters, then the colour
@@ -9853,78 +9801,18 @@
       var label = hero && hero.querySelector('[data-svh="ball-lab"]'), ruler = hero && hero.querySelector('.sv_ruler');
       var guide = hero && hero.querySelector('.svh_gv.is-right'), title = hero && hero.querySelector('[data-svh="title"]');
       if (!ball || !cv || !marks || !label || !guide || !title || !window.gsap) return;
-      var gl = document.createElement('canvas').getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
       var NS = 'http://www.w3.org/2000/svg', DEG = 135, calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
       var bloom = window.CustomEase ? CustomEase.create('svhBloom', '0.32, 0, 0.12, 1') : 'power3.out';
       var ease = window.CustomEase ? CustomEase.create('svhOsmo2', '0.625, 0.05, 0, 1') : 'expo.inOut';
-      var fx = { reveal: 0, grow: 1 }, b = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 }, time = 0, last = 0, lastDraw = 0, raf = 0, on = false, D = 0, parts = null, U = {};
-      if (!gl) { clip.style.display = marks.style.display = 'none'; return; }
-
-      var FRAG = "#version 300 es\nprecision highp float;\n" +
-        "uniform vec2 res; uniform vec2 center; uniform float R; uniform float seed; uniform float bias; uniform float heat; uniform float grainScale; uniform float t;\n" +
-        "uniform vec2 ptr; uniform float ptrR; uniform float ptrAmt; uniform vec3 stops[4]; uniform vec2 edges[3]; uniform float reveal; uniform int mode;\nout vec4 outColor;\n" +
-        "float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\n" +
-        "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);\n" +
-        "  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }\n" +
-        "float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }\n" +
-        "float s2(float x) { return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(max(x, 0.0), 1.0 / 2.4) - 0.055; }\n" +
-        "vec3 fromLab(vec3 c) {\n" +
-        "  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z, m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z, s = c.x - 0.0894841775 * c.y - 1.291485548 * c.z;\n" +
-        "  l = l * l * l; m = m * m * m; s = s * s * s;\n" +
-        "  return vec3(s2(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), s2(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), s2(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s));\n}\n" +
-        "vec3 ramp(float v) { vec3 c = stops[0]; for (int i = 0; i < 3; i++) c = mix(c, stops[i + 1], smoothstep(edges[i].x, edges[i].y, v)); return fromLab(c); }\n" +
-        "void main() {\n  vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);\n  vec2 l = (p - center) / R;\n" +
-        "  float r = length(l), aa = 1.2 / R;\n  if (r > 1.0 + aa) { outColor = vec4(0.0); return; }\n" +
-        "  vec2 gp = floor(p / grainScale);\n  float g1 = hash(gp + seed), g2 = noise(gp * 0.9 + seed * 3.0);\n" +
-        "  float grain = (g1 - 0.5) * 0.20 + (g2 - 0.5) * 0.07;\n  float h = hash(vec2(seed));\n" +
-        "  float ang = h * 6.2831 + t * 0.16;\n  float g = 0.53 + 0.14 * dot(l, vec2(cos(ang), sin(ang)));\n" +
-        "  vec2 drift = vec2(sin(t * 0.34 + h * 6.2831), cos(t * 0.27 + h * 12.566)) * 0.62;\n" +
-        "  vec2 w = vec2(fbm(l * 0.55 + h * 40.0 + drift), fbm(l * 0.55 + h * 70.0 + 5.2 - drift));\n" +
-        "  float f = fbm(l * 1.0 + w * 1.3 + h * 90.0);\n  float v = g + (f - 0.5) * 1.5 + bias - heat * 0.45;\n" +
-        "  float dp = length(p - ptr) / max(ptrR, 1.0);\n  v -= ptrAmt * 0.6 * exp(-dp * dp);\n" +
-        "  vec3 col = ramp(clamp(v, 0.0, 1.0)) + grain;\n  col = mix(col, ramp(clamp(v + (g1 - 0.5) * 0.18, 0.0, 1.0)) + grain, 0.35);\n" +
-        // how the colour comes in (round 5): 0 iris (a clean circle from the middle), 1 bloom (an organic edge that grows from
-        // the middle and settles), 2 sweep (round, after the ring, from the left), 3 rise (fills up from below with a soft wave)
-        "  float m = 1.0;\n" +
-        "  if (mode == 0) m = smoothstep(reveal * 1.03, reveal * 1.03 - 0.02, r);\n" +
-        "  else if (mode == 1) { float e = reveal * 1.35; float wob = (fbm(l * 2.2 + h * 30.0 + t * 0.15) - 0.5) * 0.55 * (1.0 - reveal * 0.6); m = smoothstep(e, e - 0.18, r + wob) * smoothstep(0.0, 0.06, reveal); }\n" +
-        "  else if (mode == 2) { float fr = mod(atan(l.y, l.x) - 3.14159265, 6.2831853) / 6.2831853; float e = reveal * 1.12; m = smoothstep(e, e - 0.1, fr); }\n" +
-        "  else { float lev = 1.08 - reveal * 2.3; float wave = sin(l.x * 5.0 + t * 1.6) * 0.05 + sin(l.x * 9.0 - t * 1.1) * 0.025; m = smoothstep(lev - 0.03, lev + 0.03, l.y + wave); }\n" +
-        "  outColor = vec4(clamp(col, 0.0, 1.0), smoothstep(1.0 + aa, 1.0 - aa, r) * m);\n}";
-      function sh(type, code) { var o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; }
-      var prog = gl.createProgram();
-      gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }'));
-      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-      gl.bindAttribLocation(prog, 0, 'a'); gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { clip.style.display = marks.style.display = 'none'; return; }
-      gl.useProgram(prog);
-      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-      ['res', 'center', 'R', 'seed', 'bias', 'heat', 'grainScale', 't', 'ptr', 'ptrR', 'ptrAmt', 'stops', 'edges', 'reveal', 'mode'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
-      function oklab(hex) {
-        var c = [0, 2, 4].map(function (i) { var v = parseInt(hex.substr(i, 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
-        var l = Math.cbrt(0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]);
-        var m = Math.cbrt(0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]);
-        var s = Math.cbrt(0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]);
-        return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
-      }
-      gl.uniform3fv(U.stops, new Float32Array([].concat.apply([], ['E4441C', 'E4566A', '4B7888', 'DACCAE'].map(oklab))));
-      gl.uniform2fv(U.edges, new Float32Array([0.12, 0.28, 0.26, 0.46, 0.5, 0.84]));
-      gl.uniform1f(U.heat, 0); gl.uniform1i(U.mode, 1); // 1 = bloom
+      var fx = { reveal: 0, grow: 1 }, b = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 }, time = 0, last = 0, lastDraw = 0, raf = 0, on = false, D = 0, parts = null;
+      var ballGL = rdBallGL('loc', true); // THE BRAND BALL, with the bloom
+      if (!ballGL) { clip.style.display = marks.style.display = 'none'; return; }
 
       function draw() {
         if (!D) return;
-        var dpr = Math.min(window.devicePixelRatio || 1, 1.5), W = Math.round(D * dpr);
-        if (cv.width !== W) { cv.width = W; cv.height = W; }
-        if (gl.canvas.width !== W) { gl.canvas.width = W; gl.canvas.height = W; }
-        gl.viewport(0, 0, W, W);
-        var f = time, R = (D / 2 - 9) * fx.grow * (calm ? 1 : 1 + Math.sin(f * 0.37) * 0.015);
-        gl.uniform1f(U.reveal, fx.reveal); gl.uniform2f(U.res, W, W); gl.uniform2f(U.center, W / 2, W / 2);
-        gl.uniform1f(U.R, R * dpr); gl.uniform1f(U.seed, 23); gl.uniform1f(U.bias, -0.12); gl.uniform1f(U.grainScale, dpr * 0.75); gl.uniform1f(U.t, f);
-        gl.uniform2f(U.ptr, b.x * dpr, b.y * dpr); gl.uniform1f(U.ptrR, Math.min(Math.max(R * 0.4, 60), 160) * dpr); gl.uniform1f(U.ptrAmt, b.amt);
-        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
-        var c2 = cv.getContext('2d'); c2.clearRect(0, 0, W, W); c2.drawImage(gl.canvas, 0, 0);
+        var dpr = Math.min(window.devicePixelRatio || 1, 1.5), mid = Math.round(D * dpr) / 2 / dpr; // the middle of the canvas's own pixels
+        var R = (D / 2 - 9) * fx.grow * (calm ? 1 : 1 + Math.sin(time * 0.37) * 0.015);
+        ballGL(cv, D, D, dpr, { cx: mid, cy: mid, R: R, seed: 23, bias: -0.12, t: time, px: b.x, py: b.y, pr: Math.min(Math.max(R * 0.4, 60), 160), amt: b.amt, reveal: fx.reveal });
       }
       // runs only while the hero is on screen, and stops for good once the page has been left (page transitions)
       function frame(now) {
