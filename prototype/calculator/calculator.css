@@ -124,6 +124,13 @@
 .calc_step > div > .calc_item:has(+ .calc_hours:not([hidden])) { border-bottom: 0; } /* the question belongs to its switch */
 .calc_step > div > .calc_item:has(+ .calc_hours[hidden]:last-child) { border-bottom: 0; }
 .calc_hours_q { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+/* Custom app: what they're after. A plain field in the field colours, the dashed line of the header fields */
+.calc_note .calc_hours_q { display: block; }
+.calc_note_field { display: block; width: 100%; min-height: 4.5em; margin: 0; padding: 10px 12px; resize: vertical; field-sizing: content;
+  font: 14px/1.5 var(--read); color: var(--field-text); background: var(--field-bg); border: 1px dashed var(--field-line); border-radius: var(--r); }
+.calc_note_field::placeholder { color: var(--muted); opacity: .7; }
+.calc_note_field:hover { border-color: var(--muted); }
+.calc_note_field:focus-visible { outline: 0; border: 1px solid var(--on); }
 .calc_seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .calc_seg_opt { position: relative; cursor: pointer; }
 .calc_seg_opt input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
@@ -165,6 +172,7 @@
 .calc_lines[hidden] { display: none; }
 .calc_lines li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); color: var(--muted); }
 .calc_lines li span:last-child { color: var(--text); font: 13px/1.45 var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.calc_lines li span.calc_quote { color: var(--muted); } /* "Priced together": words, not a number */
 
 /* Tip card under the price card, the same frosted card, joined to its item by the dashed line.
    When it doesn't fit, the whole column moves up (fitSide in calculator.js). */

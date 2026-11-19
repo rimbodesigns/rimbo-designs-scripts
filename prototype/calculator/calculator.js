@@ -42,6 +42,7 @@
       reset: "Back to my recommendation",
       clientCta: "Book a call",
       clientCtaAlt: "We go through it together",
+      callNote: "Custom app or tool: ", // before what they wrote, in the booking's note
       copyFailed: ["Couldn't copy", "Copy the link under the button."],
       previewLink: ["Link copied", "Not really: this preview can't copy. On your own site it will."],
       // The page without a (working) link
@@ -116,8 +117,10 @@
     groups: [
       { id: "motion", legend: "Motion and feel" },
       { id: "more",   legend: "Add what you need", line: "Extras" },
-      { id: "search", legend: "Search and analytics" }
+      { id: "search", legend: "Search and analytics" },
+      { id: "custom", legend: "Something custom", line: "Custom" }
     ],
+    quoteText: "Priced together", // a part or switch without a price: we talk first
     // DRAFT prices (2026-11-05): consent and a11y not confirmed yet; analytics lowered to €250, transitions
     // to €900, automations €500 (Rimbo, 2026-11-05)
     toggles: [
@@ -141,20 +144,60 @@
       { id: "leads",      group: "more",   label: "Automations",                               price: 500,  info: "Your site connected to your other tools: form leads into your CRM or mailing list, with an automatic follow-up." },
       { id: "chatbot",    group: "more",   label: "Chatbot",                                   price: 500,  info: "A chat assistant that answers visitors' questions from your site's content." },
       { id: "system",     group: "more",   label: "Design system docs and team training",      price: 800,  info: "Every build comes with a design system.\nThis adds written documentation and a training session, so your team can build new pages with it." },
-      // A switch that opens parts, like Branding. Turning it on the first time picks the preset, so the usual
-      // total stays €4,000 (Rimbo, 2026-11-09). All five part prices are DRAFT
+      // A switch that opens parts, like Branding. A part with fixed: true comes with the switch (no switch of its own,
+      // like the Brand foundation). Turning it on the first time also picks the preset, so the usual total is €4,000.
+      // Rimbo, 2026-11-19: base + paid onboarding, courses as environment + mentoring. All prices DRAFT
       { id: "members",    group: "more",   label: "Members area",
-        info: "Switch this on if your site needs members, then pick the parts.",
-        preset: ["login", "dashboard", "gated"],
+        info: "A private space for your members. The base is always in; add what your members need.",
+        preset: ["onboard"],
         parts: [
-          { id: "login",     label: "Log-in and member pages", price: 2500, info: "Sign-up, log-in and the pages only members can see." },
-          { id: "dashboard", label: "Dashboard",               price: 1000, info: "A personal page for each member, with their own info or progress." },
-          { id: "gated",     label: "Gated content",           price: 500,  info: "Downloads, videos or posts that only members can open." },
-          { id: "payments",  label: "Payments",                price: 1000, info: "Paid plans or subscriptions, so members pay to join." },
-          { id: "courses",   label: "Courses",                 price: 2500, info: "Lessons and modules, with each member's progress saved." }
+          { id: "mbase",   label: "Members base", price: 3000, fixed: true, tag: "Included",
+            info: "Everything a members area needs to work.\n" +
+              "Sign-up and log-in::Accounts your members create and manage themselves.\n" +
+              "Member home::A personal start page with their own content.\n" +
+              "Members-only content::Pages, videos and downloads only members can open." },
+          { id: "onboard", label: "Paid onboarding", price: 1000,
+            info: "Members pay to join, in one smooth flow.\n" +
+              "01::Plans::One-off, monthly or yearly.\n" +
+              "02::Checkout::Secure payment, in the look of your brand.\n" +
+              "03::Welcome::Their account is ready the moment they've paid, with a welcome email.\n" +
+              "~A fully custom checkout is possible too. We price that together." },
+          { id: "course",  label: "Course environment", price: 3000,
+            info: "A course platform built the way I build my own, for Digital Feng Shui.\n" +
+              "Custom video player::Made for your course and your brand, tuned for the best picture.\n" +
+              "Top quality, fast::Near-lossless video on dedicated video hosting, quick on any connection.\n" +
+              "Modules and progress::Lessons in order, with every member's progress saved.\n" +
+              "Interactive moments::Exercises and pieces that make it more than a playlist.\n" +
+              "~Subscriptions for course tools are yours, not included." },
+          { id: "mentor",  label: "Course mentoring, 5 calls", price: 2000,
+            info: "Five calls with someone who makes and sells his own course.\n" +
+              "What goes in::Modules, lesson length, what to film and what to leave out.\n" +
+              "How it lands::Recording, pacing, and keeping students to the end.\n" +
+              "How it sells::The launch and the page that sells it.\n" +
+              "~About an hour each, spread over the project." }
         ] },
-      { id: "shop",       group: "more",   label: "Webshop",                                   price: 4000, info: "Products, cart and checkout, built on Webflow e-commerce." },
-      { id: "priority",   group: "more",   label: "Priority start (jump the queue)",           pct: true,   info: "Your project takes the next free slot instead of waiting in line." }
+      // Levels as parts, like Members (Rimbo left the levels to me, 2026-11-19). DRAFT prices
+      { id: "shop",       group: "more",   label: "Webshop",
+        info: "Switch this on if you sell online. The shop base is always in; add what your shop needs.",
+        preset: [],
+        parts: [
+          { id: "shopbase", label: "Shop base", price: 3000, fixed: true, tag: "Included",
+            info: "A shop that's ready to sell.\n" +
+              "Products::Up to about 20, with photos and descriptions.\n" +
+              "Cart and checkout::Webflow e-commerce, with payments, tax and shipping set up.\n" +
+              "Order emails::In the look of your brand." },
+          { id: "catalog",  label: "Large catalogue", price: 2000, info: "More than about 20 products, with filters, variants like size and colour, and collections." },
+          { id: "subs",     label: "Subscriptions or downloads", price: 1000, info: "Products people subscribe to, or digital products they get right after paying." },
+          { id: "checkout", label: "Custom checkout", quote: true, info: "A checkout built from scratch around how you sell.\n~We go through it in the call and price it together." }
+        ] },
+      { id: "priority",   group: "more",   label: "Priority start (jump the queue)",           pct: true,   info: "Your project takes the next free slot instead of waiting in line." },
+      // Box 06 (Rimbo, 2026-11-19): no price yet, a talk first. Switched on, a field asks what they're after; that text
+      // goes along when they book the call
+      { id: "app",        group: "custom", label: "Custom app or tool", quote: true,
+        question: "What are you after?", placeholder: "A few lines about your idea",
+        info: "Software made around how your business works: an internal tool, a client portal, a dashboard, something with AI.\n" +
+          "I build these for my own business too.\n" +
+          "~Usually from €5,000. We start with a talk about your idea and price it together." }
     ]
   };
 
@@ -218,7 +261,10 @@
   // APPEND NEW IDS AT THE END. Never reorder or remove one: links already sent read their prices by position.
   var PRICE_ORDER = ["simple", "medium", "complex", "cms", "foundation", "identity", "logo", "guide", "illustrations", "social",
     "print", "seo", "analytics", "consent", "training", "i18n", "migration", "loader", "transition", "theme", "legal", "a11y",
-    "leads", "chatbot", "system", "login", "dashboard", "gated", "payments", "courses", "shop", "_min", "_pri"];
+    "leads", "chatbot", "system", "login", "dashboard", "gated", "payments", "courses", "shop", "_min", "_pri",
+    "mbase", "onboard", "course", "mentor", "shopbase", "catalog", "subs"];
+  // Parts renamed on 2026-11-19 (links v 2 and older): the old id now means this one
+  var RENAMED = { payments: "onboard", courses: "course" };
 
   // Every price by id: pages, the foundation, every part and switch (an hourly item: its rate), plus _min (the
   // minimum) and _pri (priority, in %)
@@ -228,8 +274,8 @@
     map[C.brand.foundation.id] = C.brand.foundation.price;
     C.brand.items.forEach(function (t) { map[t.id] = t.price; });
     C.toggles.forEach(function (t) {
-      if (t.parts) t.parts.forEach(function (p) { map[p.id] = p.price; });
-      else if (!t.pct) map[t.id] = t.hourly || t.price;
+      if (t.parts) t.parts.forEach(function (p) { if (!p.quote) map[p.id] = p.price; });
+      else if (!t.pct && !t.quote) map[t.id] = t.hourly || t.price;
     });
     map._min = C.minimum; map._pri = Math.round(C.priorityPct * 100);
     return map;
@@ -247,7 +293,7 @@
     else String(x).split(".").forEach(function (v, i) { if (v !== "" && isFinite(+v) && PRICE_ORDER[i]) map[PRICE_ORDER[i]] = +v; });
     function set(t) { if (t.id in map) { if (t.hourly) t.hourly = map[t.id]; else t.price = map[t.id]; } }
     C.pages.forEach(set); set(C.brand.foundation); C.brand.items.forEach(set);
-    C.toggles.forEach(function (t) { if (t.parts) t.parts.forEach(set); else if (!t.pct) set(t); });
+    C.toggles.forEach(function (t) { if (t.parts) t.parts.forEach(function (p) { if (!p.quote) set(p); }); else if (!t.pct && !t.quote) set(t); });
     if ("_min" in map) C.minimum = map._min;
     if ("_pri" in map) C.priorityPct = map._pri / 100;
   }
@@ -325,14 +371,26 @@
       (t.parts || []).forEach(function (p) { byId[p.id] = p; partOf[p.id] = t.id; });
     });
 
-    var state = { pages: { simple: 0, medium: 0, complex: 0, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {}, touched: {} };
+    var state = { pages: { simple: 0, medium: 0, complex: 0, cms: 0 }, brandOn: false, brandTouched: false, toggles: {}, hours: {}, touched: {}, note: "" };
     CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = t.levels[t.start].hours; });
     // A part counts only while the switch that opens it is on
     function parentOn(id) { var p = partOf[id]; return !p || (p === "brand" ? state.brandOn : !!state.toggles[p]); }
-    // An item's price: fixed, the chosen amount's hours × rate, or (a switch with parts) the parts that are on
+    // An item's price: fixed, the chosen amount's hours × rate, or (a switch with parts) its fixed part plus the parts
+    // that are on. Something "priced together" (quote) adds nothing
     function priceOf(t) {
-      if (t.parts) return t.parts.reduce(function (a, p) { return a + (state.toggles[p.id] ? p.price : 0); }, 0);
+      if (t.parts) return t.parts.reduce(function (a, p) { return a + (!p.quote && (p.fixed || state.toggles[p.id]) ? p.price : 0); }, 0);
+      if (t.quote) return 0;
       return t.hourly ? t.hourly * state.hours[t.id] : t.price;
+    }
+    // Everything on that has no price yet, by label (a switch, or a part while its switch is on)
+    function quotesOn() {
+      var out = [];
+      CONFIG.toggles.forEach(function (t) {
+        if (!state.toggles[t.id]) return;
+        if (t.quote) out.push(t.label);
+        (t.parts || []).forEach(function (p) { if (p.quote && state.toggles[p.id]) out.push(p.label); });
+      });
+      return out;
     }
 
     if (q.get("theme") === "light" || q.get("theme") === "dark") root.setAttribute("data-calc-theme", q.get("theme"));
@@ -356,6 +414,7 @@
         t: Object.keys(byId).filter(function (id) { return state.toggles[id] && parentOn(id); }).sort()
       };
       s.t.forEach(function (id) { if (byId[id].hourly) { s.h = s.h || {}; s.h[id] = state.hours[id]; } });
+      var note = state.note.trim(); if (state.toggles.app && note) s.a = note; // what they're after, for a custom app
       return s;
     }
     // Any hours (also from older links) snap to the nearest of the item's amounts
@@ -365,22 +424,24 @@
     }
     // A link's ids as this version knows them (retired items go)
     function knownIds(ids) { return (ids || []).filter(function (id) { return byId[id]; }); }
-    // Links from before Members had parts (v 1): the switch alone stood for its preset, the parts its old price covered
+    // Older links. v 1: a switch alone stood for its preset (the parts its old price covered). v 2: Members had other
+    // parts (payments and courses got new ids) and Webshop was one switch; a switch without any part of today's gets its preset
     function upgrade(s) {
       if (!s || !s.t) return s;
-      var t = s.t.slice();
+      var t = s.t.map(function (id) { return RENAMED[id] || id; });
       CONFIG.toggles.forEach(function (sw) {
         if (sw.parts && t.indexOf(sw.id) >= 0 && !sw.parts.some(function (p) { return t.indexOf(p.id) >= 0; })) t = t.concat(sw.preset);
       });
       return Object.assign({}, s, { t: t });
     }
-    if (share && !(share.v >= 2)) share = Object.assign({}, share, { r: upgrade(share.r), c: share.c && upgrade(share.c) });
+    if (share && !(share.v >= 3)) share = Object.assign({}, share, { r: upgrade(share.r), c: share.c && upgrade(share.c) });
     function applySnap(s) {
       CONFIG.pages.forEach(function (p, i) { state.pages[p.id] = Math.max(0, Math.min(p.max, Math.round(+s.p[i]) || 0)); });
       state.brandOn = !!s.b; state.brandTouched = !!s.b;
       state.toggles = {}; state.touched = {};
       knownIds(s.t).forEach(function (id) { state.toggles[id] = true; if (byId[id].parts) state.touched[id] = true; });
       CONFIG.toggles.forEach(function (t) { if (t.hourly) state.hours[t.id] = clampHours(t, s.h && s.h[t.id]); });
+      state.note = typeof s.a === "string" ? s.a.slice(0, 600) : "";
     }
     // A link's pick in the same shape as snap(), so the two compare
     function normSnap(b) {
@@ -388,6 +449,7 @@
       var ids = knownIds(b.t); // older links: fewer page types, retired items
       s.t = ids.filter(function (id) { var p = partOf[id]; return !p || (p === "brand" ? s.b : ids.indexOf(p) >= 0); }).sort();
       s.t.forEach(function (id) { var t = byId[id]; if (t && t.hourly) { s.h = s.h || {}; s.h[id] = clampHours(t, b.h && b.h[id]); } });
+      var note = typeof b.a === "string" ? b.a.slice(0, 600).trim() : ""; if (s.t.indexOf("app") >= 0 && note) s.a = note;
       return s;
     }
     function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify(normSnap(b)); }
@@ -396,7 +458,7 @@
     function picked() {
       return CONFIG.pages.some(function (p) { return state.pages[p.id]; }) ||
         (state.brandOn && CONFIG.brand.items.some(function (t) { return state.toggles[t.id]; })) ||
-        CONFIG.toggles.some(function (t) { return !t.pct && state.toggles[t.id] && priceOf(t) > 0; });
+        CONFIG.toggles.some(function (t) { return !t.pct && state.toggles[t.id] && (priceOf(t) > 0 || t.quote); });
     }
 
     // The selected items as [label, price] lines, plus:
@@ -414,6 +476,8 @@
       });
       var scope = out.reduce(function (a, x) { return a + x[1]; }, 0), pr = state.toggles.priority ? CONFIG.priorityPct : 0;
       if (pr) out.push(["Priority start (+" + Math.round(pr * 100) + "%)", scope * pr]);
+      // What has no price yet goes last, as words, and stays out of the number
+      quotesOn().forEach(function (label) { out.push([label, CONFIG.quoteText]); });
       return { lines: out, scope: scope, shown: scope * (1 + pr) };
     }
 
@@ -622,9 +686,10 @@
         set.appendChild(list);
         CONFIG.toggles.filter(function (t) { return t.group === g.id; }).forEach(function (t) {
           if (t.parts) { makeParts(t, list); return; }
-          var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : "+" + eur(t.price);
+          var priceText = t.pct ? "+" + Math.round(CONFIG.priorityPct * 100) + "%" : t.hourly ? eur(t.hourly) + " / hour" : t.quote ? CONFIG.quoteText : "+" + eur(t.price);
           list.appendChild(makeItem(t, priceText, function () { state.toggles[t.id] = !state.toggles[t.id]; render(); }));
           if (t.hourly) list.appendChild(makeHours(t));
+          else if (t.question) list.appendChild(makeNote(t));
         });
         box.appendChild(set);
       });
@@ -642,9 +707,22 @@
       list.appendChild(parent);
       var subs = el("div", "calc_subs"); subs.id = "calc-subs-" + t.id; subs.hidden = true;
       t.parts.forEach(function (p) {
-        subs.appendChild(makeItem(p, "+" + eur(p.price), function () { state.toggles[p.id] = !state.toggles[p.id]; render(); }));
+        if (p.fixed) { subs.appendChild(makeFixed(p)); return; } // comes with the switch, like the Brand foundation
+        subs.appendChild(makeItem(p, p.quote ? CONFIG.quoteText : "+" + eur(p.price), function () { state.toggles[p.id] = !state.toggles[p.id]; render(); }));
       });
       list.appendChild(subs);
+    }
+
+    // Switched on, a question with a text field opens under it (Custom app: what they're after). The text travels in
+    // the link and goes along when they book the call
+    function makeNote(t) {
+      var wrap = el("div", "calc_hours calc_note"); wrap.id = "calc-note-" + t.id; wrap.hidden = true;
+      var ask = el("label", "calc_hours_q", t.question); ask.htmlFor = "calc-note-field-" + t.id;
+      var field = el("textarea", "calc_note_field"); field.id = "calc-note-field-" + t.id; field.rows = 3; field.maxLength = 600;
+      field.placeholder = t.placeholder || "";
+      field.addEventListener("input", function () { state.note = field.value; if (mode !== "none") syncShare(); setCall(); });
+      wrap.appendChild(ask); wrap.appendChild(field);
+      return wrap;
     }
 
     // Hourly item: switched on, a question with three choices opens under it (real radio buttons, so arrow keys work)
@@ -726,7 +804,7 @@
       var fresh = [];
       lines.forEach(function (x) {
         var li = el("li");
-        li.appendChild(el("span", "", x[0])); li.appendChild(el("span", "", eur(x[1])));
+        li.appendChild(el("span", "", x[0])); li.appendChild(el("span", typeof x[1] === "string" ? "calc_quote" : "", typeof x[1] === "string" ? x[1] : eur(x[1])));
         ul.appendChild(li);
         if (had.indexOf(x[0]) < 0) fresh.push(li);
       });
@@ -766,6 +844,11 @@
           $("price-" + t.id).textContent = on ? "+" + eur(priceOf(t)) : "";
           return;
         }
+        if (t.question && !t.hourly) {
+          reveal($("note-" + t.id), on);
+          var f = $("note-field-" + t.id); if (f.value !== state.note) f.value = state.note;
+          return;
+        }
         if (!t.hourly) return;
         reveal($("hours-" + t.id), on);
         $("hours-" + t.id).querySelectorAll("input").forEach(function (i) { i.checked = +i.value === state.hours[t.id]; });
@@ -791,14 +874,23 @@
       reveal($("undo"), !!undo, swapNow);
       reveal($("start-over"), mode === "make" && picked() && !undo, swapNow); // the lead has "Back to my recommendation"
       if (mode !== "none") syncShare();
+      setCall();
       queueWire();
+    }
+
+    // Book a call: what they wrote about a custom app goes along as the booking's note (Cal.com fills "notes" from the address)
+    function setCall() {
+      var a = $("cta");
+      if (mode !== "client" || !a || a.tagName !== "A") return;
+      var note = state.toggles.app ? state.note.trim() : "";
+      a.href = CONFIG.callUrl + (note ? "?notes=" + encodeURIComponent(CONFIG.copy.callNote + note) : "");
     }
 
     // Personal links: the address bar always holds the current version, so a reload keeps it
     function shareData() {
-      // v 2: Members has parts. x: the prices of today, so this proposal keeps them
-      if (mode === "make") return { v: 2, n: $("make-name").value.trim(), m: $("make-line").value.trim(), d: today(), x: priceList(CONFIG), r: snap() };
-      var o = { v: 2, n: share.n, m: share.m, r: share.r }, s = snap();
+      // v 3: Members base + new parts, Webshop parts, a = the custom-app note. x: the prices of today, so this proposal keeps them
+      if (mode === "make") return { v: 3, n: $("make-name").value.trim(), m: $("make-line").value.trim(), d: today(), x: priceList(CONFIG), r: snap() };
+      var o = { v: 3, n: share.n, m: share.m, r: share.r }, s = snap();
       if (share.d) o.d = share.d;
       if (share.x) o.x = share.x;
       if (!sameSnap(s, share.r)) o.c = s;
