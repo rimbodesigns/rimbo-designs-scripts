@@ -129,6 +129,13 @@
       { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks.\nIn the look of your site." },
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
         info: "So you can write and publish pages and posts that get found.\nRecorded tutorial::Watch it again whenever you need it.\nOne-on-one call::About your own site.\nChecklist template::For every new page or post." },
+      // Rimbo, 2026-11-19: framed as a boost for them (and good for his name too). €500 + entry fees at cost. DRAFT
+      { id: "awards",     group: "search", label: "Launch boost: award submissions",          price: 500,
+        info: "Your new site in front of the design world, the week it launches.\n" +
+          "Awards and showcases::I enter it at Awwwards, CSS Design Awards, Made in Webflow and other showcase sites, with the screenshots and story they ask for.\n" +
+          "Strong backlinks::Links from respected design sites, which help your site in search.\n" +
+          "Exposure::Designers, studios, press and future clients browse these sites for what's new.\n" +
+          "~Entry fees of the award sites come on top, at cost. A feature is never guaranteed." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,
         info: "A second language with a language switch: every page, SEO text and form translated and checked, set up so each language can be found in search.\n~Webflow charges for localisation on top of the site plan." },
       // Three amounts, not an hours field (Rimbo, 2026-11-05): €97 an hour behind the scenes
@@ -148,7 +155,8 @@
       // like the Brand foundation). Turning it on the first time also picks the preset, so the usual total is €4,000.
       // Rimbo, 2026-11-19: base + paid onboarding, courses as environment + mentoring. All prices DRAFT
       { id: "members",    group: "more",   label: "Members area",
-        info: "A private space for your members. The base is always in; add what your members need.",
+        info: "A private space behind a log-in. The base is always in; add what your members need.\n" +
+          "Think of::A client portal, a client or member dashboard, a course environment, a small web app.",
         preset: ["onboard"],
         parts: [
           { id: "mbase",   label: "Members base", price: 3000, fixed: true, tag: "Included",
@@ -195,7 +203,8 @@
       // goes along when they book the call
       { id: "app",        group: "custom", label: "Custom app or tool", quote: true,
         question: "What are you after?", placeholder: "A few lines about your idea",
-        info: "Software made around how your business works: an internal tool, a client portal, a dashboard, something with AI.\n" +
+        info: "Software made around how your business works: an internal tool, a planning or booking system, something with AI.\n" +
+          "~A client portal or dashboard sits under Members area.\n" +
           "I build these for my own business too.\n" +
           "~Usually from €5,000. We start with a talk about your idea and price it together." }
     ]
@@ -262,7 +271,7 @@
   var PRICE_ORDER = ["simple", "medium", "complex", "cms", "foundation", "identity", "logo", "guide", "illustrations", "social",
     "print", "seo", "analytics", "consent", "training", "i18n", "migration", "loader", "transition", "theme", "legal", "a11y",
     "leads", "chatbot", "system", "login", "dashboard", "gated", "payments", "courses", "shop", "_min", "_pri",
-    "mbase", "onboard", "course", "mentor", "shopbase", "catalog", "subs"];
+    "mbase", "onboard", "course", "mentor", "shopbase", "catalog", "subs", "awards"];
   // Parts renamed on 2026-11-19 (links v 2 and older): the old id now means this one
   var RENAMED = { payments: "onboard", courses: "course" };
 
