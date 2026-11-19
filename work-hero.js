@@ -382,12 +382,35 @@ function initOrbitTiles() {
   });
 
   // hover: the front tile and its name are one link, pointing at either lights up both
-  // Added for this site: the marquee cursor of the project pages (a small card with words running through it)
-  // follows the pointer while it is on the front tile or its name. Computers only.
+  // The cursor on the tiles (Rimbo 2026-11-19, Cursor lab version A): a label in the look of the site's buttons
+  // (.wh_cur_btn: "Visit site ↗", the tile's own words in data-wh-cursor-text) TAKES OVER the mouse: the pointer hides
+  // on the tiles (.is-cur) and the label sits on it, no lag. Its letters roll in like the buttons' swap and boil like
+  // them (three poses each, nine frames a second, nothing tweened between). Computers only. The old marquee card
+  // (.wh_cursor_text) still works if the label is not in the page.
   var cur = hero.querySelector('[data-wh-cursor]');
   var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  var lbl = cur && cur.querySelector('.wh_cur_btn');
+  var lblT = lbl && lbl.querySelector('.wh_cur_t'), lblA = lbl && lbl.querySelector('.wh_cur_a');
+  var lblChars = [], boilOn = false, poses = [], boilF = -1, boil0 = 0, rnd = gsap.utils.random;
+  function splitTo(el, text) {
+    el.textContent = '';
+    return Array.from(text).map(function (c) { var s = document.createElement('span'); s.className = 'wh_cur_ch'; s.textContent = c === ' ' ? '\u00a0' : c; el.appendChild(s); return s; });
+  }
+  function boilTick() {
+    if (gone(boilTick)) return;
+    var f = Math.floor((gsap.ticker.time - boil0) * 9); if (f === boilF) return; boilF = f;
+    lblChars.forEach(function (c, i) { gsap.set(c, poses[i][(f + i) % 3]); });
+  }
+  function boilStart() {
+    if (boilOn || reduce) return; boilOn = true; boilF = -1; boil0 = gsap.ticker.time;
+    poses = lblChars.map(function () { return [0, 1, 2].map(function () { return { x: rnd(-0.6, 0.6), y: rnd(-0.7, 0.7), rotation: rnd(-3, 3) }; }); });
+    gsap.ticker.add(boilTick);
+  }
+  function boilStop() { if (!boilOn) return; boilOn = false; gsap.ticker.remove(boilTick); }
   if (cur && fine) {
-    var cx = gsap.quickTo(cur, 'x', { duration: 0.4, ease: 'power3' }), cy = gsap.quickTo(cur, 'y', { duration: 0.4, ease: 'power3' });
+    var cx, cy;
+    if (lbl) { cx = gsap.quickSetter(cur, 'x', 'px'); cy = gsap.quickSetter(cur, 'y', 'px'); hero.classList.add('is-cur'); }
+    else { cx = gsap.quickTo(cur, 'x', { duration: 0.4, ease: 'power3' }); cy = gsap.quickTo(cur, 'y', { duration: 0.4, ease: 'power3' }); }
     hero.addEventListener('pointermove', function (e) { cx(e.clientX); cy(e.clientY); }, { passive: true });
     hero.addEventListener('pointerdown', function () { if (hero.classList.contains('is-hover')) cur.setAttribute('data-press', ''); });
     window.addEventListener('pointerup', function () { cur.removeAttribute('data-press'); });
@@ -397,10 +420,19 @@ function initOrbitTiles() {
     if (!cur || !fine) return;
     if (e && e.clientX != null) { gsap.set(cur, { x: e.clientX, y: e.clientY }); }
     var word = (links[shown] && links[shown].getAttribute('data-wh-cursor-text')) || 'Visit site';
-    [].forEach.call(cur.querySelectorAll('.wh_cursor_text'), function (t) { t.textContent = word + ' \u00b7 '; });
+    if (lbl) {
+      var arrow = (links[shown] && links[shown].getAttribute('data-wh-cursor-arrow')) || '\u2197';
+      boilStop();
+      lblChars = splitTo(lblT, word).concat(splitTo(lblA, arrow));
+      gsap.set(lblChars, { transformOrigin: '50% 55%' });
+      if (!reduce) gsap.fromTo(lblChars, { yPercent: 120 }, { yPercent: 0, duration: 0.55, ease: 'expo.out', stagger: 0.012 });
+      boilStart();
+    } else {
+      [].forEach.call(cur.querySelectorAll('.wh_cursor_text'), function (t) { t.textContent = word + ' \u00b7 '; });
+    }
     cur.setAttribute('data-state', 'on');
   };
-  var hoverOff = function () { hero.classList.remove('is-hover'); if (cur) cur.setAttribute('data-state', 'off'); };
+  var hoverOff = function () { hero.classList.remove('is-hover'); boilStop(); if (cur) cur.setAttribute('data-state', 'off'); };
   clips.forEach(function (c) { c.card.addEventListener('pointerenter', hoverOn); c.card.addEventListener('pointerleave', hoverOff); });
   // Rimbo 2026-11-16: the name is no longer one link with the tile. Only its address is a link, with its own hover
   // (orange, the arrow moves; CSS), so pointing at it doesn't bring the tile's cursor or lean.

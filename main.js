@@ -9116,7 +9116,7 @@
   function rdWorkHeroLoad() {
     (function () {
       // the site loads GSAP at the end of the page: load Tinko, then the hero, once it is there (straight away after a page transition)
-      var BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@525b66f/';
+      var BASE = 'https://cdn.jsdelivr.net/gh/rimbodesigns/rimbo-designs-scripts@v1.7.217/'; // work-hero.js + tinko-live.js from this release (the hero's takeover cursor, 2026-11-19)
       function load() {
         ['tinko-live.js', 'work-hero.js'].forEach(function (f) {
           var s = document.createElement('script'); s.src = BASE + f; s.async = false; document.body.appendChild(s);
