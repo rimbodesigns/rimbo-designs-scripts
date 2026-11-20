@@ -163,12 +163,12 @@
       { id: "consent",    group: "search", label: "Cookie consent",                            price: 300,  info: "A consent banner that holds back tracking and marketing scripts until a visitor says yes, as GDPR asks.\nIn the look of your site." },
       { id: "training",   group: "search", label: "SEO training",                              price: 500,
         info: "So you can write and publish pages and posts that get found.\nRecorded tutorial::Watch it again whenever you need it.\nOne-on-one call::About your own site.\nChecklist template::For every new page or post." },
-      // Rimbo, 2026-11-19: framed as a boost for them (and good for his name too). €500 + entry fees at cost. DRAFT
-      { id: "awards",     group: "search", label: "Launch boost: award submissions",          price: 500,
-        info: "Your new site in front of the design world, the week it launches.\n" +
-          "Awards and showcases::I enter it at Awwwards, CSS Design Awards, Made in Webflow and other showcase sites, with the screenshots and story they ask for.\n" +
-          "Strong backlinks::Links from respected design sites, which help your site in search.\n" +
-          "Exposure::Designers, studios, press and future clients browse these sites for what's new.\n" +
+      // Rimbo, 2026-11-20: "just Launch boost", about THEIR launch: a reel for their socials, showcase entries, backlinks. DRAFT €1,000
+      { id: "awards",     group: "search", label: "Launch boost",                               price: 1000,
+        info: "Your launch, made to be seen.\n" +
+          "Launch reel::A short video of your new site for your socials, ready to post on launch day.\n" +
+          "Showcase entries::Your site entered at award and showcase sites, for exposure beyond your own channels.\n" +
+          "Strong backlinks::Links from respected sites, which help you in search.\n" +
           "~Entry fees of the award sites come on top, at cost. A feature is never guaranteed." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,
         info: "A second language with a language switch: every page, SEO text and form translated and checked, set up so each language can be found in search.\n~Webflow charges for localisation on top of the site plan." },
