@@ -4065,6 +4065,19 @@
     // size), on a 3D layer from the first frame so nothing re-rasterizes when the tip starts. And the scroll turn:
     // drumTurn cards over the first screen, back on the way up, settling on a card at the top.
     if (window.ScrollTrigger && ringApi && pinScreens > 0) { // home-extreme: the hero holds while the ring tips over and turns, then the page goes on
+      // The pin's spacer pushes the next section (IMAGINE peeks in under the loader) down by two screens: Lighthouse
+      // counted that as a layout shift of 0.16-0.24 (2026-11-20). Whatever of the next sections is on screen hides
+      // (visibility, not layout) while the spacer goes in and comes back a frame later; a hidden box does not shift.
+      var peek = [], sib = hero.nextElementSibling;
+      while (sib && sib.getBoundingClientRect().top < window.innerHeight) { peek.push([sib, sib.style.visibility]); sib.style.visibility = 'hidden'; sib = sib.nextElementSibling; }
+      if (peek.length) {
+        var peekUntil = performance.now() + 3000;
+        (function back() {
+          var placed = hero.parentNode && hero.parentNode.classList.contains('pin-spacer');
+          if (!placed && performance.now() < peekUntil) return requestAnimationFrame(back);
+          requestAnimationFrame(function () { peek.forEach(function (p) { p[0].style.visibility = p[1]; }); });
+        })();
+      }
       ScrollTrigger.create({
         trigger: hero, start: 'top top', end: function () { pinScreens = pinNow(); return '+=' + Math.round(window.innerHeight * pinScreens); }, pin: true, pinSpacing: true, invalidateOnRefresh: true,
         onUpdate: function (st) { scrolled = st.progress > 0.02; ringApi.scroll(st.progress); }
@@ -6400,6 +6413,7 @@
     var list = qs('.centered-slider-bullet__list', wrapper), host = qs('.wall_faces-in', wrapper);
     // the faces list is a tablist, so its <li> wrappers step aside for screen readers (role none): each tab then sits
     // straight in its tablist, as the accessibility checks require (Lighthouse flagged the list items and the tabs' parent)
+    // (the list itself becomes the tablist at page start, next to where rdWall is queued: Lighthouse 2026-11-20)
     if (list) qsa('.centered-slider-bullet__item', list).forEach(function (li) { li.setAttribute('role', 'none'); });
     var row = qs('.centered-slider-row', wrapper);
     var bullets = qsa('[data-centered-slider="bullet"]', wrapper);
@@ -9862,6 +9876,8 @@
       io.observe(el);
     };
     later('.loc_steps', 'location balls', rdLocBalls);
+    // the wall's faces are tabs from the first frame (the Designer's list says role="list"); rdWall itself waits
+    qsa('.centered-slider-bullet__list').forEach(function (l) { l.setAttribute('role', 'tablist'); qsa('.centered-slider-bullet__item', l).forEach(function (li) { li.setAttribute('role', 'none'); }); });
     if (qs('.wall_section')) later('.wall_section', 'wall of love', rdWall); else soon('wall of love', rdWall); // a wall outside a .wall_section has nothing to watch for
     soon('imagine', rdImagine); // the big ball + IMAGINE (home): light to start, its WebGL waits until the section is on screen
     later('[data-quote-swap]', 'quote swap', rdQuoteSwap); // case pages with two quotes that take turns (Echo)
