@@ -20,7 +20,7 @@
     previewLead: { v: 1, n: "Sample project", m: "", d: "2026-11-09", r: { p: [1, 3, 1, 0], b: 1, t: ["identity", "logo", "seo"] } }, // the client view in the hosted preview
     copy: {
       underMinimum: "You haven't met the {min} minimum yet.",
-      timeline: "Based on your choices: about {n} weeks, kickoff to launch",
+      timeline: "Based on your choices: from about {n} weeks, kickoff to launch",
       payment: "50% to start, 50% at launch. Payment plans possible.",
       knowTitle: "Good to know",
       runningTitle: "Running costs",
@@ -71,19 +71,19 @@
     weeks: {
       base: 1,                                   // QA and launch, every project
       foundation: 1,                             // kickoff, workshop, direction call
-      identity: 2, logo: 0.5, guide: 0.5, illustrations: 1, social: 0.2, print: 0.3,
-      simple: 0.2, medium: 0.4, complex: 1, cms: 0.6,
+      identity: 1.5, logo: 0.5, guide: 0.5, illustrations: 0.5, social: 0.2, print: 0.3,
+      simple: 0.1, medium: 0.2, complex: 0.5, cms: 0.3,     // lowered 2026-11-20: he's faster, it's a minimum guess
       loader: 0.5, transition: 0.5, theme: 0.5,
       legal: 0.2, a11y: 0.5, leads: 0.3, chatbot: 0.3, system: 0.5,
-      mbase: 1.5, onboard: 0.5, course: 1.5,
-      shopbase: 1.5, catalog: 1, subs: 0.5,
-      seo: 0.5, analytics: 0.2, consent: 0.2, training: 0.2, i18n: 1,
+      mbase: 1, onboard: 0.5, course: 1,
+      shopbase: 1, catalog: 0.5, subs: 0.5,
+      seo: 0.5, analytics: 0.2, consent: 0.2, training: 0.2, i18n: 0.5,
       migration: { 2: 0.1, 4: 0.3, 8: 0.5 }      // by the amount they pick (hours)
     },
     // RUNNING COSTS: what the platforms charge every month, paid to them, not to Rimbo. Only what applies shows.
     // Checked 2026-11-20 (Webflow's May 2026 plans); platforms change these, so check now and then
     running: [
-      { label: "Webflow site plan",      cost: "about $25 / month",   when: null },  // Premium, billed yearly
+      { label: "Webflow site plan, with CMS", cost: "about $25 / month", when: null },  // Premium (May 2026: CMS and Business merged into it), billed yearly
       { label: "Webflow e-commerce",     cost: "from $29 / month",    when: "shop" },
       { label: "Members (Memberstack)",  cost: "from $29 / month",    when: "members" },
       { label: "Each extra language",    cost: "about $9 / month",    when: "i18n" },
@@ -111,7 +111,11 @@
         info: "A page that carries the brand: custom GSAP animation, scroll stories, interactive pieces.\n~Usually the home page and one or two showpieces." },
       // A whole type of content: structure, template and all its pages (Echo's 12 case studies). €1,500 on my advice, 2026-11-09
       { id: "cms",     label: "CMS templates", hint: "Blogs, news, case studies",             price: 1500, max: 10,
-        info: "A whole type of content, like blog posts, news or case studies: the structure and one template, so you can add as many as you like in Webflow.\n~The overview page that lists them counts as a normal page. The content itself is yours to write." }
+        info: "A whole type of content, like a blog, news or case studies, ready to fill in Webflow.\n" +
+          "Overview page::The page that lists them all, with filters or categories.\n" +
+          "Template::One design for every post, so each new one looks right.\n" +
+          "Structure::The fields behind it, so you can add as many as you like.\n" +
+          "~The content itself is yours to write." }
     ],
 
     // Branding: one switch that opens the parts. Turning it on the first time selects the preset.
