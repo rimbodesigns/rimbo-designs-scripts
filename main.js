@@ -9031,13 +9031,17 @@
     })();
   }
 
-  // QUOTE SWAP — two or more quotes in one quote block take turns (case pages: Echo first, OZO later). Osmo's Line Reveal
-  // Testimonials, reshaped for the notched photo: the lines of the quote and the name slide up out of their masks, the
-  // next ones rise in, and the next person's photo wipes up inside the frame. Designer: [data-quote-swap] on .cs_quote
-  // (data-quote-autoplay = ms between turns, 0 = buttons only), each quote a [data-quote-item] with its lines in
-  // [data-quote-split], the photo frame [data-quote-photos] with one image per quote in the same order (Webflow images can't hold attributes),
-  // buttons [data-quote-prev] / [data-quote-next], counter [data-quote-current] / [data-quote-total]. Every quote and photo
-  // after the first starts hidden (combo is-next).
+  // QUOTE SWAP — two or more quotes in one quote block take turns (case pages: Echo, OZO). The lines of the quote and the
+  // name slide up out of their masks and the next ones rise in (Osmo's Line Reveal Testimonials). The photo has two styles:
+  //   lines (default): one notched frame [data-quote-photos] with one image per quote; the next one wipes up inside it.
+  //   shuffle (data-quote-style="shuffle", Rimbo's pick in the quote lab, 20 Nov): a small deck of notched cards
+  //     [data-quote-card="0|1"] (each with a [data-quote-shade]); the one behind peeks out, tilted. On a turn the front card
+  //     slides out to the side and tucks in behind, the one behind steps forward. data-quote-spread (px at a 17rem card,
+  //     scales with the card) and data-quote-tilt (degrees) tune it.
+  // Designer: [data-quote-swap] on .cs_quote, data-quote-autoplay = ms between turns (0 = buttons only), each quote a
+  // [data-quote-item] with its lines in [data-quote-split], buttons [data-quote-prev] / [data-quote-next], counter
+  // [data-quote-current] / [data-quote-total], an optional line [data-quote-progress] that fills until the next turn.
+  // Every quote (and in the lines style every photo) after the first starts hidden (combo is-next).
   function rdQuoteSwap() {
     if (!window.gsap || !window.SplitText) return;
     rdPlugins(SplitText);
@@ -9046,24 +9050,38 @@
       wrap.__qs = true;
       var items = qsa('[data-quote-item]', wrap);
       if (items.length < 2) return;
-      var frame = qs('[data-quote-photos]', wrap);
-      var imgs = frame ? qsa('img', frame) : [];
       var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      var cur = qs('[data-quote-current]', wrap), tot = qs('[data-quote-total]', wrap);
+      var shuffle = wrap.getAttribute('data-quote-style') === 'shuffle';
+      var frame = qs('[data-quote-photos]', wrap);
+      var imgs = !shuffle && frame ? qsa('img', frame) : [];
+      var cards = shuffle ? qsa('[data-quote-card]', wrap).sort(function (a, b) {
+        return (+a.getAttribute('data-quote-card') || 0) - (+b.getAttribute('data-quote-card') || 0);
+      }) : [];
+      if (shuffle && cards.length < items.length) shuffle = false;
+      var cur = qs('[data-quote-current]', wrap), tot = qs('[data-quote-total]', wrap), bar = qs('[data-quote-progress]', wrap);
       var pad = function (n) { return String(n).padStart(2, '0'); };
-      var wait = parseInt(wrap.getAttribute('data-quote-autoplay'), 10);
-      if (isNaN(wait)) wait = 7000;
+      var num = function (name, dflt) { var v = parseFloat(wrap.getAttribute(name)); return isNaN(v) ? dflt : v; };
+      var wait = num('data-quote-autoplay', 7000), spread = num('data-quote-spread', 120), tilt = num('data-quote-tilt', 6.5);
       var hidden = 'inset(100% 0% 0% 0%)', shown = 'inset(0% 0% 0% 0%)';
-      var active = 0, busy = false, onScreen = false, clock = null;
+      var active = 0, busy = false, onScreen = false, clock = null, fill = null;
       if (tot) tot.textContent = pad(items.length);
 
-      var slides = items.map(function (item, i) { return { item: item, img: imgs[i] || null, splits: [] }; });
+      var slides = items.map(function (item, i) {
+        var card = cards[i] || null;
+        return { item: item, img: imgs[i] || null, card: card, shade: card ? qs('[data-quote-shade]', card) : null, splits: [] };
+      });
       var lines = function (s) { return s.splits.reduce(function (a, sp) { return a.concat(sp.lines); }, []); };
+      var front = { x: 0, y: 0, rotation: 0, scale: 1 };
+      var behind = function () { return { x: 14, y: -12, rotation: tilt * 0.8, scale: 0.95 }; };
       var setState = function (i, on) {
         var s = slides[i];
         s.item.setAttribute('aria-hidden', String(!on));
         gsap.set(s.item, { autoAlpha: on ? 1 : 0, pointerEvents: on ? 'auto' : 'none' });
         if (s.img) gsap.set(s.img, { autoAlpha: on ? 1 : 0, zIndex: on ? 1 : 0, clipPath: shown, scale: 1 });
+        if (s.card) {
+          gsap.set(s.card, Object.assign({ zIndex: on ? 2 : 1 }, on ? front : behind()));
+          if (s.shade) gsap.set(s.shade, { opacity: on ? 0 : 0.3 });
+        }
       };
       slides.forEach(function (s, i) { setState(i, i === active); });
 
@@ -9095,6 +9113,19 @@
         gsap.set(inn.item, { autoAlpha: 1, pointerEvents: 'auto' });
         gsap.set(lines(inn), { yPercent: 110 });
         tl.to(lines(out), { yPercent: -110, duration: 0.6, ease: 'power4.inOut', stagger: { amount: 0.25 } }, 0);
+        if (shuffle) {
+          // the front card slides out sideways and tucks in behind; the new lines rise while it goes
+          var px = spread * (out.card.offsetWidth || 272) / 272;
+          tl.to(lines(inn), { yPercent: 0, duration: 0.7, ease: 'power4.inOut', stagger: { amount: 0.4 } }, 0.5);
+          tl.to(out.card, { x: px * 1.4, y: px * 0.12, rotation: tilt * 2, duration: 0.45, ease: 'power2.in' }, 0);
+          tl.set(out.card, { zIndex: 1 }, 0.45).set(inn.card, { zIndex: 2 }, 0.45);
+          tl.to(inn.card, Object.assign({ duration: 0.65, ease: 'power3.out' }, front), 0.25);
+          if (inn.shade) tl.to(inn.shade, { opacity: 0, duration: 0.5 }, 0.25);
+          tl.to(out.card, Object.assign({ duration: 0.75, ease: 'power3.out' }, behind()), 0.45);
+          if (out.shade) tl.to(out.shade, { opacity: 0.3, duration: 0.6 }, 0.45);
+          tl.set(out.item, { autoAlpha: 0 }, 0.9);
+          return;
+        }
         if (out.img) tl.to(out.img, { scale: 1.08, duration: 1.2, ease: 'power3.inOut' }, 0);
         // the new lines start rising while the last old ones leave (as in Osmo's), the photo just before them
         tl.to(lines(inn), { yPercent: 0, duration: 0.7, ease: 'power4.inOut', stagger: { amount: 0.4 } }, 0.55);
@@ -9103,17 +9134,23 @@
         tl.set(out.item, { autoAlpha: 0 }, 0.9);
       };
 
-      // the next turn comes a full wait after the last one or the last click, and only while the quote is on screen
+      // the next turn comes a full wait after the last one or the last click, and only while the quote is on screen;
+      // the progress line fills over that wait
       var tick = function () {
         if (clock) clock.kill();
+        if (fill) fill.kill();
         if (!wait) return;
         clock = gsap.delayedCall(wait / 1000, function () {
           if (!busy) goTo((active + 1) % slides.length);
           tick();
         });
-        if (!onScreen) clock.pause();
+        if (bar) fill = gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: wait / 1000, ease: 'none', transformOrigin: '0% 50%' });
+        if (!onScreen) { clock.pause(); if (fill) fill.pause(); }
       };
-      nearScreen(wrap, function (on) { onScreen = on; if (clock) { if (on) clock.resume(); else clock.pause(); } }, -80);
+      nearScreen(wrap, function (on) {
+        onScreen = on;
+        [clock, fill].forEach(function (t) { if (t) { if (on) t.resume(); else t.pause(); } });
+      }, -80);
       tick();
       var step = function (by) { return function (e) { e.preventDefault(); tick(); goTo((active + by + slides.length) % slides.length); }; };
       var prev = qs('[data-quote-prev]', wrap), nextBtn = qs('[data-quote-next]', wrap);
