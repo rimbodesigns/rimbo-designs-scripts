@@ -96,6 +96,7 @@
   // footer, FAQ...) and the browser takes one piece at a time whenever it has a moment, each inside its own page's scope and
   // GSAP context. After a page transition nothing waits: the screen is covered then, and it all has to stand before it lifts.
   var firstLoad = true, idleJobs = [], idleBusy = false;
+  var svhKickFirst = document.documentElement.classList.contains('svh-kick'); // /service loaded fresh: its kicker rises by CSS (rdSvcHero)
   function soon(name, fn) {
     if (!firstLoad) return run(name, fn);
     var scope = scopeNow();
@@ -9519,14 +9520,28 @@
          a title that isn't selectable text. On resize the letters are placed again.
        - Browsers put this font's baseline in different places (Firefox/Safari ~23 px higher than Chrome), so the baseline is
          measured here and handed to the classes as --svh-base and --svh-cap (their em values are only the Designer fallback).
-       - After a page transition it starts when the cube has rolled over. */
+       - After a page transition it starts when the cube has rolled over.
+       - The kicker (the page's H1 line above the title) does NOT wait for this code on a first load: the page head adds
+         .svh-kick and its CSS plays the same rise (8 px, .9 s, Osmo ease) from the first paint, so a phone shows it at once
+         (it was the LCP at 9 s). The class leaves once that rise has finished and the build has started, so the Impact copy
+         never replays it. A page transition re-runs the head line: then the class goes at once, the kicker waits hidden
+         under .svh-pre like the title, and the timeline below brings it in after the cube has landed, as before. */
     (function () {
       var root = document.documentElement;
+      var kickCss = svhKickFirst && root.classList.contains('svh-kick'), kickDone = null;
+      svhKickFirst = false; // any later visit to /service comes by a page transition
+      var dropKick = function () { root.classList.remove('svh-kick'); };
+      if (!kickCss) dropKick();
       var hero = document.querySelector('.sv_hero'), box = hero && hero.querySelector('[data-svh="title"]');
       if (!box || !window.gsap) { root.classList.remove('svh-pre'); return; }
       var text = box.querySelector('[data-svh="text"]'), dims = box.querySelector('[data-svh="dims"]');
       var labW = box.querySelector('[data-svh="w"]'), labH = box.querySelector('[data-svh="h"]');
       var kicker = hero.querySelector('.sv_kicker'), ruler = hero.querySelector('.sv_ruler');
+      if (kickCss) {
+        rdUndo(dropKick);
+        var kickAnim = kicker && kicker.getAnimations ? kicker.getAnimations().filter(function (a) { return a.animationName === 'svh-kick'; })[0] : null;
+        kickDone = kickAnim ? kickAnim.finished.catch(function () {}) : Promise.resolve();
+      }
       var ctx = document.createElement('canvas').getContext('2d');
       var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       var ease = window.CustomEase ? CustomEase.create('svhOsmo', '0.625, 0.05, 0, 1') : 'expo.inOut';
@@ -9568,6 +9583,7 @@
 
       function play() {
         root.classList.remove('svh-pre');
+        if (kickDone) kickDone.then(dropKick); // the kicker's CSS rise ends on its own; only then the class goes (no snap)
         var m = place();
         labels();
         hero.dispatchEvent(new CustomEvent('svh:play')); // the ball (script below) starts with the title
@@ -9622,7 +9638,7 @@
         spread(); paint();
 
         var tl = gsap.timeline({ onComplete: done });
-        tl.from(kicker, { autoAlpha: 0, y: 8, duration: 0.9, ease: ease }, 0);
+        if (!kickCss && kicker) tl.from(kicker, { autoAlpha: 0, y: 8, duration: 0.9, ease: ease }, 0); // first load: the page head's CSS plays it
         tl.to(sp, { s: 0, duration: 2, ease: ease, onUpdate: spread }, 0);
         letters.forEach(function (L, i) {
           tl.to(L, { o: 1, duration: 0.9, ease: 'power2.inOut', onUpdate: paint }, 0.05 + i * 0.05);
