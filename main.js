@@ -683,7 +683,7 @@
     // crashes"). snapCopy() switches off the ones a block doesn't show
     function markHeavy(el, clone) {
       var a = [el].concat(Array.prototype.slice.call(el.querySelectorAll('*'))), b = [clone].concat(Array.prototype.slice.call(clone.querySelectorAll('*')));
-      if (a.length !== b.length) return;
+      if (a.length !== b.length) return [];
       var styles = a.map(function (n) { return window.getComputedStyle(n); }), where = new Map(), ext = [], i;
       // the room an element takes on screen, together with everything inside it: a 3D wrapper often has no size of its
       // own, and hiding it hides its cards too (the home dial lost them all in the first try)
@@ -697,6 +697,14 @@
         if (p === undefined || !e) continue;
         ext[p] = ext[p] ? [Math.min(ext[p][0], e[0]), Math.min(ext[p][1], e[1]), Math.max(ext[p][2], e[2]), Math.max(ext[p][3], e[3])] : e.slice();
       }
+      // Fixed pieces inside a copied box (the Apply form's 0/6 counter, its paper plane): in a turned block "fixed" means
+      // fixed to that block, so every block showed one in its own corner (Rimbo). They come out of the copy and are
+      // copied on their own, at the place they have on screen (lifted in walk())
+      var fixed = [];
+      for (i = 1; i < a.length; i++) {
+        if (styles[i].position !== 'fixed' || fixed.some(function (f) { return f[0].contains(a[i]); })) continue;
+        fixed.push([a[i], b[i]]);
+      }
       for (i = 0; i < a.length; i++) {
         var n = a[i], cs = styles[i], up = where.get(n.parentElement);
         if (!ext[i] || cs.visibility !== 'visible') continue;
@@ -704,7 +712,9 @@
           (up !== undefined && styles[up].transformStyle === 'preserve-3d');
         if (heavy) b[i].setAttribute('data-rd-in', Math.floor(ext[i][0]) + ' ' + Math.floor(ext[i][1]) + ' ' + Math.ceil(ext[i][2]) + ' ' + Math.ceil(ext[i][3]));
       }
+      return fixed;
     }
+    var lifted = [];
 
     function walk(el, parent, base) {
       if (el.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(el.tagName)) return;
@@ -714,8 +724,8 @@
       var r = el.getBoundingClientRect();
       if (!onScreen(r)) return;
       var open = r.height > H * 1.2 && el.children.length > 0 && cs.transform === 'none' && !/^(VIDEO|CANVAS|IMG|IFRAME|PICTURE|svg)$/i.test(el.tagName);
-      var clone = el.cloneNode(!open);
-      if (!open) { markHeavy(el, clone); pinPictures(el, clone); } // markHeavy first: it pairs the copy's elements with the page's by their order
+      var clone = el.cloneNode(!open), fixed = [];
+      if (!open) { fixed = markHeavy(el, clone); pinPictures(el, clone); } // markHeavy first: it pairs the copy's elements with the page's by their order
       place(clone, el, r, base, cs);
       hoverLook(el, clone, !open);
       parent.appendChild(clone);
@@ -727,6 +737,7 @@
         parent.replaceChild(wrap, clone); wrap.appendChild(clone);
         freezeInside(el, wrap);
         parent.replaceChild(wrap.firstChild, wrap);
+        fixed.forEach(function (f) { f[1].style.setProperty('display', 'none', 'important'); lifted.push(f[0]); }); // after freezeInside: it pairs by order too
       }
     }
     function freezeInside(el, wrap) {
@@ -770,6 +781,13 @@
 
     walk(container, root, { x: 0, y: 0 });
     var top = root.firstElementChild;
+    for (var li = 0; li < lifted.length; li++) { // fixed pieces, measured on screen (may lift more)
+      var had = root.lastElementChild, fade = 1;
+      walk(lifted[li], root, { x: 0, y: 0 });
+      if (root.lastElementChild === had) continue;
+      for (var ring = lifted[li].parentElement; ring && ring !== document.body; ring = ring.parentElement) fade *= +getComputedStyle(ring).opacity; // a faded box around it no longer covers it
+      if (fade < 1) root.lastElementChild.style.opacity = fade * +getComputedStyle(lifted[li]).opacity;
+    }
     if (top) { top.style.visibility = 'visible'; top.style.opacity = '1'; } // the arriving page is hidden while it waits
     if (!impactShadow) qsa('[id]', root).forEach(function (el) { if (!el.closest('svg')) el.removeAttribute('id'); }); // in the page, code must never find a copy by its id
     qsa('[data-barba], [data-barba-namespace]', root).forEach(function (el) { el.removeAttribute('data-barba'); el.removeAttribute('data-barba-namespace'); }); // nor Barba
