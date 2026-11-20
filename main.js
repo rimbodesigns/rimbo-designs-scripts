@@ -6578,14 +6578,15 @@
   }
 
   // =========================================================
-  // DFS LOGO TURN — the Digital Feng Shui logo on the closing cards (.duo_svg, .duo_svg_day, .dfc_svg), as on that site
+  // DFS LOGO TURN — the Digital Feng Shui logo on the closing cards (.duo_svg, .duo_svg_day, .dfc_svg) and beside the quote
+  // on the DFS case page (.cs_mk_svg, mark only; replaced its CSS wink, which snapped back), as on that site
   // itself: every 4.4 s the ring (.m-ring) turns +45 and the star (.m-inner) -45, in .6 s. Each logo keeps its own count
   // (rdA on the svg), so on a new page it starts at 0 again. The logo and the rule that keeps CSS transitions off its
   // paths (they would fight the turn) live in Webflow. Was a script in the site head until 2026-11-14.
   // =========================================================
   var logoTurnEase = null;
   function rdLogoTurn() {
-    var LOGOS = '.duo_svg, .duo_svg_day, .dfc_svg';
+    var LOGOS = '.duo_svg, .duo_svg_day, .dfc_svg, .cs_mk_svg';
     if (reducedMotion || !qs(LOGOS)) return;
     setInterval(function () {
       if (document.hidden) return;
