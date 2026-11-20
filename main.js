@@ -203,6 +203,27 @@
     setTimeout(look, 1200); setTimeout(look, 5000); // after the page has started its own animations
   }
 
+  // IMAGE SIZES — Webflow tells the browser that most images fill the whole screen width (sizes="… 100vw"), so a 386 px
+  // Work wall cover downloaded its 1200 px file on a computer (Lighthouse 2026-11-20: ~550 KB too much on the home).
+  // Every lazy image that has not loaded yet gets its real shown width as `sizes`; the browser then picks the right file
+  // from the srcset itself (and still doubles it on a sharp screen). A cover-fit image may be cropped from a taller box,
+  // so it asks for the box's longer side. Eager images have already started, so they keep Webflow's guess. When the
+  // window grows, a box that got wider asks again (never smaller: that would download a second, worse file).
+  function rdImgSizes() {
+    var imgs = qsa('img[srcset][loading="lazy"]').filter(function (img) { return !img.complete; });
+    if (!imgs.length) return;
+    var fit = function () {
+      imgs.forEach(function (img) {
+        if (!img.isConnected) return;
+        var w = img.offsetWidth, h = img.offsetHeight; if (!w) return; // hidden (a closed menu, a phone-only copy): untouched
+        var need = Math.ceil(getComputedStyle(img).objectFit === 'cover' ? Math.max(w, h) : w);
+        if (need > (img.__rdSize || 0)) { img.__rdSize = need; img.sizes = need + 'px'; }
+      });
+    };
+    fit();
+    var rt = null; rdOn(window, 'resize', function () { clearTimeout(rt); rt = setTimeout(fit, 300); });
+  }
+
   // LOOPS — the one way to animate every frame. rdLoop(el, fn, margin) runs fn(time, deltaMs) on GSAP's ticker (one
   // loop for the whole site) only while el is within margin px of the screen (default 300, so it is already moving
   // when you scroll to it) and the tab is visible. fn returns false when nothing moves any more: the loop sleeps until
@@ -7591,8 +7612,32 @@
         var set = [].slice.call(track.children);
         return { lane: lane, track: track, set: set, n: set.length, work: set.map(function (c) { var m = pic(c); return m ? m.getAttribute('src') : ''; }), copies: 1, pos: i * 173 % 600, dir: i % 2 ? -1 : 1, f: ((i * 0.618034 + 0.31) % 1) - 0.5, len: 0 };
       }).filter(Boolean);
-      var pool = [], used = {};
-      lanes.forEach(function (o) { o.work.forEach(function (w) { if (w && pool.indexOf(w) < 0) pool.push(w); }); });
+      var pool = [], used = {}, sets = {}; // sets: each cover's sizes (from Webflow's srcset), smallest first
+      lanes.forEach(function (o) { o.work.forEach(function (w, j) {
+        if (w && pool.indexOf(w) < 0) pool.push(w);
+        var m = pic(o.set[j]), ss = m && m.getAttribute('srcset');
+        if (w && ss && !sets[w]) sets[w] = ss.split(',').map(function (x) { var q = x.trim().split(/\s+/); return { u: q[0], w: parseFloat(q[1]) || 0 }; }).filter(function (c) { return c.u && c.w; }).sort(function (a, b) { return a.w - b.w; });
+      }); });
+      // a cover gets the smallest file that is still sharp at the size it shows (Lighthouse 2026-11-20: the wall's copies
+      // and swapped covers loaded the 1200 px original into a 386 px card). One src, no srcset: the copies and the swaps
+      // set it themselves, so the browser has nothing to guess.
+      function fit(m, w) {
+        var list = sets[w], need = Math.max(m.offsetWidth, m.offsetHeight) || cardW, best = w;
+        if (!list || !need) return false;
+        need *= window.devicePixelRatio || 1;
+        for (var i = 0; i < list.length; i++) if (list[i].w >= need) { best = list[i].u; break; }
+        // already holding a file of this work that is big enough: keep it (a smaller one would be a second download)
+        var cur = m.complete && m.currentSrc, has = cur && list.filter(function (c) { return c.u === cur; })[0];
+        if (has && has.w >= need) best = cur;
+        m.removeAttribute('srcset'); m.removeAttribute('sizes');
+        if (m.getAttribute('src') !== best) m.setAttribute('src', best);
+        return true;
+      }
+      var cardW = 0;
+      function fitAll() {
+        lanes.forEach(function (o) { o.set.forEach(function (c) { var m = pic(c); if (m) cardW = Math.max(cardW, m.offsetWidth, m.offsetHeight); }); });
+        lanes.forEach(function (o) { [].slice.call(o.track.children).forEach(function (c, i) { var m = pic(c); if (m && !m.__fitW) { if (fit(m, o.work[i % o.n])) m.__fitW = 1; } }); });
+      }
       var W = 1, H = 1;
       function measure() {
         W = sec.offsetWidth || 1; H = sec.offsetHeight || 1;
@@ -7605,6 +7650,7 @@
           for (; o.copies < need; o.copies++) o.set.forEach(function (c) { var k = c.cloneNode(true); k.setAttribute('aria-hidden', 'true'); o.track.appendChild(k); });
           o.len = one;
         });
+        fitAll();
       }
       function place(o) {
         var p = ((o.pos % o.len) + o.len) % o.len;
@@ -7637,7 +7683,7 @@
             pool.forEach(function (q) { if (!seen[q] && (used[q] || 0) < best) { best = used[q] || 0; pick = q; } }); // a work that is not on the wall: the one shown longest ago
             if (!pick) { best = mine * 1.5; pool.forEach(function (q) { var f = far(q, k.at); if (f > best) { best = f; pick = q; } }); } // more covers than works: the one whose twin is clearly further away
             if (pick) {
-              for (var c = 0; c < k.o.copies; c++) { var m = pic(k.o.track.children[k.j + c * k.o.n]); if (m) { m.removeAttribute('srcset'); m.removeAttribute('sizes'); m.setAttribute('src', pick); } }
+              for (var c = 0; c < k.o.copies; c++) { var m = pic(k.o.track.children[k.j + c * k.o.n]); if (m && !fit(m, pick)) { m.removeAttribute('srcset'); m.removeAttribute('sizes'); m.setAttribute('src', pick); } }
               k.o.work[k.j] = w = pick; used[pick] = performance.now();
             }
           }
@@ -8083,8 +8129,10 @@
     // paragraph's bottom is that far down, and a visitor who stops with the whole poster in view reads it all.
     function imStory() {
       var para = qs('[data-im="story"]', sheet);
-      if (!para || reducedMotion || !('IntersectionObserver' in window)) return;
-      var units = [], DIM = 0.2, LINE = 0.93, SOFT = 0.7, lh = 0, sraf = 0, over = false, follow = false, tries = 0, seen, sizes;
+      // asked for more contrast (an OS setting): every word stays ink, like under reduced motion
+      var moreContrast = window.matchMedia && matchMedia('(prefers-contrast: more)').matches;
+      if (!para || reducedMotion || moreContrast || !('IntersectionObserver' in window)) return;
+      var units = [], DIM = 0.2, LINE = 0.93, SOFT = 0.7, lh = 0, sraf = 0, over = false, follow = false, tries = 0, armed = false, near, seen, sizes;
       try {
         (function walk(node) { // every word becomes span.im_w; the underlined phrase (wall_mark) lights as one piece
           [].slice.call(node.childNodes).forEach(function (n) {
@@ -8109,7 +8157,7 @@
       }
       function paint() {
         sraf = 0;
-        if (over || !para.isConnected) return;
+        if (over || !armed || !para.isConnected) return;
         if (!lh) place();
         var r = para.getBoundingClientRect(), R = window.innerHeight * LINE - r.top, all = true;
         if (Math.abs(r.width - para.offsetWidth) > 1 && tries++ < 180) { tick(); return; } // still turning in a page transition
@@ -8127,14 +8175,22 @@
       function hearScroll(yes) { if (yes === follow) return; follow = yes; window[yes ? 'addEventListener' : 'removeEventListener']('scroll', tick, { passive: true }); }
       function end() { // read to the end (or the page left): nothing follows the scroll any more
         if (over) return; over = true; hearScroll(false); if (sraf) cancelAnimationFrame(sraf); sraf = 0;
-        if (seen) seen.disconnect(); if (sizes) sizes.disconnect();
+        if (near) near.disconnect(); if (seen) seen.disconnect(); if (sizes) sizes.disconnect();
         units.forEach(function (u) { u.el.style.opacity = ''; }); sheet.classList.remove('is-reading');
       }
       rdUndo(end);
-      units.forEach(function (u) { u.el.style.opacity = DIM; }); // armed in one go, the fades start with the first paint
-      sheet.classList.add('is-reading');
-      seen = new IntersectionObserver(function (es) { es.forEach(function (e) { hearScroll(e.isIntersecting); if (e.isIntersecting) tick(); }); });
-      seen.observe(para);
+      // The words go faint only once the paragraph is within half a screen below (or above) the view: a visitor never
+      // sees the switch, and a page nobody scrolls (Google's Lighthouse) reads every word in full ink, so the contrast
+      // check passes (Rimbo 2026-11-20: "check Google and keep the same experience").
+      function arm() {
+        if (armed || over) return; armed = true;
+        units.forEach(function (u) { u.el.style.opacity = DIM; }); // armed in one go, the fades start with the next paint
+        sheet.classList.add('is-reading');
+        seen = new IntersectionObserver(function (es) { es.forEach(function (e) { hearScroll(e.isIntersecting); if (e.isIntersecting) tick(); }); });
+        seen.observe(para);
+      }
+      near = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { near.disconnect(); arm(); } }, { rootMargin: '50% 0px 50% 0px' });
+      near.observe(para);
       if ('ResizeObserver' in window) { sizes = new ResizeObserver(function () { lh = 0; tick(); }); sizes.observe(para); }
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(inZone(function () { lh = 0; tick(); }));
     }
@@ -9851,6 +9907,7 @@
     run('logo', rdLogoSwap);
     run('dutch lines', rdLocNl); // before the buttons and the apply form read their lines
     run('css loops rest', rdRestCssLoops);
+    run('image sizes', rdImgSizes); // before the browser reaches the lazy images further down
     run('work clips', rdWorkClips); // before rdWorkHeroLoad / work-hero.js and rdWorkSplit read the Work page's videos
     if (path.indexOf('/post/') === 0) run('post refresh', rdPostRefresh); // builds the new post page first: the buttons and the ruler pick it up (English posts; the Dutch ones keep the current layout until there are Dutch texts)
     run('band', rdBand);   // builds the home-opening rows before the marquees start
