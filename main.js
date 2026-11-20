@@ -3470,6 +3470,8 @@
     // A clip is known by its FILE NAME: a new recording needs a new file name in data-src (or new files here with the next v)
     'work-echo-open': { v: 1, tag: 'clips-v2' }, 'work-list-echo-wide': { v: 1, tag: 'clips-v2', pc: 1000, phone: 800 },
     'work-list-charlies': { v: 1, tag: 'clips-v2' }, 'work-list-dieronesie': { v: 1, tag: 'clips-v2' },
+    // the DFS spin (top of /work, list row 1, the DFS project page): one 1000 px file for every screen, 24 fps (Rimbo's pick A, 2026-11-20)
+    'work-dfs-dive': { v: 1, pc: 1000, phone: 1000 },
     // the project detail pages (rdCasePage): named by their Webflow file (the part after the asset id)
     'echo-opening': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'echo-collective-r2': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'echo-collage': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dfs-tinko-intro': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dfs-fundamentals': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dfs-dino': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ca-home': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ca-adopt': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ozo-opening-v2': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-story': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-cards': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-map-v2': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ozo-nav': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'dieronesie-opening': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'dieronesie-13': { v: 1, tag: 'clips-v3', pc: 1440, phone: 720 }, 'ig-open': { v: 1, tag: 'clips-v3', pc: 1280, phone: 720 }, 'ig-scroll': { v: 2, tag: 'clips-v3', pc: 1120, phone: 720 } };
   var CLIP_AV1 = 'video/mp4; codecs="av01.0.04M.08"';
@@ -3498,8 +3500,9 @@
   }
   function clipUrl(v) {
     var given = v.getAttribute('data-src') || '';
-    // the name: data-clip, else the file name (…/media/<name>.mp4 on jsDelivr, …/<24-character asset id>_<name>.mp4 on Webflow)
-    return clipFile(v.getAttribute('data-clip') || (/(?:\/media\/|\/[0-9a-f]{24}_)([\w-]+)\.mp4$/.exec(given) || [])[1] || '') || given;
+    // the name: data-clip, else the file name at the end of the address (…/media/<name>.mp4, Bunny's …/<name>.mp4, or
+    // Webflow's …/<24-character asset id>_<name>.mp4); a name CLIPS doesn't know keeps its own address
+    return clipFile(v.getAttribute('data-clip') || (/\/(?:[0-9a-f]{24}_)?([\w-]+)\.mp4$/.exec(given) || [])[1] || '') || given;
   }
   // an AV1 file that will not play (a decoder that gives up, a missing file): the H.264 one in its place, once, and H.264 for the clips still to come
   function clipGuard(v) {
