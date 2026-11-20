@@ -7117,16 +7117,18 @@
     }
 
     function needed(step) { return [].slice.call(step.querySelectorAll('[required], [data-needs-field], [data-required]')); }
-    // The browser calls "rimbo@gmail" a valid email; here it needs a dot and an ending of two letters or more (.nl, .com)
-    var MAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-z]{2,}$/i;
+    // The browser calls "rimbo@gmail" a valid email; here it needs a dot and at least one letter after it (Rimbo: "a dot and
+    // one letter should already be enough")
+    var MAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-z]+$/i;
     function filled(f) {
       var v = f.value.trim();
       return v !== '' && (f.type === 'hidden' || (f.checkValidity() && (f.type !== 'email' || MAIL.test(v))));
     }
     function valid(step) { return needed(step).every(filled); }
     // While a field is being typed in, its step doesn't light up yet (number, check, the Send button): only once the
-    // hand pauses or leaves the field. It lit up halfway through an email address (Rimbo: "too hasty")
-    var typing = null;
+    // hand pauses (CALM) or leaves the field. It lit up halfway through an email address (Rimbo: "too hasty"); the first
+    // wait, the same .9 s as the next step, then felt "a bit laggy"
+    var typing = null, CALM = 350, calmTimer;
     function settled(s) { return valid(s) && !(typing && s.contains(typing)); }
     function update() {
       var done = 0;
@@ -7161,8 +7163,9 @@
       typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && !/^(range|radio|checkbox|hidden)$/.test(e.target.type) ? e.target : null; // typed text only, not picks or the slider
       update();
       var s = e.target.closest('[data-step]');
-      clearTimeout(pauseTimer);
-      pauseTimer = setTimeout(function () { typing = null; update(); if (s) openAfter(s); }, PAUSE);
+      clearTimeout(pauseTimer); clearTimeout(calmTimer);
+      calmTimer = setTimeout(function () { typing = null; update(); }, CALM);
+      if (s) pauseTimer = setTimeout(function () { openAfter(s); }, PAUSE);
     });
     form.addEventListener('change', update);
     form.addEventListener('focusout', function (e) {
@@ -7442,6 +7445,8 @@
       setTimeout(function () {
         form.style.display = 'none';
         if (head) head.style.display = 'none';
+        var bar = fill && fill.closest('.apf_progress'); // the counter has nothing left to count on the thank-you (it read 0/6 there)
+        if (bar) { if (reduce || !G) bar.style.visibility = 'hidden'; else G.to(bar, { autoAlpha: 0, duration: .4, ease: 'power2.out' }); }
         done.style.display = 'block';
         window.scrollTo(0, 0);
         if (!reduce && G) plane();
