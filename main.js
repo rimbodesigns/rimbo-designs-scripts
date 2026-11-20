@@ -2239,45 +2239,6 @@
   }
 
   // =========================================================
-  // HOME — / (was Slater 35211 HOME.js)
-  // =========================================================
-  function rdHome() {
-    // The hero CTA fades out over the first 2% of scroll and leaves the flow
-    var fadeOut = byId('FadeOUT');
-    if (fadeOut) {
-      gsap.to(fadeOut, {
-        opacity: 0,
-        filter: 'blur(10px)',
-        ease: 'power2.out',
-        scrollTrigger: {
-          trigger: '#MainWrap',
-          start: 'top top',
-          end: '2% top',
-          scrub: true,
-          onEnterBack: function () { fadeOut.style.display = 'flex'; }
-        },
-        onComplete: function () { fadeOut.style.display = 'none'; }
-      });
-    }
-
-    gsap.timeline()
-      .from(split('#HeroTitle').chars, { delay: 0.2, duration: 1.6, ease: 'expo.out', yPercent: 200, stagger: 0.04 })
-      .from(split('#HeroText').lines, { duration: 0.8, ease: 'expo.out', opacity: 0, yPercent: 40 }, '<50%')
-      .from(byId('MotionBtn'), { duration: 0.8, ease: 'expo.out', opacity: 0, yPercent: 20 }, '<44%')
-      .from(byId('RED_DOT'), { duration: 0.8, ease: 'expo.out', opacity: 0, filter: 'blur(10px)', yPercent: 20 }, '<12%')
-      .from([byId('M1'), byId('M2')].filter(Boolean), { duration: 1.5, ease: 'power2.out', y: '40vh' }, '<40%');
-
-    // The "magic" title letters rise while #TRIGY scrolls through the top of the viewport
-    gsap.from(split('#MagicTitle').chars, {
-      duration: 1.6,
-      ease: 'expo.out',
-      yPercent: 200,
-      stagger: 0.04,
-      scrollTrigger: { trigger: '#TRIGY', start: 'top 20%', end: 'bottom top', scrub: true }
-    });
-  }
-
-  // =========================================================
   // SERVICE — /service and every /locations/… page (was Slater 35312 SERVICE.js)
   // =========================================================
   function rdService() {
@@ -2435,11 +2396,11 @@
     // GSAP target list throws, and a missing button must not shift the timing
     // of what follows, so it tweens an empty object instead.
     var button = qs('.btn-icon-link') || {};
-    var extras = [qs('.intro_data_work'), qs('.work_video')].filter(Boolean);
+    var extras = [qs('.work_intro-data'), qs('.work_video')].filter(Boolean);
 
     var tl = gsap.timeline()
       .from(split(intro).chars, heroCharsIn(0.33), 'pair')
-      .from(qs('.project_content'), { duration: 1.6, y: '50vh', ease: 'power2.out' }, 'pair')
+      .from(qs('.work_content'), { duration: 1.6, y: '50vh', ease: 'power2.out' }, 'pair')
       // The old script had "elastic.out(2, 0.1" without its ")", so GSAP ignored the
       // numbers and played the default elastic. Written out here exactly as it played.
       .from(button, { duration: 2, x: -24, opacity: 0, ease: 'elastic.out(1, 0.3)' }, '-=0.6');
@@ -2454,7 +2415,7 @@
     if (intro) {
       gsap.timeline()
         .from(split(intro).chars, heroCharsIn(0.33), 'pair')
-        .from(qs('.project_content'), { duration: 1.6, y: '50vh', ease: 'power2.out' }, 'pair');
+        .from(qs('.work_content'), { duration: 1.6, y: '50vh', ease: 'power2.out' }, 'pair');
     }
 
     var email = byId('Email_A');
@@ -4492,7 +4453,7 @@
   function rdScrollRuler() {
     if (window.Webflow && Webflow.env && Webflow.env('editor') !== undefined) return;
 
-    var article = qs('.richtextstyling');
+    var article = qs('.post_richtext');
     // "{skip}" typed in an H2 keeps it off the ruler (the marker itself is taken out of the heading).
     // Same marker as Osmo's Table of Contents; such a heading also gets data-toc-ignore, so a TOC skips it too.
     var headings = article ? qsa('h2', article).filter(function (h) {
@@ -4520,7 +4481,7 @@
     // Osmo's ruler ends where the last part starts, so the last section never got its turn. An empty
     // end mark right after the article is one more part (its label is hidden), so the ruler runs to the
     // end of the article
-    var box = article.closest('.richtextbox') || article;
+    var box = article.closest('.post_richtext-box') || article;
     var endMark = document.createElement('div');
     endMark.setAttribute('data-scroll-ruler-name', '');
     endMark.setAttribute('aria-hidden', 'true');
@@ -4797,7 +4758,7 @@
   function postJumpTo(h) {
     var off = window.matchMedia('(max-width: 1199px)').matches ? 80 : 32; // narrow: clear of the logo and burger (they end at 58px)
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    qsa('.richtextstyling img[loading="lazy"]').forEach(function (img) { img.loading = 'eager'; }); // so they stop moving the target
+    qsa('.post_richtext img[loading="lazy"]').forEach(function (img) { img.loading = 'eager'; }); // so they stop moving the target
     var tries = 0;
     function done() {
       if (Math.abs(h.getBoundingClientRect().top - off) > 2 && tries++ < 3) { setTimeout(function () { go(false); }, 80); return; }
@@ -4818,8 +4779,8 @@
 
   function rdPostRefresh() {
     if (window.Webflow && Webflow.env && Webflow.env('editor') !== undefined) return;
-    var container = qs('.blog_intro .container-20');
-    var h1 = qs('.blog_intro .h1_small');
+    var container = qs('.post_intro .post_intro-container');
+    var h1 = qs('.post_intro .post_title');
     if (!container || !h1 || document.documentElement.classList.contains('rf')) return;
     document.documentElement.classList.add('rf');
     var nl = /^\/nl(\/|$)/.test(location.pathname); // Dutch posts: the reading words in Dutch, the rest of the design the same
@@ -4832,7 +4793,7 @@
     (page || document.body).insertBefore(grain, (page || document.body).firstChild);
 
     // ---- hero
-    var cat = qs('.blog_catagory .blogcatagory');
+    var cat = qs('.post_categories .post_category');
     var category = cat ? cat.textContent.trim() : '';
     var eyebrow = document.createElement('div');
     eyebrow.className = 'rf-eyebrow rf-hero-eyebrow';
@@ -4843,8 +4804,8 @@
     eyebrow.appendChild(eyebrowText);
 
     // the summary is a lead paragraph, not a second heading above the article (one H1, then the article's H2s)
-    var summary = qs('.blog_intro .summary');
-    var summaryHeading = summary && qs('h2.sumary', summary);
+    var summary = qs('.post_intro .summary');
+    var summaryHeading = summary && qs('h2.post_summary-heading', summary);
     if (summaryHeading) {
       var lead = document.createElement('p');
       Array.prototype.slice.call(summaryHeading.attributes).forEach(function (a) { lead.setAttribute(a.name, a.value); }); // keeps the Webflow entrance (data-w-id)
@@ -4860,7 +4821,7 @@
     if (author) side.appendChild(author);
 
     // the sections, with the ruler's short names; open next to the title, folded below 992px
-    var article = qs('.richtextstyling');
+    var article = qs('.post_richtext');
     var sections = article ? qsa('h2', article).filter(function (h) { return h.textContent.trim() && h.textContent.indexOf('{skip}') === -1; }) : [];
 
     // the closing "Questions? Let's talk" section makes way for the project block below the article
@@ -4975,7 +4936,7 @@
   function rdOldFooterOut() {
     var pageWrap = qs('.main-wrapper');
     if (pageWrap && !byId('MainWrap')) pageWrap.id = 'MainWrap';
-    qsa('.scroll_wrap, .back-to-top').forEach(function (el) { el.parentNode.removeChild(el); });
+    qsa('.scroll_wrap, .post_back-to-top').forEach(function (el) { el.parentNode.removeChild(el); });
   }
 
   // =========================================================
@@ -5021,7 +4982,7 @@
     var on = qsa('[data-cover-hue-drift]').some(function (m) {
       return !m.classList.contains('w-condition-invisible') && getComputedStyle(m).display !== 'none';
     });
-    var cover = qs('.cover_image');
+    var cover = qs('.post_cover');
     if (!on || !cover) return;
     cover.classList.add('is-hue-drift');
   }
@@ -5030,7 +4991,7 @@
   // =========================================================
   // FULL SCREEN NAV — every page, after Osmo Supply's "Bold Full Screen Navigation" (markup, class names, toggle logic):
   // - the bar is the logo + burger in their own fixed difference-blend layer, visible the whole time
-  // - the links come from the Webflow menu (.pop-up_nav_menu, hidden; so Dutch follows along), in Integral capitals,
+  // - the links come from the Webflow menu (.nav_popup-menu, hidden; so Dutch follows along), in Integral capitals,
   //   minus Home (the logo goes home), Contact (the email is here) and the page you are on
   // - the tile is the footer's black, a little see-through and blurred
   // - bottom row: the language pill left, Amsterdam's time in the middle, the email right
@@ -5055,7 +5016,7 @@
     // the links, minus the page you are on; read from the page, so with Barba it runs again every time the menu opens
     function menuLinks() {
       var skip = [prefix || '/', prefix + '/contact', clean(location.pathname)];
-      var source = qsa('.pop-up_nav_menu .nav_link');
+      var source = qsa('.nav_popup-menu .nav_link');
       return (source.length ? source.map(function (a) {
         return { href: clean(a.getAttribute('href')), text: a.textContent.trim() };
       }) : [
@@ -9742,7 +9703,6 @@
     soon('dfs logo turn', rdLogoTurn);
 
     if (qs('[data-band]')) {} // the band page has its own opening (rdBand above), no old hero to animate
-    else if (path === '/') run('home', rdHome);
     else if (path === '/service' || path.indexOf('/locations/') === 0) run('service', rdService);
     else if (path === '/work') run('work', rdWork);
     else if (path.indexOf('/work/') === 0) run('case study', rdWorkItem);
