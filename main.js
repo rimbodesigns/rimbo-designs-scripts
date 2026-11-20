@@ -9030,6 +9030,97 @@
     })();
   }
 
+  // QUOTE SWAP — two or more quotes in one quote block take turns (case pages: Echo first, OZO later). Osmo's Line Reveal
+  // Testimonials, reshaped for the notched photo: the lines of the quote and the name slide up out of their masks, the
+  // next ones rise in, and the next person's photo wipes up inside the frame. Designer: [data-quote-swap] on .cs_quote
+  // (data-quote-autoplay = ms between turns, 0 = buttons only), each quote a [data-quote-item] with its lines in
+  // [data-quote-split], the photo frame [data-quote-photos] with one image per quote in the same order (Webflow images can't hold attributes),
+  // buttons [data-quote-prev] / [data-quote-next], counter [data-quote-current] / [data-quote-total]. Every quote and photo
+  // after the first starts hidden (combo is-next).
+  function rdQuoteSwap() {
+    if (!window.gsap || !window.SplitText) return;
+    rdPlugins(SplitText);
+    qsa('[data-quote-swap]').forEach(function (wrap) {
+      if (wrap.__qs) return;
+      wrap.__qs = true;
+      var items = qsa('[data-quote-item]', wrap);
+      if (items.length < 2) return;
+      var frame = qs('[data-quote-photos]', wrap);
+      var imgs = frame ? qsa('img', frame) : [];
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var cur = qs('[data-quote-current]', wrap), tot = qs('[data-quote-total]', wrap);
+      var pad = function (n) { return String(n).padStart(2, '0'); };
+      var wait = parseInt(wrap.getAttribute('data-quote-autoplay'), 10);
+      if (isNaN(wait)) wait = 7000;
+      var hidden = 'inset(100% 0% 0% 0%)', shown = 'inset(0% 0% 0% 0%)';
+      var active = 0, busy = false, onScreen = false, clock = null;
+      if (tot) tot.textContent = pad(items.length);
+
+      var slides = items.map(function (item, i) { return { item: item, img: imgs[i] || null, splits: [] }; });
+      var lines = function (s) { return s.splits.reduce(function (a, sp) { return a.concat(sp.lines); }, []); };
+      var setState = function (i, on) {
+        var s = slides[i];
+        s.item.setAttribute('aria-hidden', String(!on));
+        gsap.set(s.item, { autoAlpha: on ? 1 : 0, pointerEvents: on ? 'auto' : 'none' });
+        if (s.img) gsap.set(s.img, { autoAlpha: on ? 1 : 0, zIndex: on ? 1 : 0, clipPath: shown, scale: 1 });
+      };
+      slides.forEach(function (s, i) { setState(i, i === active); });
+
+      slides.forEach(function (s, i) {
+        s.splits = qsa('[data-quote-split]', s.item).map(function (el) {
+          return SplitText.create(el, {
+            type: 'lines', mask: 'lines', autoSplit: true,
+            onSplit: function (self) {
+              gsap.set(self.masks, { paddingBottom: '0.2em', marginBottom: '-0.2em' }); // room for the descenders
+              if (!still) gsap.set(self.lines, { yPercent: i === active ? 0 : 110 });
+            }
+          });
+        });
+      });
+
+      var goTo = function (next) {
+        if (busy || next === active) return;
+        busy = true;
+        var out = slides[active], inn = slides[next];
+        if (cur) cur.textContent = pad(next + 1);
+        var tl = gsap.timeline({
+          onComplete: function () { setState(active, false); setState(next, true); active = next; busy = false; }
+        });
+        if (still) {
+          tl.to([out.item, out.img].filter(Boolean), { autoAlpha: 0, duration: 0.4, ease: 'power2' }, 0)
+            .fromTo([inn.item, inn.img].filter(Boolean), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4, ease: 'power2' }, 0);
+          return;
+        }
+        gsap.set(inn.item, { autoAlpha: 1, pointerEvents: 'auto' });
+        gsap.set(lines(inn), { yPercent: 110 });
+        tl.to(lines(out), { yPercent: -110, duration: 0.6, ease: 'power4.inOut', stagger: { amount: 0.25 } }, 0);
+        if (out.img) tl.to(out.img, { scale: 1.08, duration: 1.2, ease: 'power3.inOut' }, 0);
+        // the new lines start rising while the last old ones leave (as in Osmo's), the photo just before them
+        tl.to(lines(inn), { yPercent: 0, duration: 0.7, ease: 'power4.inOut', stagger: { amount: 0.4 } }, 0.55);
+        if (inn.img) tl.fromTo(inn.img, { autoAlpha: 1, zIndex: 2, clipPath: hidden, scale: 1.15 },
+          { clipPath: shown, scale: 1, duration: 0.9, ease: 'power4.inOut' }, 0.4);
+        tl.set(out.item, { autoAlpha: 0 }, 0.9);
+      };
+
+      // the next turn comes a full wait after the last one or the last click, and only while the quote is on screen
+      var tick = function () {
+        if (clock) clock.kill();
+        if (!wait) return;
+        clock = gsap.delayedCall(wait / 1000, function () {
+          if (!busy) goTo((active + 1) % slides.length);
+          tick();
+        });
+        if (!onScreen) clock.pause();
+      };
+      nearScreen(wrap, function (on) { onScreen = on; if (clock) { if (on) clock.resume(); else clock.pause(); } }, -80);
+      tick();
+      var step = function (by) { return function (e) { e.preventDefault(); tick(); goTo((active + by + slides.length) % slides.length); }; };
+      var prev = qs('[data-quote-prev]', wrap), nextBtn = qs('[data-quote-next]', wrap);
+      if (prev) rdOn(prev, 'click', step(-1));
+      if (nextBtn) rdOn(nextBtn, 'click', step(1));
+    });
+  }
+
   // rdCasePage — was: embed in .cs_page: the new project pages (Echo, DFS, Charlie's, Anapana, Dieronesie, InnerGym, OZO)
   function rdCasePage() {
     document.addEventListener('DOMContentLoaded', function () {
@@ -9699,6 +9790,7 @@
     later('.loc_steps', 'location balls', rdLocBalls);
     if (qs('.wall_section')) later('.wall_section', 'wall of love', rdWall); else soon('wall of love', rdWall); // a wall outside a .wall_section has nothing to watch for
     soon('imagine', rdImagine); // the big ball + IMAGINE (home): light to start, its WebGL waits until the section is on screen
+    later('[data-quote-swap]', 'quote swap', rdQuoteSwap); // case pages with two quotes that take turns (Echo)
     later('.wh_sec', 'work wall', rdWorkWall); // the wall of work covers before the questions (home): starts when it comes near
     soon('faq', rdFaq);
     soon('journey pass', rdPass);
