@@ -7117,12 +7117,21 @@
     }
 
     function needed(step) { return [].slice.call(step.querySelectorAll('[required], [data-needs-field], [data-required]')); }
-    function filled(f) { return f.value.trim() !== '' && (f.type === 'hidden' || f.checkValidity()); }
+    // The browser calls "rimbo@gmail" a valid email; here it needs a dot and an ending of two letters or more (.nl, .com)
+    var MAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-z]{2,}$/i;
+    function filled(f) {
+      var v = f.value.trim();
+      return v !== '' && (f.type === 'hidden' || (f.checkValidity() && (f.type !== 'email' || MAIL.test(v))));
+    }
     function valid(step) { return needed(step).every(filled); }
+    // While a field is being typed in, its step doesn't light up yet (number, check, the Send button): only once the
+    // hand pauses or leaves the field. It lit up halfway through an email address (Rimbo: "too hasty")
+    var typing = null;
+    function settled(s) { return valid(s) && !(typing && s.contains(typing)); }
     function update() {
       var done = 0;
       steps.forEach(function (s) {
-        var ok = shown(s) && valid(s);
+        var ok = shown(s) && settled(s);
         on(s.querySelector('.apf_num'), 'is-on', ok);
         on(s.querySelector('.apf_check'), 'is-on', ok);
         if (ok) done++;
@@ -7131,7 +7140,7 @@
       steps.forEach(function (s) { on(s, 'is-current', s === last); });
       if (fill) fill.style.height = (done / steps.length * 100) + '%';
       if (count) count.textContent = done + '/' + steps.length;
-      on(sendBtn, 'is-secondary', !steps.every(valid));
+      on(sendBtn, 'is-secondary', !steps.every(settled));
     }
     function open(step) {
       show(step);
@@ -7149,13 +7158,17 @@
       update();
     }
     form.addEventListener('input', function (e) {
+      typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && !/^(range|radio|checkbox|hidden)$/.test(e.target.type) ? e.target : null; // typed text only, not picks or the slider
       update();
       var s = e.target.closest('[data-step]');
       clearTimeout(pauseTimer);
-      if (s) pauseTimer = setTimeout(function () { openAfter(s); }, PAUSE);
+      pauseTimer = setTimeout(function () { typing = null; update(); if (s) openAfter(s); }, PAUSE);
     });
     form.addEventListener('change', update);
-    form.addEventListener('focusout', function (e) { var s = e.target.closest('[data-step]'); if (s) openAfter(s); });
+    form.addEventListener('focusout', function (e) {
+      if (typing === e.target) { typing = null; update(); }
+      var s = e.target.closest('[data-step]'); if (s) openAfter(s);
+    });
     // The picks, chips and calendar are role=button blocks: Enter and Space press them
     form.addEventListener('keydown', function (e) {
       var b = e.target.closest('[role="button"]');
