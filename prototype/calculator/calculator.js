@@ -165,11 +165,11 @@
         info: "So you can write and publish pages and posts that get found.\nRecorded tutorial::Watch it again whenever you need it.\nOne-on-one call::About your own site.\nChecklist template::For every new page or post." },
       // Rimbo, 2026-11-20: "just Launch boost", about THEIR launch: a reel for their socials, showcase entries, backlinks. DRAFT €1,000
       { id: "awards",     group: "search", label: "Launch boost",                               price: 1000,
-        info: "Your launch, made to be seen.\n" +
-          "Launch reel::A short video of your new site for your socials, ready to post on launch day.\n" +
-          "Showcase entries::Your site entered at award and showcase sites, for exposure beyond your own channels.\n" +
-          "Shared with my network::A post about your launch to my audience, and a link from my site to yours.\n" +
-          "Strong backlinks::Links from respected sites, which help you in search.\n" +
+        info: "Get the most out of your launch.\n" +
+          "01::Launch plan::We plan your launch together: who to tell, where and when, fitted to your business.\n" +
+          "02::Launch reel::A high-end motion design reel of your new site, made for your socials.\n" +
+          "03::Showcase entries::Your site entered at award and showcase sites: exposure, and strong links that help you in search.\n" +
+          "04::Shared with my network::A post to my audience and a link from my site to yours. Good for both of us.\n" +
           "~Entry fees of the award sites come on top, at cost. A feature is never guaranteed." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,
         info: "A second language with a language switch: every page, SEO text and form translated and checked, set up so each language can be found in search.\n~Webflow charges for localisation on top of the site plan." },
