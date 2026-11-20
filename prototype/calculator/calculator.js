@@ -168,6 +168,7 @@
         info: "Your launch, made to be seen.\n" +
           "Launch reel::A short video of your new site for your socials, ready to post on launch day.\n" +
           "Showcase entries::Your site entered at award and showcase sites, for exposure beyond your own channels.\n" +
+          "Shared with my network::A post about your launch to my audience, and a link from my site to yours.\n" +
           "Strong backlinks::Links from respected sites, which help you in search.\n" +
           "~Entry fees of the award sites come on top, at cost. A feature is never guaranteed." },
       { id: "i18n",       group: "search", label: "Multi-language",                            price: 500,
